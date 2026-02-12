@@ -805,8 +805,8 @@ function NestEditForm({
 function LeafletMap({
   markers,
   isAddingMode,
-  onMapClick,
-  onMarkerClick,
+  onMapClick = () => {},
+  onMarkerClick = () => {},
   center,
   zoom,
 }) {
