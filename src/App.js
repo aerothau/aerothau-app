@@ -47,7 +47,9 @@ import {
   Eye,
   AlertTriangle,
   XCircle,
-  Activity
+  Activity,
+  Upload,
+  FileSpreadsheet
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -68,7 +70,7 @@ const appId = "aerothau-goelands";
 const MAIN_WEBSITE_URL = "https://www.aerothau.fr";
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 
-// --- DONNÉES DE DÉPART ---
+// --- CONSTANTES ET DONNÉES DE DÉPART ---
 const INITIAL_USERS = [
   { username: "admin", password: "aerothau2024", role: "admin", name: "Aerothau Admin", id: 0 },
 ];
@@ -78,7 +80,7 @@ const MOCK_CLIENTS = [
   { id: 2, name: "Camping Les Flots Bleus", type: "Privé", address: "Route de la Corniche, 34200 Sète", contact: "Marie Martin", phone: "06 12 34 56 78", email: "info@flotsbleus.com", username: "camping", password: "123" },
 ];
 
-// --- COMPOSANTS UI DE BASE ---
+// --- 1. COMPOSANTS UI DE BASE ---
 
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
   const baseStyle = "px-4 py-2 rounded-lg font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
@@ -167,7 +169,7 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 
 const ClientReportForm = ({ nest, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
-    title: "", // Champ titre ajouté
+    title: "", 
     ...nest,
     ownerContact: "",
     description: "",
@@ -289,7 +291,7 @@ const ReportEditForm = ({ report, clients, onSave, onCancel }) => {
   );
 };
 
-const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }) => {
+const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly = false }) => {
   const [formData, setFormData] = useState({ title: "", comments: "", eggs: 0, status: "present", clientId: "", ...nest });
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
@@ -347,6 +349,9 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }
       </div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Notes Techniques</label><textarea className="w-full p-2 border rounded-lg text-sm h-20 mt-1" placeholder="Accès, détails..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/></div>
       <div className="flex gap-2">
+        {onDelete && (
+             <Button variant="danger" onClick={() => onDelete(formData)} title="Supprimer ce nid"><Trash2 size={16}/></Button>
+        )}
         <Button variant="outline" className="flex-1" onClick={onCancel}>Fermer</Button>
         <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
       </div>
@@ -437,7 +442,6 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
     total: markers.length,
     neutralized: markers.filter(m => m.status && (m.status === "sterilized_1" || m.status === "sterilized_2" || m.status === "sterilized")).length,
     pending: interventions.filter(i => i.status === "Planifié").length,
-    // Detailed breakdown
     reported: markers.filter(m => m.status === "reported_by_client").length,
     nonPresent: markers.filter(m => m.status === "non_present").length,
     passage1: markers.filter(m => m.status === "sterilized_1").length,
@@ -448,7 +452,6 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
     <div className="space-y-8 animate-in fade-in duration-500 text-slate-800">
       <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">TABLEAU DE BORD</h2><Badge status="Live Data" /></div>
       
-      {/* Statistiques Globales Détaillées */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="p-4 bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
               <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest">Signalements</span>
@@ -516,7 +519,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
   );
 };
 
-const MapInterface = ({ markers, clients, onUpdateNest }) => {
+const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     const [selectedMarker, setSelectedMarker] = useState(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [isAdding, setIsAdding] = useState(false);
@@ -585,7 +588,13 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
                                 <button onClick={() => setSelectedMarker(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
                             </div>
                             <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
-                                <NestEditForm nest={selectedMarker} clients={clients} onSave={async(u) => { await onUpdateNest(u); setSelectedMarker(null); }} onCancel={() => setSelectedMarker(null)} />
+                                <NestEditForm 
+                                    nest={selectedMarker} 
+                                    clients={clients} 
+                                    onSave={async(u) => { await onUpdateNest(u); setSelectedMarker(null); }} 
+                                    onCancel={() => setSelectedMarker(null)}
+                                    onDelete={async(u) => { if(window.confirm("Supprimer ce nid ?")) { await onDeleteNest(u); setSelectedMarker(null); } }}
+                                />
                             </div>
                         </Card>
                     </div>
@@ -597,16 +606,99 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
 
 const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
   const [selectedNest, setSelectedNest] = useState(null);
+  
+  // Fonction pour l'import de fichier
+  const handleFileUpload = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Import dynamique de la bibliothèque XLSX depuis un CDN
+      if (!window.XLSX) {
+          const script = document.createElement('script');
+          script.src = "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js";
+          script.async = true;
+          script.onload = () => processFile(file);
+          document.body.appendChild(script);
+      } else {
+          processFile(file);
+      }
+  };
+
+  const processFile = (file) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+          const data = new Uint8Array(e.target.result);
+          const workbook = window.XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = window.XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          // Ignorer l'en-tête (ligne 0)
+          for (let i = 1; i < jsonData.length; i++) {
+              const row = jsonData[i];
+              if (!row || row.length < 2) continue; // Ignorer les lignes vides
+
+              const title = row[0] || "Nid importé";
+              const addressRaw = row[1] || "";
+              const comments = row[2] || "";
+
+              // Tentative de détection de coordonnées dans la colonne B
+              let lat = 0, lng = 0, address = addressRaw;
+              const coords = addressRaw.replace(/,/g, " ").split(/\s+/).filter(Boolean).map(parseFloat);
+              
+              if (coords.length >= 2 && !isNaN(coords[0]) && !isNaN(coords[1]) && Math.abs(coords[0]) <= 90) {
+                   lat = coords[0];
+                   lng = coords[1];
+                   address = `GPS Importé: ${lat}, ${lng}`;
+              } 
+
+              // Création du nid
+              const newNest = {
+                  id: Date.now() + i, // ID unique temporel
+                  title: title,
+                  address: address,
+                  comments: comments,
+                  lat: lat, // Sera 0 si pas de coords, à placer manuellement
+                  lng: lng,
+                  status: (lat !== 0 && lng !== 0) ? "present" : "temp", // Si pas de GPS, statut "à valider"
+                  eggs: 0,
+                  clientId: clients[0]?.id || "" // Par défaut au premier client
+              };
+
+              // Envoi à Firebase
+              await onUpdateNest(newNest);
+          }
+          alert(`${jsonData.length - 1} nids importés avec succès !`);
+      };
+      reader.readAsArrayBuffer(file);
+  };
+
   return (
     <div className="space-y-6 text-slate-800">
-      <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
+        <div className="relative">
+            <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} className="hidden" id="file-upload" />
+            <label htmlFor="file-upload" className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest cursor-pointer hover:bg-emerald-700 transition-colors shadow-lg">
+                <FileSpreadsheet size={18}/> Importer Excel
+            </label>
+        </div>
+      </div>
       <Card className="overflow-hidden border-0 shadow-xl rounded-3xl bg-white">
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-            <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Emplacement</th><th className="p-6">État</th><th className="p-6 text-center">Œufs</th><th className="p-6 text-right">Actions</th></tr></thead>
+            <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Titre / Adresse</th><th className="p-6">État</th><th className="p-6 text-center">Œufs</th><th className="p-6 text-right">Actions</th></tr></thead>
             <tbody className="divide-y divide-slate-100 text-slate-800">
                 {markers.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50 transition-colors"><td className="p-6 font-bold">{m.address}</td><td className="p-6"><Badge status={m.status} /></td><td className="p-6 font-black text-sky-600 text-center">{m.eggs}</td><td className="p-6 flex justify-end gap-2"><button onClick={() => setSelectedNest(m)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18} /></button><button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18} /></button></td></tr>
+                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-6">
+                        <div className="font-bold">{m.title || "Sans titre"}</div>
+                        <div className="text-xs text-slate-500">{m.address}</div>
+                    </td>
+                    <td className="p-6"><Badge status={m.status} /></td>
+                    <td className="p-6 font-black text-sky-600 text-center">{m.eggs}</td>
+                    <td className="p-6 flex justify-end gap-2"><button onClick={() => setSelectedNest(m)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18} /></button><button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18} /></button></td>
+                </tr>
                 ))}
             </tbody>
             </table>
@@ -1000,7 +1092,7 @@ export default function AerothauApp() {
             {user.role === "admin" ? (
               <>
                 {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} />}
-                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} />}
+                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "markers", n.id.toString()))} />}
                 {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "markers", n.id.toString()))} />}
                 {view === "clients" && <ClientManagement clients={clients} setSelectedClient={setSelectedClient} setView={setView} onCreateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "clients", c.id.toString()))} />}
                 {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "clients", c.id.toString()))} />}
