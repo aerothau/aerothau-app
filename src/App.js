@@ -153,6 +153,130 @@ function LoginForm({ onLogin, users, logoUrl }) {
   );
 }
 
+function ClientEditForm({ client, onSave, onCancel }) {
+  const [formData, setFormData] = useState({ ...client });
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label>
+        <input type="text" className="w-full p-2 border rounded-lg" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
+        <select className="w-full p-2 border rounded-lg bg-white" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
+          <option value="Collectivité">Collectivité</option>
+          <option value="Privé">Privé</option>
+          <option value="Syndic">Syndic</option>
+        </select>
+      </div>
+      <div>
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label>
+        <input type="text" className="w-full p-2 border rounded-lg" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Contact</label>
+        <input type="text" className="w-full p-2 border rounded-lg" value={formData.contact} onChange={(e) => setFormData({ ...formData, contact: e.target.value })} />
+      </div>
+      <div>
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone</label>
+        <input type="text" className="w-full p-2 border rounded-lg" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+      </div>
+      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4">
+        <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Accès Espace Client</h4>
+        <div className="space-y-3">
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Identifiant</label><input type="text" className="w-full p-2 border rounded-lg bg-white" value={formData.username || ""} onChange={(e) => setFormData({ ...formData, username: e.target.value })} /></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Mot de passe</label><input type="text" className="w-full p-2 border rounded-lg bg-white" value={formData.password || ""} onChange={(e) => setFormData({ ...formData, password: e.target.value })} /></div>
+        </div>
+      </div>
+      <div className="flex gap-2 pt-2">
+        <Button variant="outline" onClick={onCancel} className="flex-1">Annuler</Button>
+        <Button variant="success" onClick={() => onSave(formData)} className="flex-1">Sauvegarder</Button>
+      </div>
+    </div>
+  );
+}
+
+function InterventionEditForm({ intervention, clients, onSave, onDelete, onCancel }) {
+  const [formData, setFormData] = useState({
+    clientId: clients[0]?.id,
+    status: "Planifié",
+    technician: "",
+    notes: "",
+    date: new Date().toISOString().split("T")[0],
+    ...intervention,
+  });
+
+  return (
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+      <div>
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
+        <select
+          className="w-full p-2 mt-1 border rounded-lg bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+          value={formData.clientId}
+          onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}
+        >
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-[10px] font-bold text-slate-400 uppercase">Date</label>
+          <input
+            type="date"
+            className="w-full p-2 mt-1 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+            value={formData.date}
+            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+          />
+        </div>
+        <div>
+          <label className="text-[10px] font-bold text-slate-400 uppercase">Technicien</label>
+          <input
+            type="text"
+            placeholder="Nom..."
+            className="w-full p-2 mt-1 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+            value={formData.technician || ""}
+            onChange={(e) => setFormData({ ...formData, technician: e.target.value })}
+          />
+        </div>
+      </div>
+      <div>
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
+        <select
+          className="w-full p-2 mt-1 border rounded-lg bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+          value={formData.status}
+          onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+        >
+          <option value="Planifié">Planifié</option>
+          <option value="En attente">En attente</option>
+          <option value="Terminé">Terminé</option>
+          <option value="Annulé">Annulé</option>
+        </select>
+      </div>
+      <div>
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Notes</label>
+        <textarea
+          rows="3"
+          className="w-full p-2 mt-1 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none resize-none"
+          placeholder="Détails de l'intervention..."
+          value={formData.notes || ""}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+        />
+      </div>
+      <div className="flex gap-2 pt-4">
+        {onDelete && formData.id && (
+          <Button variant="danger" onClick={() => onDelete(formData)}>
+            <Trash2 size={18} />
+          </Button>
+        )}
+        <Button variant="outline" onClick={onCancel} className="flex-1">Annuler</Button>
+        <Button variant="success" onClick={() => onSave(formData)} className="flex-1">Sauver</Button>
+      </div>
+    </div>
+  );
+}
+
 function ReportEditForm({ report, clients, onSave, onCancel }) {
   const [formData, setFormData] = useState({ title: "Rapport", date: new Date().toISOString().split("T")[0], type: "Intervention", status: "Brouillon", clientId: "", ...report });
   return (
@@ -519,7 +643,10 @@ function ReportsView({ reports, clients, onUpdateReport, onDeleteReport }) {
                                 <td className="p-4 font-medium flex items-center gap-2"><FileText size={16} className="text-slate-400"/> {r.title}</td>
                                 <td className="p-4">{clients.find(c => c.id === r.clientId)?.name}</td>
                                 <td className="p-4"><Badge status={r.status}/></td>
-                                <td className="p-4 flex justify-end gap-2"><button onClick={() => setEditingRep(r)} className="p-2 text-blue-600"><Edit size={16}/></button><button onClick={() => {if(window.confirm("Supprimer ?")) onDeleteReport(r);}} className="p-2 text-red-600"><Trash2 size={16}/></button></td>
+                                <td className="p-4 flex justify-end gap-3">
+                                  <button onClick={() => setEditingRep(r)} className="text-blue-600 hover:text-blue-800 transition-colors" title="Modifier"><Edit size={16}/></button>
+                                  <button onClick={() => {if(window.confirm("Supprimer ?")) onDeleteReport(r);}} className="text-red-600 hover:text-red-800 transition-colors" title="Supprimer"><Trash2 size={16}/></button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
