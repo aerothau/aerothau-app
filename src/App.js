@@ -46,7 +46,8 @@ import {
   MessageSquare,
   Eye,
   AlertTriangle,
-  XCircle
+  XCircle,
+  Activity
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -67,7 +68,7 @@ const appId = "aerothau-goelands";
 const MAIN_WEBSITE_URL = "https://www.aerothau.fr";
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 
-// --- DONNÉES DE DÉMONSTRATION ---
+// --- DONNÉES DE DÉPART ---
 const INITIAL_USERS = [
   { username: "admin", password: "aerothau2024", role: "admin", name: "Aerothau Admin", id: 0 },
 ];
@@ -77,7 +78,7 @@ const MOCK_CLIENTS = [
   { id: 2, name: "Camping Les Flots Bleus", type: "Privé", address: "Route de la Corniche, 34200 Sète", contact: "Marie Martin", phone: "06 12 34 56 78", email: "info@flotsbleus.com", username: "camping", password: "123" },
 ];
 
-// --- 1. COMPOSANTS UI DE BASE ---
+// --- COMPOSANTS UI DE BASE ---
 
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
   const baseStyle = "px-4 py-2 rounded-lg font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
@@ -104,7 +105,7 @@ const Badge = ({ status }) => {
     "En attente": "bg-orange-100 text-orange-700",
     Annulé: "bg-red-100 text-red-700",
     present: "bg-red-100 text-red-700",
-    non_present: "bg-slate-100 text-slate-500 border border-slate-200",
+    non_present: "bg-slate-200 text-slate-500 border border-slate-300",
     sterilized_1: "bg-lime-100 text-lime-700",
     sterilized_2: "bg-green-100 text-green-700",
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
@@ -434,53 +435,82 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
 const AdminDashboard = ({ interventions, clients, markers }) => {
   const stats = useMemo(() => ({
     total: markers.length,
-    neutralized: markers.filter(m => m.status && m.status.includes("sterilized")).length,
-    pending: interventions.filter(i => i.status === "Planifié").length
+    neutralized: markers.filter(m => m.status && (m.status === "sterilized_1" || m.status === "sterilized_2" || m.status === "sterilized")).length,
+    pending: interventions.filter(i => i.status === "Planifié").length,
+    // Detailed breakdown
+    reported: markers.filter(m => m.status === "reported_by_client").length,
+    nonPresent: markers.filter(m => m.status === "non_present").length,
+    passage1: markers.filter(m => m.status === "sterilized_1").length,
+    passage2: markers.filter(m => m.status === "sterilized_2").length,
   }), [markers, interventions]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 text-slate-800">
       <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">TABLEAU DE BORD</h2><Badge status="Live Data" /></div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-8 bg-blue-600 text-white shadow-xl border-0">
-            <div className="flex justify-between items-start">
-                <p className="text-xs font-black uppercase opacity-70 tracking-widest text-white">Total Nids</p>
-                <Bird size={20} opacity={0.5} className="text-white"/>
-            </div>
-            <p className="text-5xl font-black mt-2 tracking-tighter text-white">{stats.total}</p>
-        </Card>
-        <Card className="p-8 bg-emerald-600 text-white shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Neutralisés</p><CheckCircle size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.neutralized}</p></Card>
-        <Card className="p-8 bg-orange-600 text-white shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Interventions</p><Calendar size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.pending}</p></Card>
+      
+      {/* Statistiques Globales Détaillées */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-4 bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+              <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest">Signalements</span>
+              <span className="text-3xl font-black text-slate-800">{stats.reported}</span>
+          </Card>
+           <Card className="p-4 bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Non Présents</span>
+              <span className="text-3xl font-black text-slate-800">{stats.nonPresent}</span>
+          </Card>
+           <Card className="p-4 bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+              <span className="text-[10px] font-black uppercase text-lime-600 tracking-widest">1er Passage</span>
+              <span className="text-3xl font-black text-slate-800">{stats.passage1}</span>
+          </Card>
+           <Card className="p-4 bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+              <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">2ème Passage</span>
+              <span className="text-3xl font-black text-slate-800">{stats.passage2}</span>
+          </Card>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="p-8 shadow-lg border-0 rounded-3xl"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">SÉCURITÉ PAR CLIENT</h3>
-              <div className="space-y-5">
-                  {clients.map(c => {
-                      const cMarkers = markers.filter(m => m.clientId === c.id);
-                      const neut = cMarkers.filter(m => m.status && m.status.includes("sterilized")).length;
-                      const perc = cMarkers.length > 0 ? (neut / cMarkers.length) * 100 : 0;
-                      return (
-                          <div key={c.id} className="space-y-2">
-                              <div className="flex justify-between text-sm font-bold text-slate-700 uppercase tracking-tight"><span>{c.name}</span><span>{Math.round(perc)}%</span></div>
-                              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-50"><div className="bg-emerald-500 h-full transition-all duration-1000 shadow-sm" style={{width: `${perc}%`}}/></div>
-                          </div>
-                      );
-                  })}
-              </div>
-          </Card>
-          <Card className="p-8 shadow-lg border-0 rounded-3xl"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">ACTIVITÉ RÉCENTE</h3>
-                <div className="space-y-4 text-slate-800">
-                    {interventions.slice(0, 5).sort((a,b) => new Date(b.date) - new Date(a.date)).map(i => (
-                        <div key={i.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors border border-slate-100">
+
+      <div className="grid grid-cols-1 gap-8">
+          <h3 className="text-xl font-black uppercase tracking-tighter text-slate-800 mt-4">SITUATION PAR CLIENT</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {clients.map(client => {
+                  const cMarkers = markers.filter(m => m.clientId === client.id);
+                  const cReported = cMarkers.filter(m => m.status === "reported_by_client").length;
+                  const cNonPresent = cMarkers.filter(m => m.status === "non_present").length;
+                  const cPassage1 = cMarkers.filter(m => m.status === "sterilized_1").length;
+                  const cPassage2 = cMarkers.filter(m => m.status === "sterilized_2").length;
+                  
+                  return (
+                      <Card key={client.id} className="p-6 hover:shadow-lg transition-shadow">
+                        <div className="flex justify-between items-start mb-6 pb-4 border-b border-slate-50">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white rounded-lg border shadow-sm text-sky-600"><Calendar size={14}/></div>
-                                <div><p className="text-xs font-black uppercase tracking-tight">{clients.find(cl => cl.id === i.clientId)?.name || "N/A"}</p><p className="text-[10px] text-slate-400 font-bold">{i.date}</p></div>
+                                <div className="p-3 bg-sky-50 text-sky-600 rounded-xl shadow-sm"><Users size={20}/></div>
+                                <div>
+                                    <h4 className="font-black text-slate-800 uppercase tracking-tight">{client.name}</h4>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{cMarkers.length} Nids total</span>
+                                </div>
                             </div>
-                            <Badge status={i.status} />
                         </div>
-                    ))}
-                </div>
-          </Card>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-2 bg-purple-50/50 rounded-lg border border-purple-100 text-center">
+                                <p className="text-[9px] font-black text-purple-400 uppercase">Signalés</p>
+                                <p className="text-xl font-black text-purple-700">{cReported}</p>
+                            </div>
+                            <div className="p-2 bg-slate-50/50 rounded-lg border border-slate-100 text-center">
+                                <p className="text-[9px] font-black text-slate-400 uppercase">Absents</p>
+                                <p className="text-xl font-black text-slate-600">{cNonPresent}</p>
+                            </div>
+                            <div className="p-2 bg-lime-50/50 rounded-lg border border-lime-100 text-center">
+                                <p className="text-[9px] font-black text-lime-600 uppercase">Passage 1</p>
+                                <p className="text-xl font-black text-lime-700">{cPassage1}</p>
+                            </div>
+                            <div className="p-2 bg-emerald-50/50 rounded-lg border border-emerald-100 text-center">
+                                <p className="text-[9px] font-black text-emerald-600 uppercase">Passage 2</p>
+                                <p className="text-xl font-black text-emerald-700">{cPassage2}</p>
+                            </div>
+                        </div>
+                      </Card>
+                  );
+              })}
+          </div>
       </div>
     </div>
   );
