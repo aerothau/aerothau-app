@@ -104,9 +104,9 @@ const Badge = ({ status }) => {
     present: "bg-red-100 text-red-700",
     sterilized_1: "bg-lime-100 text-lime-700",
     sterilized_2: "bg-green-100 text-green-700",
-    temp: "bg-slate-400 text-white animate-pulse",
+    temp: "bg-slate-500 text-white animate-pulse border-2 border-dashed border-white",
   };
-  return <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || "bg-gray-100 text-gray-600"}`}>{status}</span>;
+  return <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || "bg-gray-100 text-gray-600"}`}>{status === 'temp' ? 'À valider' : status}</span>;
 };
 
 // --- 2. FORMULAIRES ---
@@ -140,6 +140,11 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
           {error && <p className="text-xs text-red-500 font-bold">{error}</p>}
           <Button type="submit" variant="sky" className="w-full py-4 uppercase">Connexion</Button>
         </form>
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+            <a href={MAIN_WEBSITE_URL} className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-sky-600 uppercase tracking-widest transition-colors">
+                <ChevronLeft size={14} /> Retour au site Aerothau.fr
+            </a>
+        </div>
       </Card>
     </div>
   );
@@ -287,11 +292,10 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   const markersLayerRef = useRef(null);
   const markersRef = useRef(markers);
 
-  // Garder markersRef à jour pour updateMarkers
   useEffect(() => {
     markersRef.current = markers;
-    if (mapInstanceRef.current && window.L) {
-        updateMarkers();
+    if (mapInstanceRef.current && window.L && mapInstanceRef.current._updateMarkers) {
+        mapInstanceRef.current._updateMarkers();
     }
   }, [markers]);
 
@@ -300,10 +304,10 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
     const L = window.L;
     markersLayerRef.current.clearLayers();
     markersRef.current.forEach(m => {
-      let color = m.status === "present" ? "#ef4444" : (m.status === "temp" ? "#94a3b8" : "#22c55e");
+      let color = m.status === "present" ? "#ef4444" : (m.status === "temp" ? "#64748b" : "#22c55e");
       const icon = L.divIcon({
         className: "custom-icon",
-        html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.3)'" onmouseout="this.style.transform='scale(1)'"></div>`,
+        html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); ${m.status === 'temp' ? 'animation: pulse 1s infinite;' : 'transition: transform 0.2s;'}" onmouseover="this.style.transform='scale(1.3)'" onmouseout="this.style.transform='scale(1)'"></div>`,
         iconSize: [22, 22], iconAnchor: [11, 11]
       });
       L.marker([m.lat, m.lng], { icon }).on('click', (e) => { L.DomEvent.stopPropagation(e); onMarkerClick(m); }).addTo(markersLayerRef.current);
@@ -313,15 +317,26 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   useEffect(() => {
     if (mapInstanceRef.current || !mapContainerRef.current) return;
     
-    // Ajout dynamique Leaflet si non présent
-    if (!document.getElementById('leaflet-css')) {
+    // Check for script to avoid dupes
+    if (!document.getElementById('leaflet-script')) {
         const link = document.createElement("link"); 
         link.id = 'leaflet-css'; link.rel = "stylesheet"; 
         link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
         document.head.appendChild(link);
+        
+        const script = document.createElement("script"); 
+        script.id = 'leaflet-script';
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; 
+        script.async = true;
+        
+        script.onload = initMap;
+        document.head.appendChild(script);
+    } else if (window.L) {
+        initMap();
     }
 
-    const initMap = () => {
+    function initMap() {
+        if (!mapContainerRef.current) return;
         const L = window.L;
         const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
         mapInstanceRef.current = map;
@@ -329,24 +344,11 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map);
         markersLayerRef.current = L.layerGroup().addTo(map);
         
-        delete L.Icon.Default.prototype._getIconUrl;
-        L.Icon.Default.mergeOptions({
-          iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-          iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-        });
+        // Expose update function
+        map._updateMarkers = updateMarkers;
 
         map.on('click', (e) => onMapClick && onMapClick(e.latlng));
         updateMarkers();
-    };
-
-    if (window.L) {
-        initMap();
-    } else {
-        const script = document.createElement("script"); 
-        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true;
-        script.onload = initMap;
-        document.head.appendChild(script);
     }
 
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
@@ -411,21 +413,45 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [isAdding, setIsAdding] = useState(false);
     const [mapCenter, setMapCenter] = useState(null);
+    const [tempMarker, setTempMarker] = useState(null);
 
     const handleSearch = useCallback(async (e) => {
         if (e.key === "Enter" && searchQuery.trim()) {
+            let lat, lng, addr;
+            
+            // 1. Check if input is GPS coords
             const coords = searchQuery.replace(/,/g, " ").split(/\s+/).filter(Boolean).map(parseFloat);
-            if (coords.length === 2 && !coords.some(isNaN)) {
-                setMapCenter({ lat: coords[0], lng: coords[1] }); return;
+            if (coords.length === 2 && !coords.some(isNaN) && Math.abs(coords[0]) <= 90) {
+                lat = coords[0]; lng = coords[1]; addr = `GPS: ${lat}, ${lng}`;
+            } else {
+                // 2. Geocoding
+                try {
+                    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=fr`);
+                    const d = await r.json();
+                    if (d?.[0]) { lat = parseFloat(d[0].lat); lng = parseFloat(d[0].lon); addr = d[0].display_name.split(',')[0]; }
+                    else { alert("Lieu non trouvé."); return; }
+                } catch (err) { console.error(err); return; }
             }
-            try {
-                const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=fr`);
-                const d = await r.json();
-                if (d?.[0]) setMapCenter({ lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) });
-                else alert("Lieu non trouvé.");
-            } catch (err) { console.error("Search error", err); }
+
+            if (lat && lng) {
+                setMapCenter({ lat, lng });
+                setTempMarker({ id: "temp", lat, lng, address: addr, status: "temp", eggs: 0 });
+            }
         }
     }, [searchQuery]);
+
+    const handleMarkerClick = (marker) => {
+        if (marker.id === "temp") {
+            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present", eggs: 0, clientId: clients[0]?.id || "" };
+            onUpdateNest(newNest);
+            setTempMarker(null);
+            setSelectedMarker(newNest);
+        } else {
+            setSelectedMarker(marker);
+        }
+    };
+
+    const displayMarkers = useMemo(() => tempMarker ? [...markers, tempMarker] : markers, [markers, tempMarker]);
 
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col gap-6">
@@ -439,12 +465,19 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
                 </Button>
             </Card>
             <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden border-8 border-white bg-white">
-                <LeafletMap markers={markers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={setSelectedMarker} onMapClick={async (ll) => {
+                {tempMarker && !isAdding && (
+                     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-800 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce pointer-events-none">
+                        📍 Cliquez sur le point gris pour valider
+                    </div>
+                )}
+                
+                <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} onMapClick={async (ll) => {
                     if(!isAdding) return;
                     const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present", eggs: 0, clientId: clients[0]?.id || "" };
                     await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
                 }}/>
-                {selectedMarker && (
+                
+                {selectedMarker && selectedMarker.id !== "temp" && (
                     <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
                         <Card className="border-0 flex flex-col overflow-hidden rounded-3xl">
                             <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
@@ -701,9 +734,32 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
     );
 };
 
-// --- COMPOSANT APP PRINCIPAL ---
+const ClientSpace = ({ user, markers }) => {
+    const myMarkers = markers.filter(m => m.clientId === user.clientId);
+    const neut = myMarkers.filter(m => m.status.includes("sterilized")).length;
+    return (
+        <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="space-y-10">
+                <Card className="p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0">
+                    <div className="relative z-10"><h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Bonjour, {user.name}</h2><div className="w-16 h-1 bg-sky-500 mb-6"></div><p className="text-slate-400 font-bold max-w-lg leading-relaxed uppercase text-xs tracking-widest">Contrôlez l'état sanitaire de votre site en temps réel via l'interface de surveillance Aerothau.</p></div>
+                    <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
+                </Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
+                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02] bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{markers.filter(m => m.clientId === user.clientId).length}</p></div></Card>
+                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02] bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
+                </div>
+            </div>
+            {/* Ajout de la carte spécifique client ici */}
+            <div className="h-[600px] rounded-2xl overflow-hidden border-4 border-slate-100 shadow-inner">
+                <LeafletMap markers={myMarkers} isAddingMode={false} />
+            </div>
+        </div>
+    );
+};
 
-export default function App() {
+// --- COMPOSANT APP PRINCIPAL (DÉFINI EN DERNIER) ---
+
+export default function AerothauApp() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState("dashboard");
   const [clients, setClients] = useState([]);
