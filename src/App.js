@@ -921,6 +921,7 @@ function LeafletMap({
     markers.forEach((marker) => {
       let color;
       const isPurple = marker.status === "reported_by_client";
+      const isTemp = marker.status === "temp";
       switch (marker.status) {
         case "sterilized_1":
           color = "#84cc16"; // Lime Green (Passage 1)
@@ -935,6 +936,9 @@ function LeafletMap({
         case "present":
           color = "#ef4444"; // Red
           break;
+        case "temp":
+          color = "#94a3b8"; // Slate (Gris)
+          break;
         default:
           color = "#64748b"; // Slate
           break;
@@ -943,6 +947,8 @@ function LeafletMap({
         className: "custom-div-icon",
         html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; ${
           isPurple ? "animation: pulse-purple 2s infinite;" : ""
+        } ${
+          isTemp ? "animation: pulse-grey 2s infinite; border: 2px dashed white;" : ""
         }"><div style="width: 8px; height: 8px; background-color: white; border-radius: 50%;"></div></div>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12],
@@ -1026,6 +1032,7 @@ function LeafletMap({
 
       <style>{`
         @keyframes pulse-purple { 0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(168, 85, 247, 0); } 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); } }
+        @keyframes pulse-grey { 0% { box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(148, 163, 184, 0); } 100% { box-shadow: 0 0 0 0 rgba(148, 163, 184, 0); } }
       `}</style>
     </div>
   );
@@ -1102,6 +1109,16 @@ function LoginForm({ onLogin, users, logoUrl }) {
             Se connecter
           </button>
         </form>
+        
+        {/* Lien retour vers le site principal */}
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+          <a 
+            href={MAIN_WEBSITE_URL} 
+            className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-sky-600 uppercase tracking-widest transition-colors"
+          >
+            <ChevronLeft size={14} /> Retour au site Aerothau.fr
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -2362,13 +2379,13 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [mapCenter, setMapCenter] = useState(null);
-  // NOUVEAU : On gère l'état de la recherche
   const [searchQuery, setSearchQuery] = useState("");
+  // Ajout d'un marqueur temporaire pour la recherche
+  const [tempMarker, setTempMarker] = useState(null);
 
   const onMapClick = async (latlng) => {
     if (!isAddingMode) return;
 
-    // Create new marker immediately
     let addr = "Nouveau nid";
     try {
       const r = await fetch(
@@ -2389,27 +2406,74 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
       eggs: 0,
     };
 
-    // Save immediately to DB to persist it even if page refreshes or edit is cancelled
     await onUpdateNest(newM);
     setSelectedMarker(newM);
     setIsAddingMode(false);
   };
 
-  // NOUVEAU : Fonction de recherche qui s'active en appuyant sur Entrée
+  // Transformation du point gris en "vrai" point si cliqué
+  const handleMarkerClick = async (marker) => {
+    if (marker.id === "temp") {
+      const newM = {
+        id: Date.now(),
+        clientId: clients[0]?.id || 0,
+        lat: marker.lat,
+        lng: marker.lng,
+        address: marker.address,
+        status: "present", // Devient rouge et présent
+        eggs: 0,
+      };
+      setTempMarker(null); // On enlève le gris
+      await onUpdateNest(newM); // On l'enregistre
+      setSelectedMarker(newM); // On ouvre la page d'édition pour le modifier
+    } else {
+      setSelectedMarker(marker);
+    }
+  };
+
   const handleSearch = async (e) => {
     if (e.key === "Enter" && searchQuery.trim() !== "") {
+      // 1. On vérifie d'abord si c'est des coordonnées GPS
+      // Remplace les virgules par des espaces pour gérer "43.402, 3.696" ou "43.402 3.696"
+      const coords = searchQuery.replace(/,/g, " ").split(/\s+/).filter(Boolean);
+      if (coords.length === 2) {
+        const lat = parseFloat(coords[0]);
+        const lng = parseFloat(coords[1]);
+        
+        // Vérification que ce sont de vraies coordonnées valides
+        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          setMapCenter({ lat, lng });
+          setTempMarker({
+            id: "temp",
+            lat: lat,
+            lng: lng,
+            address: `Position GPS : ${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+            status: "temp",
+            eggs: 0,
+          });
+          return; // On arrête là
+        }
+      }
+
+      // 2. Si ce n'est pas du GPS, on cherche une adresse normale
       try {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
             searchQuery
-          )}&countrycodes=fr` // Limité à la France pour plus de précision
+          )}&countrycodes=fr`
         );
         const data = await response.json();
         if (data && data.length > 0) {
-          // On déplace la carte sur le premier résultat trouvé
-          setMapCenter({
-            lat: parseFloat(data[0].lat),
-            lng: parseFloat(data[0].lon),
+          const lat = parseFloat(data[0].lat);
+          const lng = parseFloat(data[0].lon);
+          setMapCenter({ lat, lng });
+          setTempMarker({
+            id: "temp",
+            lat: lat,
+            lng: lng,
+            address: data[0].display_name.split(",").slice(0, 3).join(","),
+            status: "temp",
+            eggs: 0,
           });
         } else {
           alert("Adresse introuvable.");
@@ -2421,9 +2485,13 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
     }
   };
 
-  const visibleMarkers = markers.filter(
+  // On ajoute le point gris à la liste des points visibles
+  let visibleMarkers = markers.filter(
     (m) => filterStatus === "all" || m.status === filterStatus
   );
+  if (tempMarker) {
+    visibleMarkers = [...visibleMarkers, tempMarker];
+  }
 
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col gap-4">
@@ -2436,10 +2504,9 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               size={18}
             />
-            {/* NOUVEAU : Le champ input est maintenant connecté au moteur de recherche */}
             <input
               type="text"
-              placeholder="Chercher une adresse (puis Entrée)..."
+              placeholder="Adresse ou GPS (ex: 43.40, 3.69)..."
               className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-sky-500 text-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -2448,10 +2515,13 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
           </div>
           <Button
             variant={isAddingMode ? "danger" : "primary"}
-            onClick={() => setIsAddingMode(!isAddingMode)}
+            onClick={() => {
+              setIsAddingMode(!isAddingMode);
+              if (isAddingMode) setTempMarker(null); // On efface le point gris si on annule
+            }}
             className="shrink-0"
           >
-            {isAddingMode ? "Annuler" : "Ajouter un nid"}
+            {isAddingMode ? "Annuler" : "Ajouter un nid (Clic manuel)"}
           </Button>
         </div>
 
@@ -2516,20 +2586,29 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900/90 text-white px-4 py-2 rounded-full shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
             <Crosshair size={18} className="text-red-400 animate-pulse" />
             <span className="text-sm font-bold">
-              Cliquez sur la carte pour placer le nid
+              Cliquez n'importe où sur la carte pour placer le nid
             </span>
           </div>
+        )}
+        
+        {tempMarker && !isAddingMode && (
+           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-full shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+           <MapPin size={16} className="text-slate-400" />
+           <span className="text-sm font-bold">
+             Cliquez sur le point gris pour l'ajouter comme nid
+           </span>
+         </div>
         )}
 
         <LeafletMap
           markers={visibleMarkers}
           isAddingMode={isAddingMode}
-          onMarkerClick={setSelectedMarker}
+          onMarkerClick={handleMarkerClick}
           onMapClick={onMapClick}
           center={mapCenter}
         />
 
-        {selectedMarker && (
+        {selectedMarker && selectedMarker.id !== "temp" && (
           <div className="absolute top-4 left-4 z-[500] w-72 animate-in slide-in-from-left-4 fade-in duration-300">
             <Card className="shadow-2xl border-0">
               <div className="bg-slate-800 p-3 text-white flex justify-between rounded-t-xl">
