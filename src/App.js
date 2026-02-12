@@ -75,7 +75,7 @@ const MOCK_CLIENTS = [
   { id: 2, name: "Camping Les Flots Bleus", type: "Privé", address: "Route de la Corniche, 34200 Sète", contact: "Marie Martin", phone: "06 12 34 56 78", email: "info@flotsbleus.com", username: "camping", password: "123" },
 ];
 
-// --- 1. COMPOSANTS UI DE BASE (DÉFINIS EN PREMIER) ---
+// --- 1. COMPOSANTS UI DE BASE ---
 
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
   const baseStyle = "px-4 py-2 rounded-lg font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
@@ -109,9 +109,9 @@ const Badge = ({ status }) => {
   return <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || "bg-gray-100 text-gray-600"}`}>{status}</span>;
 };
 
-// --- 2. FORMULAIRES (DÉFINIS AVANT LEUR UTILISATION) ---
+// --- 2. FORMULAIRES ---
 
-const LoginForm = ({ onLogin, users }) => {
+const LoginForm = ({ onLogin, users, logoUrl }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -126,25 +126,20 @@ const LoginForm = ({ onLogin, users }) => {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Card className="p-8 w-full max-w-md shadow-2xl border-0 ring-1 ring-slate-100">
-        <div className="flex justify-center mb-8"><img src={LOGO_URL} alt="Logo" className="h-16 w-auto" /></div>
+        <div className="flex justify-center mb-8"><img src={logoUrl} alt="Logo" className="h-16 w-auto" /></div>
         <h1 className="text-2xl font-black text-center text-slate-900 mb-8 uppercase tracking-tighter">Aerothau<span className="text-sky-600">.</span></h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500" placeholder="Identifiant" />
+            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 text-sm" placeholder="Identifiant" />
           </div>
           <div className="relative">
             <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500" placeholder="Mot de passe" />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 text-sm" placeholder="Mot de passe" />
           </div>
           {error && <p className="text-xs text-red-500 font-bold">{error}</p>}
           <Button type="submit" variant="sky" className="w-full py-4 uppercase">Connexion</Button>
         </form>
-        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-            <a href={MAIN_WEBSITE_URL} className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-sky-600 uppercase tracking-widest transition-colors">
-                <ChevronLeft size={14} /> Retour au site Aerothau.fr
-            </a>
-        </div>
       </Card>
     </div>
   );
@@ -154,21 +149,21 @@ const ClientEditForm = ({ client, onSave, onCancel }) => {
   const [formData, setFormData] = useState({ ...client });
   return (
     <div className="space-y-4">
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-            <select className="w-full p-2 border rounded-lg bg-white" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
+            <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
                 <option value="Privé">Privé</option><option value="Collectivité">Collectivité</option><option value="Syndic">Syndic</option>
             </select>
         </div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone</label><input type="text" className="w-full p-2 border rounded-lg" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
       </div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-2 border rounded-lg" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
       <div className="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
-        <h4 className="text-[10px] font-black text-slate-400 uppercase mb-3">Identifiants Espace Client</h4>
+        <h4 className="text-[10px] font-black text-slate-400 uppercase mb-3 text-center">Accès Espace Client</h4>
         <div className="grid grid-cols-2 gap-4">
-            <input type="text" placeholder="Identifiant" className="p-2 border rounded-lg bg-white" value={formData.username || ""} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
-            <input type="text" placeholder="Pass" className="p-2 border rounded-lg bg-white" value={formData.password || ""} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+            <input type="text" placeholder="Identifiant" className="p-2 border rounded-lg bg-white text-xs" value={formData.username || ""} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
+            <input type="text" placeholder="Pass" className="p-2 border rounded-lg bg-white text-xs" value={formData.password || ""} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
         </div>
       </div>
       <div className="flex gap-2 pt-4">
@@ -182,22 +177,22 @@ const ClientEditForm = ({ client, onSave, onCancel }) => {
 const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCancel }) => {
   const [formData, setFormData] = useState({ clientId: clients[0]?.id || "", status: "Planifié", technician: "", notes: "", date: new Date().toISOString().split("T")[0], ...intervention });
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-slate-800">
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
-        <select className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-sky-500" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
+        <select className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-sky-500 text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
           {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Agent</label><input type="text" className="w-full p-2 border rounded-lg" value={formData.technician} onChange={(e) => setFormData({ ...formData, technician: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Agent</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.technician} onChange={(e) => setFormData({ ...formData, technician: e.target.value })} /></div>
       </div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
-        <select className="w-full p-2 border rounded-lg bg-white" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
           <option value="Planifié">Planifié</option><option value="En attente">En attente</option><option value="Terminé">Terminé</option><option value="Annulé">Annulé</option>
         </select>
       </div>
-      <textarea placeholder="Notes d'intervention..." className="w-full p-3 border rounded-lg h-24 text-sm" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
+      <textarea placeholder="Observations..." className="w-full p-3 border rounded-lg h-24 text-sm" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
       <div className="flex gap-2 pt-2">
         {onDelete && formData.id && <Button variant="danger" onClick={() => onDelete(formData)}><Trash2 size={16}/></Button>}
         <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
@@ -211,17 +206,17 @@ const ReportEditForm = ({ report, clients, onSave, onCancel }) => {
   const [formData, setFormData] = useState({ title: "Rapport", date: new Date().toISOString().split("T")[0], type: "Intervention", status: "Brouillon", clientId: "", ...report });
   return (
     <div className="space-y-4">
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre</label><input type="text" className="w-full p-2 border rounded-lg" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
-        <select className="w-full p-2 border rounded-lg bg-white" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
+        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
           <option value="">-- Choisir --</option>
           {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-            <select className="w-full p-2 border rounded-lg bg-white" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
+            <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
                 <option value="Intervention">Intervention</option><option value="Bilan">Bilan</option>
             </select>
         </div>
@@ -257,25 +252,25 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }
       <div>
         <label className="text-[10px] font-bold text-slate-400 uppercase">Photo du nid</label>
         {formData.photo ? (
-            <div className="relative"><img src={formData.photo} className="w-full h-32 object-cover rounded-lg border shadow-inner" /><button onClick={() => setFormData({...formData, photo: null})} className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full shadow-lg hover:bg-red-700 transition-colors"><X size={14}/></button></div>
+            <div className="relative mt-1"><img src={formData.photo} className="w-full h-32 object-cover rounded-lg border shadow-inner" /><button onClick={() => setFormData({...formData, photo: null})} className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full shadow-lg hover:bg-red-700 transition-colors"><X size={14}/></button></div>
         ) : (
-            <label className="flex flex-col items-center justify-center border-2 border-dashed h-32 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors border-slate-200">
+            <label className="mt-1 flex flex-col items-center justify-center border-2 border-dashed h-32 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors border-slate-200">
                 <Camera size={24} className="text-slate-300 mb-2"/>
                 <span className="text-[10px] font-black uppercase text-slate-400">Ajouter une photo</span>
                 <input type="file" className="hidden" onChange={handlePhotoUpload}/>
             </label>
         )}
       </div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Emplacement</label><textarea className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/></div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Emplacement</label><textarea className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/></div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
-            <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+            <select className="w-full p-2 border rounded-lg bg-white text-sm mt-1" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
                 <option value="present">Présent</option><option value="sterilized_1">1er Passage</option><option value="sterilized_2">2ème Passage</option>
             </select>
         </div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Œufs</label><input type="number" className="w-full p-2 border rounded-lg text-sm" value={formData.eggs} onChange={(e) => setFormData({...formData, eggs: parseInt(e.target.value)})}/></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Œufs</label><input type="number" className="w-full p-2 border rounded-lg text-sm mt-1" value={formData.eggs} onChange={(e) => setFormData({...formData, eggs: parseInt(e.target.value)})}/></div>
       </div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Notes Techniques</label><textarea className="w-full p-2 border rounded-lg text-sm h-20" placeholder="Accès, détails..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/></div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Notes Techniques</label><textarea className="w-full p-2 border rounded-lg text-sm h-20 mt-1" placeholder="Accès, détails..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/></div>
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onCancel}>Fermer</Button>
         <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
@@ -284,50 +279,79 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }
   );
 };
 
-// --- 3. CARTE & VUES PRINCIPALES (DÉFINIES APRÈS LES FORMULAIRES) ---
+// --- 3. CARTE & VUES PRINCIPALES ---
 
 const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
+  const markersRef = useRef(markers);
+
+  // Garder markersRef à jour pour updateMarkers
+  useEffect(() => {
+    markersRef.current = markers;
+    if (mapInstanceRef.current && window.L) {
+        updateMarkers();
+    }
+  }, [markers]);
+
+  const updateMarkers = useCallback(() => {
+    if (!mapInstanceRef.current || !markersLayerRef.current || !window.L) return;
+    const L = window.L;
+    markersLayerRef.current.clearLayers();
+    markersRef.current.forEach(m => {
+      let color = m.status === "present" ? "#ef4444" : (m.status === "temp" ? "#94a3b8" : "#22c55e");
+      const icon = L.divIcon({
+        className: "custom-icon",
+        html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.3)'" onmouseout="this.style.transform='scale(1)'"></div>`,
+        iconSize: [22, 22], iconAnchor: [11, 11]
+      });
+      L.marker([m.lat, m.lng], { icon }).on('click', (e) => { L.DomEvent.stopPropagation(e); onMarkerClick(m); }).addTo(markersLayerRef.current);
+    });
+  }, [onMarkerClick]);
 
   useEffect(() => {
     if (mapInstanceRef.current || !mapContainerRef.current) return;
-    const link = document.createElement("link"); link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-    document.head.appendChild(link);
-    const script = document.createElement("script"); script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true;
-    script.onload = () => {
-      if (!mapContainerRef.current) return;
-      const L = window.L;
-      const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
-      mapInstanceRef.current = map;
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map);
-      markersLayerRef.current = L.layerGroup().addTo(map);
-      
-      const updateMarkers = () => {
-        if (!markersLayerRef.current) return;
-        markersLayerRef.current.clearLayers();
-        markers.forEach(m => {
-          let color = m.status === "present" ? "#ef4444" : (m.status === "temp" ? "#94a3b8" : "#22c55e");
-          const icon = L.divIcon({
-            className: "custom-icon",
-            html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.3)'" onmouseout="this.style.transform='scale(1)'"></div>`,
-            iconSize: [22, 22], iconAnchor: [11, 11]
-          });
-          L.marker([m.lat, m.lng], { icon }).on('click', (e) => { L.DomEvent.stopPropagation(e); onMarkerClick(m); }).addTo(markersLayerRef.current);
+    
+    // Ajout dynamique Leaflet si non présent
+    if (!document.getElementById('leaflet-css')) {
+        const link = document.createElement("link"); 
+        link.id = 'leaflet-css'; link.rel = "stylesheet"; 
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+    }
+
+    const initMap = () => {
+        const L = window.L;
+        const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
+        mapInstanceRef.current = map;
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map);
+        markersLayerRef.current = L.layerGroup().addTo(map);
+        
+        delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+          iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+          shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
         });
-      };
 
-      map.on('click', (e) => onMapClick && onMapClick(e.latlng));
-      updateMarkers();
-      mapInstanceRef.current._updateMarkers = updateMarkers;
+        map.on('click', (e) => onMapClick && onMapClick(e.latlng));
+        updateMarkers();
     };
-    document.head.appendChild(script);
-    return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
-  }, []);
 
-  useEffect(() => { if (mapInstanceRef.current?._updateMarkers) mapInstanceRef.current._updateMarkers(); }, [markers]);
+    if (window.L) {
+        initMap();
+    } else {
+        const script = document.createElement("script"); 
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true;
+        script.onload = initMap;
+        document.head.appendChild(script);
+    }
+
+    return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
+  }, [onMapClick, updateMarkers]);
+
   useEffect(() => { if (mapInstanceRef.current && center) mapInstanceRef.current.setView([center.lat, center.lng], 18); }, [center]);
 
   return <div className={`w-full h-full rounded-2xl overflow-hidden shadow-inner bg-slate-100 ${isAddingMode ? 'cursor-crosshair ring-4 ring-sky-500 ring-inset' : ''}`} ref={mapContainerRef} />;
@@ -349,7 +373,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
         <Card className="p-8 bg-orange-600 text-white shadow-orange-100 shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Interventions</p><Calendar size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.pending}</p></Card>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="p-8"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">SÉCURITÉ PAR CLIENT</h3>
+          <Card className="p-8 shadow-lg border-0 rounded-3xl"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">SÉCURITÉ PAR CLIENT</h3>
               <div className="space-y-5">
                   {clients.map(c => {
                       const cMarkers = markers.filter(m => m.clientId === c.id);
@@ -364,7 +388,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
                   })}
               </div>
           </Card>
-          <Card className="p-8"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">ACTIVITÉ RÉCENTE</h3>
+          <Card className="p-8 shadow-lg border-0 rounded-3xl"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">ACTIVITÉ RÉCENTE</h3>
                 <div className="space-y-4">
                     {interventions.slice(0, 5).sort((a,b) => new Date(b.date) - new Date(a.date)).map(i => (
                         <div key={i.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
@@ -405,24 +429,24 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
 
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col gap-6">
-            <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0">
+            <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl">
                 <div className="relative flex-1 w-full group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={20}/>
                     <input type="text" placeholder="Recherche d'adresse ou coordonnées GPS..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-sky-500 text-sm font-medium transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
                 </div>
-                <Button variant={isAdding ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs" onClick={() => setIsAdding(!isAdding)}>
+                <Button variant={isAdding ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAdding(!isAdding)}>
                     {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
                 </Button>
             </Card>
-            <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden border-8 border-white">
+            <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden border-8 border-white bg-white">
                 <LeafletMap markers={markers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={setSelectedMarker} onMapClick={async (ll) => {
                     if(!isAdding) return;
                     const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present", eggs: 0, clientId: clients[0]?.id || "" };
                     await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
                 }}/>
                 {selectedMarker && (
-                    <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300">
-                        <Card className="shadow-2xl border-0 flex flex-col overflow-hidden rounded-3xl">
+                    <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
+                        <Card className="border-0 flex flex-col overflow-hidden rounded-3xl">
                             <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
                                 <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><Crosshair size={16} className="text-sky-400"/> Fiche Nid</span>
                                 <button onClick={() => setSelectedMarker(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
@@ -444,18 +468,20 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
     <div className="space-y-6">
       <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
       <Card className="overflow-hidden border-0 shadow-xl rounded-3xl">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Emplacement</th><th className="p-6">État</th><th className="p-6">Œufs</th><th className="p-6 text-right">Actions</th></tr></thead>
-          <tbody className="divide-y divide-slate-100">
-            {markers.map((m) => (
-              <tr key={m.id} className="hover:bg-slate-50 transition-colors"><td className="p-6 font-bold text-slate-700">{m.address}</td><td className="p-6"><Badge status={m.status} /></td><td className="p-6 font-black text-sky-600">{m.eggs}</td><td className="p-6 flex justify-end gap-2"><button onClick={() => setSelectedNest(m)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all"><Edit size={18} /></button><button onClick={() => { if (window.confirm("Supprimer ce nid de la base ?")) onDeleteNest(m); }} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all"><Trash2 size={18} /></button></td></tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+            <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Emplacement</th><th className="p-6">État</th><th className="p-6 text-center">Œufs</th><th className="p-6 text-right">Actions</th></tr></thead>
+            <tbody className="divide-y divide-slate-100 text-slate-800">
+                {markers.map((m) => (
+                <tr key={m.id} className="hover:bg-slate-50 transition-colors"><td className="p-6 font-bold">{m.address}</td><td className="p-6"><Badge status={m.status} /></td><td className="p-6 font-black text-sky-600 text-center">{m.eggs}</td><td className="p-6 flex justify-end gap-2"><button onClick={() => setSelectedNest(m)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18} /></button><button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18} /></button></td></tr>
+                ))}
+            </tbody>
+            </table>
+        </div>
       </Card>
       {selectedNest && (
         <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-          <Card className="bg-white rounded-3xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border-0"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter">Modifier le nid</h3><NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} /></Card>
+          <Card className="bg-white rounded-3xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border-0 text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Modifier le nid</h3><NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} /></Card>
         </div>
       )}
     </div>
@@ -466,8 +492,8 @@ const ClientManagement = ({ clients, setSelectedClient, setView, onCreateClient,
   const [isCreating, setIsCreating] = useState(false);
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">CLIENTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs" onClick={() => setIsCreating(true)}><Plus size={18} /> Nouveau Client</Button></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">CLIENTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={18} /> Nouveau Client</Button></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-slate-800">
         {clients.map((c) => (
           <Card key={c.id} className="p-8 cursor-pointer hover:shadow-2xl transition-all group border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl" onClick={() => { setSelectedClient(c); setView("client-detail"); }}>
             <div className="flex justify-between items-start mb-6"><div className="p-3 bg-sky-50 text-sky-600 rounded-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors duration-500 shadow-sm"><Users size={24} /></div><span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{c.type}</span></div>
@@ -478,7 +504,7 @@ const ClientManagement = ({ clients, setSelectedClient, setView, onCreateClient,
       </div>
       {isCreating && (
         <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-          <Card className="p-8 w-full max-w-lg shadow-2xl border-0 rounded-3xl"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter">Créer une fiche</h3><ClientEditForm client={{ id: Date.now(), name: "", type: "Privé", address: "", contact: "", phone: "", email: "" }} onSave={(d) => { onCreateClient(d); setIsCreating(false); }} onCancel={() => setIsCreating(false)} /></Card>
+          <Card className="p-8 w-full max-w-lg shadow-2xl border-0 rounded-3xl text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Créer une fiche</h3><ClientEditForm client={{ id: Date.now(), name: "", type: "Privé", address: "", contact: "", phone: "", email: "" }} onSave={(d) => { onCreateClient(d); setIsCreating(false); }} onCancel={() => setIsCreating(false)} /></Card>
         </div>
       )}
     </div>
@@ -491,26 +517,26 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
     const cNests = useMemo(() => markers.filter(m => m.clientId === selectedClient.id), [markers, selectedClient]);
     
     return (
-        <div className="space-y-8">
-            <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-0 shadow-md">&larr; Retour</Button>
+        <div className="space-y-8 text-slate-800">
+            <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-0 shadow-md h-10">&larr; Retour</Button>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="space-y-8">
                     <Card className="p-8 border-0 shadow-xl rounded-3xl">
                         {isEditing ? <ClientEditForm client={selectedClient} onSave={(d) => {onUpdateClient(d); setIsEditing(false);}} onCancel={() => setIsEditing(false)}/> : (
                             <>
-                                <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter text-slate-800">{selectedClient.name}</h2>
+                                <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter text-slate-900">{selectedClient.name}</h2>
                                 <div className="space-y-6 text-sm font-bold text-slate-600 uppercase">
                                     <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><MapPin size={20} className="text-sky-500 shrink-0"/><p className="leading-tight text-xs">{selectedClient.address}</p></div>
                                     <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><Phone size={20} className="text-sky-500 shrink-0"/><p className="text-xs">{selectedClient.phone}</p></div>
                                     <div className="bg-slate-900 p-6 rounded-2xl text-white space-y-3 shadow-lg">
-                                        <p className="text-[10px] font-black opacity-50 tracking-widest">ACCÈS ESPACE CLIENT</p>
+                                        <p className="text-[10px] font-black opacity-50 tracking-widest text-center">ACCÈS ESPACE CLIENT</p>
                                         <p className="text-xs tracking-widest"><span className="opacity-50">ID:</span> {selectedClient.username}</p>
                                         <p className="text-xs tracking-widest"><span className="opacity-50">PASS:</span> {selectedClient.password}</p>
                                     </div>
                                 </div>
                                 <div className="flex flex-col gap-3 mt-8">
-                                    <Button variant="sky" className="w-full py-3 rounded-2xl uppercase tracking-widest text-xs font-black" onClick={() => setIsEditing(true)}>Modifier</Button>
-                                    <Button variant="danger" className="w-full py-3 rounded-2xl uppercase tracking-widest text-xs font-black" onClick={() => {if(window.confirm("Supprimer ce client ?")){onDeleteClient(selectedClient); setView("clients");}}}>Supprimer</Button>
+                                    <Button variant="sky" className="w-full py-3 rounded-2xl uppercase tracking-widest text-xs font-black h-12" onClick={() => setIsEditing(true)}>Modifier</Button>
+                                    <Button variant="danger" className="w-full py-3 rounded-2xl uppercase tracking-widest text-xs font-black h-12" onClick={() => {if(window.confirm("Supprimer ce client ?")){onDeleteClient(selectedClient); setView("clients");}}}>Supprimer</Button>
                                 </div>
                             </>
                         )}
@@ -518,13 +544,13 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
                 </div>
                 <div className="lg:col-span-2 space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card className="p-6 shadow-lg border-0 rounded-3xl bg-slate-900 text-white"><p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2">Nids recensés</p><p className="text-4xl font-black text-sky-400">{cNests.length}</p></Card>
-                        <Card className="p-6 shadow-lg border-0 rounded-3xl bg-sky-600 text-white"><p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2">Missions effectuées</p><p className="text-4xl font-black text-white">{cInt.filter(i => i.status === "Terminé").length}</p></Card>
+                        <Card className="p-6 shadow-lg border-0 rounded-3xl bg-slate-900 text-white"><p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2 text-center">Nids recensés</p><p className="text-5xl font-black text-sky-400 text-center">{cNests.length}</p></Card>
+                        <Card className="p-6 shadow-lg border-0 rounded-3xl bg-sky-600 text-white"><p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2 text-center">Missions effectuées</p><p className="text-5xl font-black text-white text-center">{cInt.filter(i => i.status === "Terminé").length}</p></Card>
                     </div>
-                    <Card className="p-8 border-0 shadow-xl rounded-3xl"><h3 className="text-xl font-black uppercase tracking-tighter mb-6 text-slate-800">HISTORIQUE DES PASSAGES</h3>
-                        <div className="overflow-hidden">
+                    <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white"><h3 className="text-xl font-black uppercase tracking-tighter mb-6 text-slate-900">HISTORIQUE DES PASSAGES</h3>
+                        <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest border-b border-slate-100"><tr><th className="p-4">Date</th><th className="p-4">Statut</th><th className="p-4">Notes</th></tr></thead>
+                                <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 text-slate-500"><tr><th className="p-4">Date</th><th className="p-4">Statut</th><th className="p-4">Notes</th></tr></thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {cInt.length === 0 ? <tr><td colSpan="3" className="p-8 text-center text-slate-400 font-bold uppercase text-xs italic">Aucune intervention</td></tr> : cInt.map(i => <tr key={i.id} className="hover:bg-slate-50 transition-colors"><td className="p-4 font-black text-slate-700">{i.date}</td><td className="p-4"><Badge status={i.status}/></td><td className="p-4 text-xs font-bold text-slate-500 italic truncate max-w-[200px]">{i.notes}</td></tr>)}
                                 </tbody>
@@ -575,18 +601,18 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 text-slate-800">
             <div className="flex justify-between items-center flex-wrap gap-4">
-                <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">PLANNING</h2>
+                <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">PLANNING</h2>
                 <div className="flex items-center gap-2 bg-white p-1 rounded-2xl shadow-lg border border-slate-100">
                     <button onClick={() => setViewMode("calendar")} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === "calendar" ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Calendrier</button>
                     <button onClick={() => setViewMode("list")} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === "list" ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Liste</button>
                 </div>
-                <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs" onClick={() => setIsCreating(true)}><Plus size={16}/> Programmer</Button>
+                <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Programmer</Button>
             </div>
 
             {viewMode === "calendar" ? (
-                <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl">
+                <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
                     <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
                         <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={24}/></button>
                         <h3 className="text-xl font-black uppercase tracking-widest">{currentDate.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</h3>
@@ -598,31 +624,33 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
                     <div className="grid grid-cols-7 border-collapse">{renderCalendar()}</div>
                 </Card>
             ) : (
-                <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest">
-                            <tr><th className="p-6">Date</th><th className="p-6">Client bénéficiaire</th><th className="p-6">Statut mission</th><th className="p-6 text-right">Actions</th></tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {interventions.length === 0 ? <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest">Aucune intervention programmée</td></tr> : interventions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(i => (
-                                <tr key={i.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-6 font-black text-sky-600">{i.date}</td>
-                                    <td className="p-6 font-bold uppercase text-slate-700 tracking-tight">{clients.find(c => c.id === i.clientId)?.name || "N/A"}</td>
-                                    <td className="p-6"><Badge status={i.status}/></td>
-                                    <td className="p-6 flex justify-end gap-3">
-                                        <button onClick={() => setEditingInt(i)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
-                                        <button onClick={() => {if(window.confirm("Supprimer cette mission ?")) onDeleteIntervention(i);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest">
+                                <tr><th className="p-6">Date</th><th className="p-6">Client bénéficiaire</th><th className="p-6">Statut mission</th><th className="p-6 text-right">Actions</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {interventions.length === 0 ? <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest">Aucune intervention programmée</td></tr> : interventions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(i => (
+                                    <tr key={i.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="p-6 font-black text-sky-600">{i.date}</td>
+                                        <td className="p-6 font-bold uppercase text-slate-700 tracking-tight">{clients.find(c => c.id === i.clientId)?.name || "N/A"}</td>
+                                        <td className="p-6"><Badge status={i.status}/></td>
+                                        <td className="p-6 flex justify-end gap-3">
+                                            <button onClick={() => setEditingInt(i)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
+                                            <button onClick={() => {if(window.confirm("Supprimer cette mission ?")) onDeleteIntervention(i);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </Card>
             )}
 
             {(isCreating || editingInt) && (
                 <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl">
+                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl text-slate-800 bg-white">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating && !editingInt?.clientId ? "Nouvelle Mission" : "Détails Mission"}</h3>
                             <button onClick={() => {setEditingInt(null); setIsCreating(false);}} className="text-slate-400 hover:text-slate-600 p-1.5 bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
@@ -639,58 +667,36 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
     const [isCreating, setIsCreating] = useState(false);
     const [editingRep, setEditingRep] = useState(null);
     return (
-        <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">DOCUMENTS & RAPPORTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button></div>
-            <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Nom du document</th><th className="p-6">Client concerné</th><th className="p-6">Statut de validation</th><th className="p-6 text-right">Actions</th></tr></thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {reports.length === 0 ? <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-bold uppercase italic tracking-widest">Aucun document en base</td></tr> : reports.map(r => (
-                            <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="p-6 font-black flex items-center gap-4 text-slate-700 tracking-tight"><div className="p-2.5 bg-slate-100 text-slate-500 rounded-xl"><FileText size={20}/></div> {r.title}</td>
-                                <td className="p-6 text-xs font-black uppercase text-slate-400">{clients.find(c => c.id === r.clientId)?.name || "Client supprimé"}</td>
-                                <td className="p-6"><Badge status={r.status}/></td>
-                                <td className="p-6 flex justify-end gap-3">
-                                    <button onClick={() => setEditingRep(r)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
-                                    <button onClick={() => {if(window.confirm("Supprimer ce document ?")) onDeleteReport(r);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+        <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
+            <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS & RAPPORTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button></div>
+            <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Nom du document</th><th className="p-6">Client concerné</th><th className="p-6">Statut de validation</th><th className="p-6 text-right">Actions</th></tr></thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {reports.length === 0 ? <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-bold uppercase italic tracking-widest">Aucun document en base</td></tr> : reports.map(r => (
+                                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="p-6 font-black flex items-center gap-4 text-slate-700 tracking-tight"><div className="p-2.5 bg-slate-100 text-slate-500 rounded-xl"><FileText size={20}/></div> {r.title}</td>
+                                    <td className="p-6 text-xs font-black uppercase text-slate-400">{clients.find(c => c.id === r.clientId)?.name || "Client supprimé"}</td>
+                                    <td className="p-6"><Badge status={r.status}/></td>
+                                    <td className="p-6 flex justify-end gap-3">
+                                        <button onClick={() => setEditingRep(r)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
+                                        <button onClick={() => {if(window.confirm("Supprimer ce document ?")) onDeleteReport(r);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </Card>
             {(isCreating || editingRep) && (
                 <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl">
+                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white text-slate-800">
                         <div className="flex justify-between items-center mb-8"><h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating ? "Nouveau Document" : "Modifier"}</h3><button onClick={() => {setEditingRep(null); setIsCreating(false);}} className="text-slate-400 p-1.5 bg-slate-100 rounded-full"><X size={20}/></button></div>
                         <ReportEditForm report={editingRep} clients={clients} onSave={async (d) => { await onUpdateReport(d); setEditingRep(null); setIsCreating(false); }} onCancel={() => {setEditingRep(null); setIsCreating(false);}} />
                     </Card>
                 </div>
             )}
-        </div>
-    );
-};
-
-const ClientSpace = ({ user, markers }) => {
-    const myMarkers = markers.filter(m => m.clientId === user.clientId);
-    const neut = myMarkers.filter(m => m.status.includes("sterilized")).length;
-    return (
-        <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500">
-            <div className="space-y-10">
-                <Card className="p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0">
-                    <div className="relative z-10"><h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Bonjour, {user.name}</h2><div className="w-16 h-1 bg-sky-500 mb-6"></div><p className="text-slate-400 font-bold max-w-lg leading-relaxed uppercase text-xs tracking-widest">Contrôlez l'état sanitaire de votre site en temps réel via l'interface de surveillance Aerothau.</p></div>
-                    <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
-                </Card>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02]"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
-                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02]"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
-                </div>
-            </div>
-            <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">CARTOGRAPHIE DÉTAILLÉE</h3>
-                <div className="h-[600px] rounded-2xl overflow-hidden border-4 border-slate-100 shadow-inner">
-                    <LeafletMap markers={myMarkers} isAddingMode={false} />
-                </div>
-            </Card>
         </div>
     );
 };
@@ -749,12 +755,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex text-slate-900 font-sans selection:bg-sky-100 selection:text-sky-900">
-      <aside className={`fixed lg:static inset-y-0 left-0 z-[100] w-72 bg-slate-900 text-white transform transition-transform duration-500 ease-in-out shadow-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-[1000] w-72 bg-slate-900 text-white transform transition-transform duration-500 ease-in-out shadow-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="p-8 h-full flex flex-col">
           <div className="flex items-center gap-4 mb-12"><div className="p-2 bg-white rounded-xl shadow-lg shadow-white/5"><img src={LOGO_URL} alt="Logo" className="h-10 w-auto" /></div><span className="text-xl font-black uppercase tracking-tighter">Aerothau</span></div>
-          <nav className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar">
+          <nav className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar pr-2">
             {[
-                { id: "dashboard", label: "Tableau de Bord", icon: Home, roles: ["admin"] },
+                { id: "dashboard", label: "Dashboard", icon: Home, roles: ["admin"] },
                 { id: "map", label: "Carte Interactive", icon: MapIcon, roles: ["admin", "client"] },
                 { id: "nests", label: "Gestion des Nids", icon: Bird, roles: ["admin"] },
                 { id: "clients", label: "Fiches Clients", icon: Users, roles: ["admin"] },
@@ -768,7 +774,7 @@ export default function App() {
           </nav>
           <div className="mt-auto pt-8 border-t border-slate-800 space-y-6">
               <div className="flex items-center gap-3 px-4">
-                  <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center font-black text-sky-400 border border-slate-700 shadow-inner">{user.name.charAt(0).toUpperCase()}</div>
+                  <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center font-black text-sky-400 border border-slate-700 shadow-inner uppercase">{user.name.charAt(0)}</div>
                   <div className="overflow-hidden"><p className="text-xs font-black uppercase tracking-tighter truncate text-white">{user.name}</p><p className="text-[10px] font-bold uppercase text-slate-500 tracking-widest">{user.role}</p></div>
               </div>
               <button onClick={() => setUser(null)} className="w-full flex items-center gap-4 text-red-500 hover:bg-red-500 hover:text-white p-4 rounded-2xl transition-all font-black uppercase text-[10px] tracking-widest group shadow-sm"><LogOut size={18} className="group-hover:rotate-12 transition-transform"/> Déconnexion</button>
@@ -791,7 +797,22 @@ export default function App() {
                 {view === "reports" && <ReportsView reports={reports} clients={clients} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "reports", r.id.toString()))} />}
               </>
             ) : (
-                <ClientSpace user={user} markers={markers} />
+                <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500">
+                    {view === "dashboard" && (
+                        <div className="space-y-10">
+                            <Card className="p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0">
+                                <div className="relative z-10"><h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Bonjour, {user.name}</h2><div className="w-16 h-1 bg-sky-500 mb-6"></div><p className="text-slate-400 font-bold max-w-lg leading-relaxed uppercase text-xs tracking-widest">Contrôlez l'état sanitaire de votre site en temps réel via l'interface de surveillance Aerothau.</p></div>
+                                <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
+                            </Card>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
+                                <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02] bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{markers.filter(m => m.clientId === user.clientId).length}</p></div></Card>
+                                <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02] bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{interventions.filter(i => i.clientId === user.clientId && i.status === "Terminé").length}</p></div></Card>
+                            </div>
+                        </div>
+                    )}
+                    {view === "map" && <MapInterface markers={markers.filter(m => m.clientId === user.clientId)} clients={clients} onUpdateNest={() => {}} />}
+                    {view === "reports" && <ReportsView reports={reports.filter(r => r.clientId === user.clientId)} clients={clients} onUpdateReport={() => {}} onDeleteReport={() => {}} />}
+                </div>
             )}
           </div>
         </div>
@@ -801,6 +822,7 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .custom-icon { display: flex; align-items: center; justify-content: center; }
       `}</style>
     </div>
   );
