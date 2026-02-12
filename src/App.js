@@ -1751,174 +1751,91 @@ function MapInterface({ markers, onUpdateNest, clients }) {
   );
 }
 
-// ... Les autres composants comme AdminDashboard, ClientSpace, NestManagement restent inchangés
-// par manque de place dans ce bloc, mais ils sont déjà corrects.
-
-function ClientSpace({ user, markers }) {
-  const myId = user.clientId;
-  const myMarkers = markers.filter((m) => m.clientId === myId);
-
-  const sterilizedCount = myMarkers.filter((m) => m.status === "sterilized_2" || m.status === "sterilized").length;
-  const activeCount = myMarkers.filter((m) => m.status === "present").length;
-
+function ClientManagement({
+  clients,
+  setSelectedClient,
+  setView,
+  interventions,
+  onCreateClient,
+  onDeleteClient,
+}) {
+  const [isCreating, setIsCreating] = useState(false);
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-800 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
-        <div className="relative z-10">
-          <h2 className="text-3xl font-bold mb-2 tracking-tight">Bonjour, {user.name}</h2>
-          <p className="text-purple-100">Bienvenue sur votre espace de suivi.</p>
-        </div>
-        <Bell className="absolute -right-8 -bottom-8 h-48 w-48 text-white/10 rotate-12" />
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+          Fiches Clients
+        </h2>
+        <Button onClick={() => setIsCreating(true)}>
+          <Plus size={18} /> Nouveau Client
+        </Button>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card className="p-4 h-full flex flex-col">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4"><MapIcon size={20} className="text-purple-500" /> Cartographie des Nids</h3>
-            <div className="h-[500px] rounded-xl overflow-hidden border flex-1 relative">
-              <LeafletMap markers={myMarkers} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {clients.map((client) => (
+          <Card
+            key={client.id}
+            className="hover:shadow-md transition-all cursor-pointer relative group border-slate-200"
+            onClick={() => {
+              setSelectedClient(client);
+              setView("client-detail");
+            }}
+          >
+            <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm("Supprimer ce client ?"))
+                    onDeleteClient(client);
+                }}
+                className="p-1.5 bg-white text-slate-400 hover:text-red-500 border rounded-full shadow-sm"
+              >
+                <Trash2 size={16} />
+              </button>
             </div>
-          </Card>
-        </div>
-        <div className="space-y-6">
-          <Card className="p-4 border-l-4 border-l-emerald-500 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-emerald-50 rounded-full text-emerald-600 shrink-0"><CheckCircle size={24} /></div>
-              <div className="flex-1">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">État du parc</p>
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="font-bold text-slate-900 text-lg">{sterilizedCount}/{myMarkers.length}</p>
-                    <p className="text-xs text-slate-500">Nids neutralisés</p>
-                  </div>
-                  {activeCount > 0 && <span className="text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded">{activeCount} Actifs</span>}
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-2 bg-sky-50 text-sky-600 rounded-lg">
+                  <Users size={20} />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {client.type}
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">
+                {client.name}
+              </h3>
+              <div className="space-y-1 text-sm text-slate-500">
+                <div className="flex items-center gap-2">
+                  <MapPin size={14} /> {client.address}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone size={14} /> {client.phone}
                 </div>
               </div>
             </div>
           </Card>
-          <Card className="p-6 flex flex-col max-h-[400px]">
-            <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex justify-between items-center">Liste des Nids</h3>
-            <div className="space-y-3 overflow-y-auto pr-1 custom-scrollbar flex-1">
-              {myMarkers.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 italic text-sm">Aucun nid recensé.</div>
-              ) : (
-                myMarkers.map((m) => (
-                  <div key={m.id} className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-center gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{m.address}</p>
-                    </div>
-                    <div className="shrink-0"><Badge status={m.status} /></div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Card>
-        </div>
+        ))}
       </div>
-    </div>
-  );
-}
-
-function AdminDashboard({ interventions, clients, markers }) {
-  const stats = {
-    total: markers.length,
-    neutralized: markers.filter((m) => m.status === "sterilized_1" || m.status === "sterilized_2" || m.status === "sterilized").length,
-    pending: interventions.filter((i) => i.status === "Planifié").length,
-  };
-  return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h2 className="text-2xl font-bold mb-4 text-slate-800">Tableau de Bord</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="p-6 bg-sky-600 text-white shadow-lg">
-            <div className="flex justify-between items-start">
-              <div><p className="text-sm opacity-80 uppercase font-bold">Total Nids</p><p className="text-4xl font-black mt-1">{stats.total}</p></div>
-              <Bird className="opacity-20" size={32} />
-            </div>
-          </Card>
-          <Card className="p-6 bg-emerald-600 text-white shadow-lg">
-            <div className="flex justify-between items-start">
-              <div><p className="text-sm opacity-80 uppercase font-bold">Neutralisés</p><p className="text-4xl font-black mt-1">{stats.neutralized}</p></div>
-              <CheckCircle className="opacity-20" size={32} />
-            </div>
-          </Card>
-          <Card className="p-6 bg-orange-600 text-white shadow-lg">
-            <div className="flex justify-between items-start">
-              <div><p className="text-sm opacity-80 uppercase font-bold">Interventions</p><p className="text-4xl font-black mt-1">{stats.pending}</p></div>
-              <Calendar className="opacity-20" size={32} />
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2"><Users size={20} className="text-sky-600" /> Situation par Client</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {clients.map((client) => {
-            const clientMarkers = markers.filter((m) => m.clientId === client.id);
-            const neutralized = clientMarkers.filter((m) => m.status === "sterilized_1" || m.status === "sterilized_2" || m.status === "sterilized").length;
-            const progress = clientMarkers.length > 0 ? (neutralized / clientMarkers.length) * 100 : 0;
-            return (
-              <Card key={client.id} className="p-5">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h4 className="font-bold text-lg text-slate-800 line-clamp-1">{client.name}</h4>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-xs text-slate-500 mb-1">
-                      <span>Progression</span><span className="font-bold">{Math.round(progress)}%</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${progress}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NestManagement({ markers, onUpdateNest, onDeleteNest, clients }) {
-  const [selectedNest, setSelectedNest] = useState(null);
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Gestion des Nids</h2>
-      <Card className="overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-500">
-            <tr>
-              <th className="p-4">Adresse</th>
-              <th className="p-4">Status</th>
-              <th className="p-4">Oeufs</th>
-              <th className="p-4">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {markers.map((m) => (
-              <tr key={m.id}>
-                <td className="p-4">{m.address}</td>
-                <td className="p-4"><Badge status={m.status} /></td>
-                <td className="p-4 font-bold">{m.eggs}</td>
-                <td className="p-4 flex gap-2">
-                  <button onClick={() => setSelectedNest(m)} className="text-blue-600 hover:text-blue-800"><Edit size={16} /></button>
-                  <button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-      {selectedNest && (
+      {isCreating && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-lg mb-4">Modifier Nid</h3>
-            <NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} />
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="font-bold text-lg mb-4">Nouveau Client</h3>
+            <ClientEditForm
+              client={{
+                id: Date.now(),
+                name: "",
+                type: "Privé",
+                address: "",
+                contact: "",
+                phone: "",
+                email: "",
+              }}
+              onSave={(d) => {
+                onCreateClient(d);
+                setIsCreating(false);
+              }}
+              onCancel={() => setIsCreating(false)}
+            />
           </div>
         </div>
       )}
