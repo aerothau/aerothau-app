@@ -1601,9 +1601,9 @@ function ClientSpace({ user, interventions, markers, clients, onUpdateNest }) {
                 onMarkerClick={setSelectedMarker}
               />
               {selectedMarker && (
-                <div className="absolute top-4 left-4 z-[500] w-72">
-                  <Card className="shadow-2xl border-0">
-                    <div className="bg-slate-800 p-3 text-white flex justify-between items-center rounded-t-xl">
+                <div className="absolute top-4 left-4 z-[500] w-72 md:w-80 max-h-[calc(100%-2rem)] flex flex-col">
+                  <Card className="shadow-2xl border-0 flex flex-col max-h-full overflow-hidden">
+                    <div className="bg-slate-800 p-3 text-white flex justify-between items-center rounded-t-xl shrink-0">
                       <span className="font-bold text-sm">Détails Nid</span>
                       <button
                         onClick={() => setSelectedMarker(null)}
@@ -1612,7 +1612,7 @@ function ClientSpace({ user, interventions, markers, clients, onUpdateNest }) {
                         <X size={16} />
                       </button>
                     </div>
-                    <div className="p-4">
+                    <div className="p-4 overflow-y-auto">
                       <NestEditForm nest={selectedMarker} readOnly={true} />
                     </div>
                   </Card>
@@ -2609,9 +2609,9 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
         />
 
         {selectedMarker && selectedMarker.id !== "temp" && (
-          <div className="absolute top-4 left-4 z-[500] w-72 animate-in slide-in-from-left-4 fade-in duration-300">
-            <Card className="shadow-2xl border-0">
-              <div className="bg-slate-800 p-3 text-white flex justify-between rounded-t-xl">
+          <div className="absolute top-4 left-4 z-[500] w-72 md:w-80 max-h-[calc(100%-2rem)] flex flex-col animate-in slide-in-from-left-4 fade-in duration-300">
+            <Card className="shadow-2xl border-0 flex flex-col max-h-full overflow-hidden">
+              <div className="bg-slate-800 p-3 text-white flex justify-between items-center rounded-t-xl shrink-0">
                 <span className="font-bold flex items-center gap-2">
                   <MapIcon size={16} /> Détails Nid
                 </span>
@@ -2622,7 +2622,7 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
                   <X size={16} />
                 </button>
               </div>
-              <div className="p-4">
+              <div className="p-4 overflow-y-auto">
                 <NestEditForm
                   nest={selectedMarker}
                   clients={clients}
