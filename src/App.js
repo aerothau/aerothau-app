@@ -83,7 +83,6 @@ const INITIAL_USERS = [
     name: "Aerothau Admin",
     id: 0,
   },
-  // Les clients sont maintenant gérés dynamiquement via la base de données
 ];
 
 const MOCK_CLIENTS = [
@@ -2363,6 +2362,8 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [mapCenter, setMapCenter] = useState(null);
+  // NOUVEAU : On gère l'état de la recherche
+  const [searchQuery, setSearchQuery] = useState("");
 
   const onMapClick = async (latlng) => {
     if (!isAddingMode) return;
@@ -2394,15 +2395,35 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
     setIsAddingMode(false);
   };
 
+  // NOUVEAU : Fonction de recherche qui s'active en appuyant sur Entrée
+  const handleSearch = async (e) => {
+    if (e.key === "Enter" && searchQuery.trim() !== "") {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            searchQuery
+          )}&countrycodes=fr` // Limité à la France pour plus de précision
+        );
+        const data = await response.json();
+        if (data && data.length > 0) {
+          // On déplace la carte sur le premier résultat trouvé
+          setMapCenter({
+            lat: parseFloat(data[0].lat),
+            lng: parseFloat(data[0].lon),
+          });
+        } else {
+          alert("Adresse introuvable.");
+        }
+      } catch (error) {
+        console.error("Erreur recherche :", error);
+        alert("Erreur lors de la recherche.");
+      }
+    }
+  };
+
   const visibleMarkers = markers.filter(
     (m) => filterStatus === "all" || m.status === filterStatus
   );
-
-  const statusColors = {
-    present: "bg-red-500",
-    sterilized: "bg-green-500",
-    reported_by_client: "bg-purple-500",
-  };
 
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col gap-4">
@@ -2415,10 +2436,14 @@ function MapInterface({ markers, onUpdateNest, setMarkers, clients }) {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               size={18}
             />
+            {/* NOUVEAU : Le champ input est maintenant connecté au moteur de recherche */}
             <input
               type="text"
-              placeholder="Chercher une adresse..."
+              placeholder="Chercher une adresse (puis Entrée)..."
               className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-sky-500 text-sm"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearch}
             />
           </div>
           <Button
