@@ -289,7 +289,7 @@ const ReportEditForm = ({ report, clients, onSave, onCancel }) => {
 };
 
 const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }) => {
-  const [formData, setFormData] = useState({ title: "", comments: "", eggs: 0, status: "present", ...nest });
+  const [formData, setFormData] = useState({ title: "", comments: "", eggs: 0, status: "present", clientId: "", ...nest });
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -324,6 +324,13 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }
         )}
       </div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre / Nom du site</label><input type="text" className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.title || ""} onChange={(e) => setFormData({...formData, title: e.target.value})}/></div>
+      <div>
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Client Associé</label>
+        <select className="w-full p-2 border rounded-lg bg-white text-sm mt-1 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.clientId || ""} onChange={(e) => setFormData({...formData, clientId: parseInt(e.target.value) || ""})}>
+            <option value="">-- Aucun client --</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Emplacement</label><textarea className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/></div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
