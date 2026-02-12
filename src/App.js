@@ -75,7 +75,7 @@ const MOCK_CLIENTS = [
   { id: 2, name: "Camping Les Flots Bleus", type: "Privé", address: "Route de la Corniche, 34200 Sète", contact: "Marie Martin", phone: "06 12 34 56 78", email: "info@flotsbleus.com", username: "camping", password: "123" },
 ];
 
-// --- COMPOSANTS UI DE BASE ---
+// --- 1. COMPOSANTS UI DE BASE (DÉFINIS EN PREMIER) ---
 
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
   const baseStyle = "px-4 py-2 rounded-lg font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
@@ -109,9 +109,9 @@ const Badge = ({ status }) => {
   return <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || "bg-gray-100 text-gray-600"}`}>{status}</span>;
 };
 
-// --- FORMULAIRES ---
+// --- 2. FORMULAIRES (DÉFINIS AVANT LEUR UTILISATION) ---
 
-const LoginForm = ({ onLogin, users, logoUrl }) => {
+const LoginForm = ({ onLogin, users }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -126,7 +126,7 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <Card className="p-8 w-full max-w-md shadow-2xl border-0 ring-1 ring-slate-100">
-        <div className="flex justify-center mb-8"><img src={logoUrl} alt="Logo" className="h-16 w-auto" /></div>
+        <div className="flex justify-center mb-8"><img src={LOGO_URL} alt="Logo" className="h-16 w-auto" /></div>
         <h1 className="text-2xl font-black text-center text-slate-900 mb-8 uppercase tracking-tighter">Aerothau<span className="text-sky-600">.</span></h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
@@ -140,6 +140,11 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
           {error && <p className="text-xs text-red-500 font-bold">{error}</p>}
           <Button type="submit" variant="sky" className="w-full py-4 uppercase">Connexion</Button>
         </form>
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+            <a href={MAIN_WEBSITE_URL} className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-sky-600 uppercase tracking-widest transition-colors">
+                <ChevronLeft size={14} /> Retour au site Aerothau.fr
+            </a>
+        </div>
       </Card>
     </div>
   );
@@ -160,7 +165,7 @@ const ClientEditForm = ({ client, onSave, onCancel }) => {
       </div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-2 border rounded-lg" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
       <div className="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
-        <h4 className="text-[10px] font-black text-slate-400 uppercase mb-3">Accès Espace Client</h4>
+        <h4 className="text-[10px] font-black text-slate-400 uppercase mb-3">Identifiants Espace Client</h4>
         <div className="grid grid-cols-2 gap-4">
             <input type="text" placeholder="Identifiant" className="p-2 border rounded-lg bg-white" value={formData.username || ""} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
             <input type="text" placeholder="Pass" className="p-2 border rounded-lg bg-white" value={formData.password || ""} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
@@ -192,7 +197,7 @@ const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCance
           <option value="Planifié">Planifié</option><option value="En attente">En attente</option><option value="Terminé">Terminé</option><option value="Annulé">Annulé</option>
         </select>
       </div>
-      <textarea placeholder="Observations..." className="w-full p-3 border rounded-lg h-24 text-sm" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
+      <textarea placeholder="Notes d'intervention..." className="w-full p-3 border rounded-lg h-24 text-sm" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
       <div className="flex gap-2 pt-2">
         {onDelete && formData.id && <Button variant="danger" onClick={() => onDelete(formData)}><Trash2 size={16}/></Button>}
         <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
@@ -279,7 +284,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }
   );
 };
 
-// --- CARTOGRAPHIE ---
+// --- 3. CARTE & VUES PRINCIPALES (DÉFINIES APRÈS LES FORMULAIRES) ---
 
 const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }) => {
   const mapContainerRef = useRef(null);
@@ -301,6 +306,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
       markersLayerRef.current = L.layerGroup().addTo(map);
       
       const updateMarkers = () => {
+        if (!markersLayerRef.current) return;
         markersLayerRef.current.clearLayers();
         markers.forEach(m => {
           let color = m.status === "present" ? "#ef4444" : (m.status === "temp" ? "#94a3b8" : "#22c55e");
@@ -326,8 +332,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
 
   return <div className={`w-full h-full rounded-2xl overflow-hidden shadow-inner bg-slate-100 ${isAddingMode ? 'cursor-crosshair ring-4 ring-sky-500 ring-inset' : ''}`} ref={mapContainerRef} />;
 };
-
-// --- VUES ---
 
 const AdminDashboard = ({ interventions, clients, markers }) => {
   const stats = useMemo(() => ({
@@ -667,6 +671,30 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
     );
 };
 
+const ClientSpace = ({ user, markers }) => {
+    const myMarkers = markers.filter(m => m.clientId === user.clientId);
+    const neut = myMarkers.filter(m => m.status.includes("sterilized")).length;
+    return (
+        <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500">
+            <div className="space-y-10">
+                <Card className="p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0">
+                    <div className="relative z-10"><h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Bonjour, {user.name}</h2><div className="w-16 h-1 bg-sky-500 mb-6"></div><p className="text-slate-400 font-bold max-w-lg leading-relaxed uppercase text-xs tracking-widest">Contrôlez l'état sanitaire de votre site en temps réel via l'interface de surveillance Aerothau.</p></div>
+                    <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
+                </Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02]"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
+                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02]"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
+                </div>
+            </div>
+            <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">CARTOGRAPHIE DÉTAILLÉE</h3>
+                <div className="h-[600px] rounded-2xl overflow-hidden border-4 border-slate-100 shadow-inner">
+                    <LeafletMap markers={myMarkers} isAddingMode={false} />
+                </div>
+            </Card>
+        </div>
+    );
+};
+
 // --- COMPOSANT APP PRINCIPAL ---
 
 export default function App() {
@@ -763,22 +791,7 @@ export default function App() {
                 {view === "reports" && <ReportsView reports={reports} clients={clients} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "reports", r.id.toString()))} />}
               </>
             ) : (
-                <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500">
-                    {view === "dashboard" && (
-                        <div className="space-y-10">
-                            <Card className="p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0">
-                                <div className="relative z-10"><h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Bonjour, {user.name}</h2><div className="w-16 h-1 bg-sky-500 mb-6"></div><p className="text-slate-400 font-bold max-w-lg leading-relaxed uppercase text-xs tracking-widest">Contrôlez l'état sanitaire de votre site en temps réel via l'interface de surveillance Aerothau.</p></div>
-                                <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
-                            </Card>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02]"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{markers.filter(m => m.clientId === user.clientId).length}</p></div></Card>
-                                <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02]"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{interventions.filter(i => i.clientId === user.clientId && i.status === "Terminé").length}</p></div></Card>
-                            </div>
-                        </div>
-                    )}
-                    {view === "map" && <MapInterface markers={markers.filter(m => m.clientId === user.clientId)} clients={clients} onUpdateNest={() => {}} />}
-                    {view === "reports" && <ReportsView reports={reports.filter(r => r.clientId === user.clientId)} clients={clients} onUpdateReport={() => {}} onDeleteReport={() => {}} />}
-                </div>
+                <ClientSpace user={user} markers={markers} />
             )}
           </div>
         </div>
