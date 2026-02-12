@@ -45,8 +45,6 @@ import {
   Camera,
   MessageSquare,
   Eye,
-  AlertTriangle,
-  XCircle
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -67,7 +65,7 @@ const appId = "aerothau-goelands";
 const MAIN_WEBSITE_URL = "https://www.aerothau.fr";
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 
-// --- CONSTANTES ET DONNÉES DE DÉPART ---
+// --- DONNÉES DE DÉPART ---
 const INITIAL_USERS = [
   { username: "admin", password: "aerothau2024", role: "admin", name: "Aerothau Admin", id: 0 },
 ];
@@ -77,7 +75,7 @@ const MOCK_CLIENTS = [
   { id: 2, name: "Camping Les Flots Bleus", type: "Privé", address: "Route de la Corniche, 34200 Sète", contact: "Marie Martin", phone: "06 12 34 56 78", email: "info@flotsbleus.com", username: "camping", password: "123" },
 ];
 
-// --- 1. COMPOSANTS UI DE BASE ---
+// --- COMPOSANTS UI DE BASE ---
 
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
   const baseStyle = "px-4 py-2 rounded-lg font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
@@ -104,7 +102,7 @@ const Badge = ({ status }) => {
     "En attente": "bg-orange-100 text-orange-700",
     Annulé: "bg-red-100 text-red-700",
     present: "bg-red-100 text-red-700",
-    non_present: "bg-slate-100 text-slate-500 border border-slate-200",
+    non_present: "bg-slate-200 text-slate-500 border border-slate-300",
     sterilized_1: "bg-lime-100 text-lime-700",
     sterilized_2: "bg-green-100 text-green-700",
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
@@ -123,7 +121,7 @@ const Badge = ({ status }) => {
   return <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
 };
 
-// --- 2. FORMULAIRES ---
+// --- FORMULAIRES ---
 
 const LoginForm = ({ onLogin, users, logoUrl }) => {
   const [username, setUsername] = useState("");
@@ -167,7 +165,7 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 const ClientEditForm = ({ client, onSave, onCancel }) => {
   const [formData, setFormData] = useState({ ...client });
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-slate-800">
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
@@ -224,7 +222,7 @@ const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCance
 const ReportEditForm = ({ report, clients, onSave, onCancel }) => {
   const [formData, setFormData] = useState({ title: "Rapport", date: new Date().toISOString().split("T")[0], type: "Intervention", status: "Brouillon", clientId: "", ...report });
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-slate-800">
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
         <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
@@ -259,19 +257,19 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }
     }
   };
   if (readOnly) return (
-    <div className="space-y-3">
+    <div className="space-y-3 text-slate-800">
       {nest.photo && <img src={nest.photo} alt="Nid" className="w-full h-40 object-cover rounded-lg" />}
-      <h4 className="font-bold text-slate-800">{nest.address}</h4>
+      <h4 className="font-bold">{nest.address}</h4>
       <div className="flex gap-2"><Badge status={nest.status} /><span className="text-xs text-slate-500 font-bold">{nest.eggs} œufs</span></div>
       {nest.comments && <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 italic">{nest.comments}</p>}
     </div>
   );
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 text-slate-800">
       <div>
         <label className="text-[10px] font-bold text-slate-400 uppercase">Photo du nid</label>
         {formData.photo ? (
-            <div className="relative mt-1"><img src={formData.photo} className="w-full h-32 object-cover rounded-lg border shadow-inner" /><button onClick={() => setFormData({...formData, photo: null})} className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full shadow-lg hover:bg-red-700 transition-colors"><X size={14}/></button></div>
+            <div className="relative mt-1"><img src={formData.photo} className="w-full h-32 object-cover rounded-lg border shadow-inner" alt="Nid"/><button onClick={() => setFormData({...formData, photo: null})} className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full shadow-lg hover:bg-red-700 transition-colors"><X size={14}/></button></div>
         ) : (
             <label className="mt-1 flex flex-col items-center justify-center border-2 border-dashed h-32 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors border-slate-200">
                 <Camera size={24} className="text-slate-300 mb-2"/>
@@ -323,12 +321,12 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
     markersLayerRef.current.clearLayers();
     markersRef.current.forEach(m => {
       let color = "#64748b"; // Slate default
-      if (m.status === "present") color = "#ef4444"; // Red
-      else if (m.status === "temp") color = "#94a3b8"; // Grey temp
-      else if (m.status === "sterilized_1") color = "#84cc16"; // Lime
-      else if (m.status === "sterilized_2") color = "#22c55e"; // Green
-      else if (m.status === "reported_by_client") color = "#a855f7"; // Purple
-      else if (m.status === "non_present") color = "#cbd5e1"; // Light Slate
+      if (m.status === "present") color = "#ef4444"; 
+      else if (m.status === "temp") color = "#94a3b8"; 
+      else if (m.status === "sterilized_1") color = "#84cc16"; 
+      else if (m.status === "sterilized_2") color = "#22c55e"; 
+      else if (m.status === "reported_by_client") color = "#a855f7"; 
+      else if (m.status === "non_present") color = "#cbd5e1"; 
 
       const icon = L.divIcon({
         className: "custom-icon",
@@ -388,12 +386,19 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
   }), [markers, interventions]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 text-slate-800">
       <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">TABLEAU DE BORD</h2><Badge status="Live Data" /></div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-8 bg-blue-600 text-white shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Total Nids</p><Bird size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.total}</p></Card>
-        <Card className="p-8 bg-emerald-600 text-white shadow-emerald-100 shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Neutralisés</p><CheckCircle size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.neutralized}</p></Card>
-        <Card className="p-8 bg-orange-600 text-white shadow-orange-100 shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Interventions</p><Calendar size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.pending}</p></Card>
+        {/* CORRECTION : Carte Total Nids en Bleu avec texte blanc pour lisibilité */}
+        <Card className="p-8 bg-blue-600 text-white shadow-xl border-0">
+            <div className="flex justify-between items-start">
+                <p className="text-xs font-black uppercase opacity-70 tracking-widest text-white">Total Nids</p>
+                <Bird size={20} opacity={0.5} className="text-white"/>
+            </div>
+            <p className="text-5xl font-black mt-2 tracking-tighter text-white">{stats.total}</p>
+        </Card>
+        <Card className="p-8 bg-emerald-600 text-white shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Neutralisés</p><CheckCircle size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.neutralized}</p></Card>
+        <Card className="p-8 bg-orange-600 text-white shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Interventions</p><Calendar size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.pending}</p></Card>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Card className="p-8 shadow-lg border-0 rounded-3xl"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">SÉCURITÉ PAR CLIENT</h3>
@@ -412,12 +417,12 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
               </div>
           </Card>
           <Card className="p-8 shadow-lg border-0 rounded-3xl"><h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-slate-800">ACTIVITÉ RÉCENTE</h3>
-                <div className="space-y-4">
+                <div className="space-y-4 text-slate-800">
                     {interventions.slice(0, 5).sort((a,b) => new Date(b.date) - new Date(a.date)).map(i => (
-                        <div key={i.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
+                        <div key={i.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors border border-slate-100">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-white rounded-lg border shadow-sm text-sky-600"><Calendar size={14}/></div>
-                                <div><p className="text-xs font-black uppercase tracking-tight text-slate-800">{clients.find(cl => cl.id === i.clientId)?.name || "N/A"}</p><p className="text-[10px] text-slate-400 font-bold">{i.date}</p></div>
+                                <div><p className="text-xs font-black uppercase tracking-tight">{clients.find(cl => cl.id === i.clientId)?.name || "N/A"}</p><p className="text-[10px] text-slate-400 font-bold">{i.date}</p></div>
                             </div>
                             <Badge status={i.status} />
                         </div>
@@ -450,7 +455,6 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
                     else { alert("Lieu non trouvé."); return; }
                 } catch (err) { console.error(err); return; }
             }
-
             if (lat && lng) {
                 setMapCenter({ lat, lng });
                 setTempMarker({ id: "temp", lat, lng, address: addr, status: "temp", eggs: 0 });
@@ -461,9 +465,7 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
     const handleMarkerClick = (marker) => {
         if (marker.id === "temp") {
             const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present", eggs: 0, clientId: clients[0]?.id || "" };
-            onUpdateNest(newNest);
-            setTempMarker(null);
-            setSelectedMarker(newNest);
+            onUpdateNest(newNest); setTempMarker(null); setSelectedMarker(newNest);
         } else {
             setSelectedMarker(marker);
         }
@@ -472,8 +474,8 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
     const displayMarkers = useMemo(() => tempMarker ? [...markers, tempMarker] : markers, [markers, tempMarker]);
 
     return (
-        <div className="h-[calc(100vh-140px)] flex flex-col gap-6">
-            <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl">
+        <div className="h-[calc(100vh-140px)] flex flex-col gap-6 text-slate-800">
+            <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
                 <div className="relative flex-1 w-full group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={20}/>
                     <input type="text" placeholder="Recherche d'adresse ou coordonnées GPS..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-sky-500 text-sm font-medium transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
@@ -488,16 +490,14 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
                         📍 Cliquez sur le point gris pour valider
                     </div>
                 )}
-                
                 <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} onMapClick={async (ll) => {
                     if(!isAdding) return;
                     const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present", eggs: 0, clientId: clients[0]?.id || "" };
                     await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
                 }}/>
-                
                 {selectedMarker && selectedMarker.id !== "temp" && (
                     <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
-                        <Card className="border-0 flex flex-col overflow-hidden rounded-3xl">
+                        <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
                             <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
                                 <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><Crosshair size={16} className="text-sky-400"/> Fiche Nid</span>
                                 <button onClick={() => setSelectedMarker(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
@@ -516,9 +516,9 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
 const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
   const [selectedNest, setSelectedNest] = useState(null);
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-800">
       <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
-      <Card className="overflow-hidden border-0 shadow-xl rounded-3xl">
+      <Card className="overflow-hidden border-0 shadow-xl rounded-3xl bg-white">
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
             <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Emplacement</th><th className="p-6">État</th><th className="p-6 text-center">Œufs</th><th className="p-6 text-right">Actions</th></tr></thead>
@@ -542,11 +542,11 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
 const ClientManagement = ({ clients, setSelectedClient, setView, onCreateClient, onDeleteClient }) => {
   const [isCreating, setIsCreating] = useState(false);
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 text-slate-800">
       <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">CLIENTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={18} /> Nouveau Client</Button></div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-slate-800">
         {clients.map((c) => (
-          <Card key={c.id} className="p-8 cursor-pointer hover:shadow-2xl transition-all group border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl" onClick={() => { setSelectedClient(c); setView("client-detail"); }}>
+          <Card key={c.id} className="p-8 cursor-pointer hover:shadow-2xl transition-all group border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl bg-white" onClick={() => { setSelectedClient(c); setView("client-detail"); }}>
             <div className="flex justify-between items-start mb-6"><div className="p-3 bg-sky-50 text-sky-600 rounded-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors duration-500 shadow-sm"><Users size={24} /></div><span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{c.type}</span></div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter mb-2">{c.name}</h3>
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wide truncate mt-4"><MapPin size={12} className="inline mr-2 text-sky-500" /> {c.address}</p>
@@ -572,16 +572,16 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
             <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-0 shadow-md h-10">&larr; Retour</Button>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="space-y-8">
-                    <Card className="p-8 border-0 shadow-xl rounded-3xl">
+                    <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white">
                         {isEditing ? <ClientEditForm client={selectedClient} onSave={(d) => {onUpdateClient(d); setIsEditing(false);}} onCancel={() => setIsEditing(false)}/> : (
                             <>
                                 <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter text-slate-900">{selectedClient.name}</h2>
                                 <div className="space-y-6 text-sm font-bold text-slate-600 uppercase">
                                     <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><MapPin size={20} className="text-sky-500 shrink-0"/><p className="leading-tight text-xs">{selectedClient.address}</p></div>
                                     <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><Phone size={20} className="text-sky-500 shrink-0"/><p className="text-xs">{selectedClient.phone}</p></div>
-                                    <div className="bg-slate-900 p-6 rounded-2xl text-white space-y-3 shadow-lg">
-                                        <p className="text-[10px] font-black opacity-50 tracking-widest text-center">ACCÈS ESPACE CLIENT</p>
-                                        <p className="text-xs tracking-widest"><span className="opacity-50">ID:</span> {selectedClient.username}</p>
+                                    <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-lg">
+                                        <p className="text-[10px] font-black opacity-50 tracking-widest text-center mb-4">ACCÈS ESPACE CLIENT</p>
+                                        <p className="text-xs tracking-widest mb-2"><span className="opacity-50">ID:</span> {selectedClient.username}</p>
                                         <p className="text-xs tracking-widest"><span className="opacity-50">PASS:</span> {selectedClient.password}</p>
                                     </div>
                                 </div>
@@ -676,7 +676,7 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
                 </Card>
             ) : (
                 <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto text-slate-800">
                         <table className="w-full text-left text-sm">
                             <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest">
                                 <tr><th className="p-6">Date</th><th className="p-6">Client bénéficiaire</th><th className="p-6">Statut mission</th><th className="p-6 text-right">Actions</th></tr>
@@ -701,7 +701,7 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
 
             {(isCreating || editingInt) && (
                 <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl text-slate-800 bg-white">
+                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating && !editingInt?.clientId ? "Nouvelle Mission" : "Détails Mission"}</h3>
                             <button onClick={() => {setEditingInt(null); setIsCreating(false);}} className="text-slate-400 hover:text-slate-600 p-1.5 bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
@@ -756,26 +756,27 @@ const ClientSpace = ({ user, markers }) => {
     const myMarkers = markers.filter(m => m.clientId === user.clientId);
     const neut = myMarkers.filter(m => m.status.includes("sterilized")).length;
     return (
-        <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500">
+        <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500 text-slate-800">
             <div className="space-y-10">
                 <Card className="p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0">
                     <div className="relative z-10"><h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Bonjour, {user.name}</h2><div className="w-16 h-1 bg-sky-500 mb-6"></div><p className="text-slate-400 font-bold max-w-lg leading-relaxed uppercase text-xs tracking-widest">Contrôlez l'état sanitaire de votre site en temps réel via l'interface de surveillance Aerothau.</p></div>
                     <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
                 </Card>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
-                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02] bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{markers.filter(m => m.clientId === user.clientId).length}</p></div></Card>
-                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02] bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
+                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
+                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
                 </div>
             </div>
-            {/* Ajout de la carte spécifique client ici */}
-            <div className="h-[600px] rounded-2xl overflow-hidden border-4 border-slate-100 shadow-inner">
-                <LeafletMap markers={myMarkers} isAddingMode={false} />
-            </div>
+            <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white"><h3 className="text-lg font-black uppercase tracking-tighter mb-6">CARTOGRAPHIE DE VOTRE SITE</h3>
+                <div className="h-[600px] rounded-2xl overflow-hidden border-4 border-slate-100 shadow-inner">
+                    <LeafletMap markers={myMarkers} isAddingMode={false} />
+                </div>
+            </Card>
         </div>
     );
 };
 
-// --- COMPOSANT APP PRINCIPAL (DÉFINI EN DERNIER) ---
+// --- COMPOSANT APP PRINCIPAL ---
 
 export default function AerothauApp() {
   const [user, setUser] = useState(null);
@@ -857,7 +858,7 @@ export default function AerothauApp() {
       </aside>
 
       <main className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <header className="bg-white/80 backdrop-blur-md border-b p-4 flex lg:hidden items-center justify-between sticky top-0 z-[110] shadow-sm"><button onClick={() => setIsSidebarOpen(true)} className="text-slate-600 p-2 hover:bg-slate-100 rounded-xl transition-colors"><Menu size={24} /></button><span className="font-black uppercase tracking-tighter text-slate-900">Aerothau</span><div className="w-10"></div></header>
+        <header className="bg-white/80 backdrop-blur-md border-b p-4 flex lg:hidden items-center justify-between sticky top-0 z-[110] shadow-sm text-slate-900"><button onClick={() => setIsSidebarOpen(true)} className="p-2"><Menu size={24} /></button><span className="font-black uppercase tracking-tighter">Aerothau</span><div className="w-10"></div></header>
         <div className="flex-1 p-6 lg:p-12 overflow-auto custom-scrollbar">
           <div className="max-w-6xl mx-auto">
             {user.role === "admin" ? (
@@ -871,22 +872,7 @@ export default function AerothauApp() {
                 {view === "reports" && <ReportsView reports={reports} clients={clients} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "reports", r.id.toString()))} />}
               </>
             ) : (
-                <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500">
-                    {view === "dashboard" && (
-                        <div className="space-y-10">
-                            <Card className="p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0">
-                                <div className="relative z-10"><h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Bonjour, {user.name}</h2><div className="w-16 h-1 bg-sky-500 mb-6"></div><p className="text-slate-400 font-bold max-w-lg leading-relaxed uppercase text-xs tracking-widest">Contrôlez l'état sanitaire de votre site en temps réel via l'interface de surveillance Aerothau.</p></div>
-                                <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
-                            </Card>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
-                                <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02] bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{markers.filter(m => m.clientId === user.clientId).length}</p></div></Card>
-                                <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 transition-transform hover:scale-[1.02] bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{interventions.filter(i => i.clientId === user.clientId && i.status === "Terminé").length}</p></div></Card>
-                            </div>
-                        </div>
-                    )}
-                    {view === "map" && <MapInterface markers={markers.filter(m => m.clientId === user.clientId)} clients={clients} onUpdateNest={() => {}} />}
-                    {view === "reports" && <ReportsView reports={reports.filter(r => r.clientId === user.clientId)} clients={clients} onUpdateReport={() => {}} onDeleteReport={() => {}} />}
-                </div>
+                <ClientSpace user={user} markers={markers} interventions={interventions} clients={clients} reports={reports} />
             )}
           </div>
         </div>
