@@ -45,6 +45,8 @@ import {
   Camera,
   MessageSquare,
   Eye,
+  AlertTriangle,
+  XCircle
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -102,11 +104,23 @@ const Badge = ({ status }) => {
     "En attente": "bg-orange-100 text-orange-700",
     Annulé: "bg-red-100 text-red-700",
     present: "bg-red-100 text-red-700",
+    non_present: "bg-slate-100 text-slate-500 border border-slate-200",
     sterilized_1: "bg-lime-100 text-lime-700",
     sterilized_2: "bg-green-100 text-green-700",
+    reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
     temp: "bg-slate-500 text-white animate-pulse border-2 border-dashed border-white",
   };
-  return <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || "bg-gray-100 text-gray-600"}`}>{status === 'temp' ? 'À valider' : status}</span>;
+  
+  const labels = {
+    present: "Présent",
+    non_present: "Non présent",
+    sterilized_1: "1er Passage",
+    sterilized_2: "2ème Passage",
+    reported_by_client: "Signalement",
+    temp: "À valider"
+  };
+
+  return <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
 };
 
 // --- 2. FORMULAIRES ---
@@ -270,7 +284,11 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }
       <div className="grid grid-cols-2 gap-4">
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
             <select className="w-full p-2 border rounded-lg bg-white text-sm mt-1" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
-                <option value="present">Présent</option><option value="sterilized_1">1er Passage</option><option value="sterilized_2">2ème Passage</option>
+                <option value="reported_by_client">Signalement</option>
+                <option value="present">Présent</option>
+                <option value="sterilized_1">1er Passage</option>
+                <option value="sterilized_2">2ème Passage</option>
+                <option value="non_present">Non présent</option>
             </select>
         </div>
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Œufs</label><input type="number" className="w-full p-2 border rounded-lg text-sm mt-1" value={formData.eggs} onChange={(e) => setFormData({...formData, eggs: parseInt(e.target.value)})}/></div>
@@ -304,7 +322,14 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
     const L = window.L;
     markersLayerRef.current.clearLayers();
     markersRef.current.forEach(m => {
-      let color = m.status === "present" ? "#ef4444" : (m.status === "temp" ? "#64748b" : "#22c55e");
+      let color = "#64748b"; // Slate default
+      if (m.status === "present") color = "#ef4444"; // Red
+      else if (m.status === "temp") color = "#94a3b8"; // Grey temp
+      else if (m.status === "sterilized_1") color = "#84cc16"; // Lime
+      else if (m.status === "sterilized_2") color = "#22c55e"; // Green
+      else if (m.status === "reported_by_client") color = "#a855f7"; // Purple
+      else if (m.status === "non_present") color = "#cbd5e1"; // Light Slate
+
       const icon = L.divIcon({
         className: "custom-icon",
         html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); ${m.status === 'temp' ? 'animation: pulse 1s infinite;' : 'transition: transform 0.2s;'}" onmouseover="this.style.transform='scale(1.3)'" onmouseout="this.style.transform='scale(1)'"></div>`,
@@ -317,7 +342,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   useEffect(() => {
     if (mapInstanceRef.current || !mapContainerRef.current) return;
     
-    // Check for script to avoid dupes
     if (!document.getElementById('leaflet-script')) {
         const link = document.createElement("link"); 
         link.id = 'leaflet-css'; link.rel = "stylesheet"; 
@@ -343,10 +367,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map);
         markersLayerRef.current = L.layerGroup().addTo(map);
-        
-        // Expose update function
         map._updateMarkers = updateMarkers;
-
         map.on('click', (e) => onMapClick && onMapClick(e.latlng));
         updateMarkers();
     }
@@ -370,7 +391,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">TABLEAU DE BORD</h2><Badge status="Live Data" /></div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-8 bg-sky-600 text-white shadow-sky-100 shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Nids Identifiés</p><Bird size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.total}</p></Card>
+        <Card className="p-8 bg-blue-600 text-white shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Total Nids</p><Bird size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.total}</p></Card>
         <Card className="p-8 bg-emerald-600 text-white shadow-emerald-100 shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Neutralisés</p><CheckCircle size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.neutralized}</p></Card>
         <Card className="p-8 bg-orange-600 text-white shadow-orange-100 shadow-xl border-0"><div className="flex justify-between items-start"><p className="text-xs font-black uppercase opacity-70 tracking-widest">Interventions</p><Calendar size={20} opacity={0.5}/></div><p className="text-5xl font-black mt-2 tracking-tighter">{stats.pending}</p></Card>
       </div>
@@ -418,13 +439,10 @@ const MapInterface = ({ markers, clients, onUpdateNest }) => {
     const handleSearch = useCallback(async (e) => {
         if (e.key === "Enter" && searchQuery.trim()) {
             let lat, lng, addr;
-            
-            // 1. Check if input is GPS coords
             const coords = searchQuery.replace(/,/g, " ").split(/\s+/).filter(Boolean).map(parseFloat);
             if (coords.length === 2 && !coords.some(isNaN) && Math.abs(coords[0]) <= 90) {
                 lat = coords[0]; lng = coords[1]; addr = `GPS: ${lat}, ${lng}`;
             } else {
-                // 2. Geocoding
                 try {
                     const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=fr`);
                     const d = await r.json();
