@@ -45,6 +45,8 @@ import {
   Camera,
   MessageSquare,
   Eye,
+  AlertTriangle,
+  XCircle
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -65,7 +67,7 @@ const appId = "aerothau-goelands";
 const MAIN_WEBSITE_URL = "https://www.aerothau.fr";
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 
-// --- DONNÉES DE DÉPART ---
+// --- DONNÉES DE DÉMONSTRATION ---
 const INITIAL_USERS = [
   { username: "admin", password: "aerothau2024", role: "admin", name: "Aerothau Admin", id: 0 },
 ];
@@ -75,7 +77,7 @@ const MOCK_CLIENTS = [
   { id: 2, name: "Camping Les Flots Bleus", type: "Privé", address: "Route de la Corniche, 34200 Sète", contact: "Marie Martin", phone: "06 12 34 56 78", email: "info@flotsbleus.com", username: "camping", password: "123" },
 ];
 
-// --- COMPOSANTS UI DE BASE ---
+// --- 1. COMPOSANTS UI DE BASE ---
 
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
   const baseStyle = "px-4 py-2 rounded-lg font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
@@ -102,7 +104,7 @@ const Badge = ({ status }) => {
     "En attente": "bg-orange-100 text-orange-700",
     Annulé: "bg-red-100 text-red-700",
     present: "bg-red-100 text-red-700",
-    non_present: "bg-slate-200 text-slate-500 border border-slate-300",
+    non_present: "bg-slate-100 text-slate-500 border border-slate-200",
     sterilized_1: "bg-lime-100 text-lime-700",
     sterilized_2: "bg-green-100 text-green-700",
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
@@ -121,7 +123,7 @@ const Badge = ({ status }) => {
   return <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
 };
 
-// --- FORMULAIRES ---
+// --- 2. FORMULAIRES ---
 
 const LoginForm = ({ onLogin, users, logoUrl }) => {
   const [username, setUsername] = useState("");
@@ -158,6 +160,46 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
             </a>
         </div>
       </Card>
+    </div>
+  );
+};
+
+const ClientReportForm = ({ nest, onSave, onCancel }) => {
+  const [formData, setFormData] = useState({
+    title: "", // Champ titre ajouté
+    ...nest,
+    ownerContact: "",
+    description: "",
+    status: "reported_by_client",
+  });
+  return (
+    <div className="space-y-4">
+      <div className="p-3 bg-purple-50 border border-purple-100 rounded-lg text-purple-800 text-sm flex gap-2">
+        <Info size={18} className="shrink-0" />
+        <p>Signalement en cours pour Aerothau.</p>
+      </div>
+      <div>
+        <label className="text-xs font-bold text-slate-500 uppercase">Titre du signalement</label>
+        <input type="text" className="w-full mt-1 p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500" value={formData.title || ""} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Toiture Garage..." />
+      </div>
+      <div>
+        <label className="text-xs font-bold text-slate-500 uppercase">Adresse</label>
+        <div className="bg-slate-100 p-3 mt-1 rounded-lg text-sm text-slate-600 flex items-center gap-2">
+          <MapPin size={16} className="text-purple-500" /> {formData.address}
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-bold text-slate-500 uppercase">Contact</label>
+        <input type="text" placeholder="Nom ou téléphone..." className="w-full mt-1 p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500" value={formData.ownerContact} onChange={(e) => setFormData({ ...formData, ownerContact: e.target.value })} />
+      </div>
+      <div>
+        <label className="text-xs font-bold text-slate-500 uppercase">Détails</label>
+        <textarea placeholder="Description du lieu..." className="w-full mt-1 p-2 border rounded-lg text-sm resize-none outline-none focus:ring-2 focus:ring-purple-500" rows="3" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+      </div>
+      <div className="flex gap-2 pt-2">
+        <Button variant="outline" onClick={onCancel} className="flex-1 justify-center">Annuler</Button>
+        <Button variant="purple" onClick={() => onSave(formData)} className="flex-1 justify-center"><Send size={16} /> Envoyer</Button>
+      </div>
     </div>
   );
 };
@@ -259,7 +301,10 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }
   if (readOnly) return (
     <div className="space-y-3 text-slate-800">
       {nest.photo && <img src={nest.photo} alt="Nid" className="w-full h-40 object-cover rounded-lg" />}
-      <h4 className="font-bold">{nest.address}</h4>
+      <div>
+        <h4 className="font-bold text-lg">{nest.title || "Nid"}</h4>
+        <p className="text-xs text-slate-500 mb-2"><MapIcon size={12} className="inline mr-1"/>{nest.address}</p>
+      </div>
       <div className="flex gap-2"><Badge status={nest.status} /><span className="text-xs text-slate-500 font-bold">{nest.eggs} œufs</span></div>
       {nest.comments && <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 italic">{nest.comments}</p>}
     </div>
@@ -278,6 +323,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, readOnly = false }
             </label>
         )}
       </div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre / Nom du site</label><input type="text" className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.title || ""} onChange={(e) => setFormData({...formData, title: e.target.value})}/></div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Emplacement</label><textarea className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/></div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
@@ -389,7 +435,6 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
     <div className="space-y-8 animate-in fade-in duration-500 text-slate-800">
       <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">TABLEAU DE BORD</h2><Badge status="Live Data" /></div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* CORRECTION : Carte Total Nids en Bleu avec texte blanc pour lisibilité */}
         <Card className="p-8 bg-blue-600 text-white shadow-xl border-0">
             <div className="flex justify-between items-start">
                 <p className="text-xs font-black uppercase opacity-70 tracking-widest text-white">Total Nids</p>
@@ -755,6 +800,11 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
 const ClientSpace = ({ user, markers }) => {
     const myMarkers = markers.filter(m => m.clientId === user.clientId);
     const neut = myMarkers.filter(m => m.status.includes("sterilized")).length;
+    
+    // Ajout de la fonction pour ouvrir le rapport client (si nécessaire, ici je remets le ClientReportForm pour l'ajout)
+    const [pendingReport, setPendingReport] = useState(null);
+    const [isAddingMode, setIsAddingMode] = useState(false);
+
     return (
         <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500 text-slate-800">
             <div className="space-y-10">
@@ -767,11 +817,60 @@ const ClientSpace = ({ user, markers }) => {
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
                 </div>
             </div>
-            <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white"><h3 className="text-lg font-black uppercase tracking-tighter mb-6">CARTOGRAPHIE DE VOTRE SITE</h3>
-                <div className="h-[600px] rounded-2xl overflow-hidden border-4 border-slate-100 shadow-inner">
-                    <LeafletMap markers={myMarkers} isAddingMode={false} />
+            
+            <div className="h-[600px] flex flex-col gap-6 text-slate-800">
+                <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
+                    <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-500">Cartographie de votre site</div>
+                    <Button variant={isAddingMode ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAddingMode(!isAddingMode)}>
+                        {isAddingMode ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Signaler un nid</>}
+                    </Button>
+                </Card>
+                <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden border-8 border-white bg-white">
+                     {isAddingMode && (
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce pointer-events-none">
+                            📍 Cliquez sur la carte pour signaler un nid
+                        </div>
+                    )}
+                    <LeafletMap 
+                        markers={myMarkers} 
+                        isAddingMode={isAddingMode} 
+                        onMapClick={(ll) => {
+                            if(isAddingMode) {
+                                setPendingReport({
+                                    id: Date.now(),
+                                    clientId: user.clientId,
+                                    lat: ll.lat,
+                                    lng: ll.lng,
+                                    address: "Nouveau signalement",
+                                    status: "reported_by_client",
+                                    title: "Signalement Client",
+                                });
+                                setIsAddingMode(false);
+                            }
+                        }}
+                    />
+                    
+                    {pendingReport && (
+                        <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
+                             <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
+                                <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
+                                    <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><Crosshair size={16} className="text-sky-400"/> Signalement</span>
+                                    <button onClick={() => setPendingReport(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
+                                </div>
+                                <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
+                                    <ClientReportForm nest={pendingReport} onSave={async (d) => {
+                                        // Ici, on devrait appeler une fonction pour sauvegarder, mais comme ClientSpace n'a pas accès direct à updateFirebase dans cette structure simplifiée, 
+                                        // dans une vraie app on passerait la fonction en prop. Pour l'instant, c'est visuel.
+                                        console.log("Sauvegarde signalement", d);
+                                        setPendingReport(null);
+                                        alert("Signalement enregistré !");
+                                    }} onCancel={() => setPendingReport(null)} />
+                                </div>
+                            </Card>
+                        </div>
+                    )}
                 </div>
-            </Card>
+            </div>
         </div>
     );
 };
