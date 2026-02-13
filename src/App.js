@@ -49,7 +49,11 @@ import {
   XCircle,
   Activity,
   Upload,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Cloud,
+  Wind,
+  Sun,
+  Download
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -301,17 +305,44 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
       reader.readAsDataURL(file);
     }
   };
+  
   if (readOnly) return (
-    <div className="space-y-3 text-slate-800">
-      {nest.photo && <img src={nest.photo} alt="Nid" className="w-full h-40 object-cover rounded-lg" />}
+    <div className="space-y-4 text-slate-800">
+      {nest.photo && (
+          <div className="rounded-xl overflow-hidden shadow-md border border-slate-100">
+              <img src={nest.photo} alt="Nid" className="w-full h-40 object-cover" />
+          </div>
+      )}
       <div>
-        <h4 className="font-bold text-lg">{nest.title || "Nid"}</h4>
-        <p className="text-xs text-slate-500 mb-2"><MapIcon size={12} className="inline mr-1"/>{nest.address}</p>
+        <div className="flex justify-between items-start">
+            <h4 className="font-bold text-lg text-slate-900">{nest.title || "Nid sans nom"}</h4>
+            <Badge status={nest.status} />
+        </div>
+        <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><MapIcon size={12}/>{nest.address}</p>
       </div>
-      <div className="flex gap-2"><Badge status={nest.status} /><span className="text-xs text-slate-500 font-bold">{nest.eggs} œufs</span></div>
-      {nest.comments && <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 italic">{nest.comments}</p>}
+      
+      <div className="grid grid-cols-2 gap-4">
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Œufs</p>
+              <p className="text-xl font-black text-slate-800">{nest.eggs}</p>
+          </div>
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-center">
+               <p className="text-[10px] font-bold text-slate-400 uppercase">ID</p>
+               <p className="text-sm font-mono text-slate-600 mt-1">#{nest.id.toString().slice(-4)}</p>
+          </div>
+      </div>
+
+      {nest.comments && (
+          <div className="bg-sky-50 p-3 rounded-lg border border-sky-100">
+            <p className="text-[10px] font-bold text-sky-600 uppercase mb-1">Observation</p>
+            <p className="text-sm text-sky-900 italic">{nest.comments}</p>
+          </div>
+      )}
+      
+      <Button variant="sky" className="w-full mt-2" onClick={onCancel}>Fermer</Button>
     </div>
   );
+
   return (
     <div className="space-y-4 text-slate-800">
       <div>
@@ -926,13 +957,16 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
     );
 };
 
-const ClientSpace = ({ user, markers }) => {
-    const myMarkers = markers.filter(m => m.clientId === user.clientId);
-    const neut = myMarkers.filter(m => m.status.includes("sterilized")).length;
+const ClientSpace = ({ user, markers, interventions, clients, reports }) => {
+    const myMarkers = useMemo(() => markers.filter(m => m.clientId === user.clientId), [markers, user.clientId]);
+    const neut = useMemo(() => myMarkers.filter(m => m.status && m.status.includes("sterilized")).length, [myMarkers]);
     
     // Ajout de la fonction pour ouvrir le rapport client (si nécessaire, ici je remets le ClientReportForm pour l'ajout)
     const [pendingReport, setPendingReport] = useState(null);
     const [isAddingMode, setIsAddingMode] = useState(false);
+    
+    // NOUVEAU : État pour le détail d'un nid cliqué
+    const [selectedNestDetail, setSelectedNestDetail] = useState(null);
 
     return (
         <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500 text-slate-800">
@@ -941,63 +975,132 @@ const ClientSpace = ({ user, markers }) => {
                     <div className="relative z-10"><h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Bonjour, {user.name}</h2><div className="w-16 h-1 bg-sky-500 mb-6"></div><p className="text-slate-400 font-bold max-w-lg leading-relaxed uppercase text-xs tracking-widest">Contrôlez l'état sanitaire de votre site en temps réel via l'interface de surveillance Aerothau.</p></div>
                     <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
                 </Card>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
+                
+                {/* WIDGET METEO & STATS */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-slate-900">
+                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex flex-col justify-between bg-gradient-to-br from-sky-400 to-blue-600 text-white relative overflow-hidden">
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="font-bold uppercase tracking-widest text-xs opacity-80">Météo de vol</span>
+                                <Cloud size={24} />
+                            </div>
+                            <div className="flex items-end gap-2">
+                                <span className="text-4xl font-black">18°C</span>
+                                <span className="text-sm font-bold mb-1 opacity-90">Vent: 12 km/h NO</span>
+                            </div>
+                            <p className="text-xs mt-4 font-medium bg-white/20 p-2 rounded-lg inline-block">✅ Conditions optimales</p>
+                        </div>
+                        <Wind className="absolute -right-4 -bottom-4 w-24 h-24 text-white/10" />
+                    </Card>
+
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
                 </div>
             </div>
             
-            <div className="h-[600px] flex flex-col gap-6 text-slate-800">
-                <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
-                    <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-500">Cartographie de votre site</div>
-                    <Button variant={isAddingMode ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAddingMode(!isAddingMode)}>
-                        {isAddingMode ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Signaler un nid</>}
-                    </Button>
-                </Card>
-                <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden border-8 border-white bg-white">
-                     {isAddingMode && (
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce pointer-events-none">
-                            📍 Cliquez sur la carte pour signaler un nid
+            {/* DOCUMENTS RECENTS */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                 <div className="lg:col-span-2 h-[600px] flex flex-col gap-6 text-slate-800">
+                    <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
+                        <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-500">Cartographie de votre site</div>
+                        <Button variant={isAddingMode ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAddingMode(!isAddingMode)}>
+                            {isAddingMode ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Signaler un nid</>}
+                        </Button>
+                    </Card>
+                    <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden border-8 border-white bg-white">
+                         {isAddingMode && (
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce pointer-events-none">
+                                📍 Cliquez sur la carte pour signaler un nid
+                            </div>
+                        )}
+                        <LeafletMap 
+                            markers={myMarkers} 
+                            isAddingMode={isAddingMode} 
+                            onMarkerClick={(m) => {
+                                if(!isAddingMode) setSelectedNestDetail(m);
+                            }}
+                            onMapClick={(ll) => {
+                                if(isAddingMode) {
+                                    setPendingReport({
+                                        id: Date.now(),
+                                        clientId: user.clientId,
+                                        lat: ll.lat,
+                                        lng: ll.lng,
+                                        address: "Nouveau signalement",
+                                        status: "reported_by_client",
+                                        title: "Signalement Client",
+                                    });
+                                    setIsAddingMode(false);
+                                }
+                            }}
+                        />
+                        
+                        {/* FORMULAIRE SIGNALEMENT */}
+                        {pendingReport && (
+                            <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
+                                 <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
+                                    <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
+                                        <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><Crosshair size={16} className="text-sky-400"/> Signalement</span>
+                                        <button onClick={() => setPendingReport(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
+                                    </div>
+                                    <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
+                                        <ClientReportForm nest={pendingReport} onSave={async (d) => {
+                                            // Ici, on devrait appeler une fonction pour sauvegarder, mais comme ClientSpace n'a pas accès direct à updateFirebase dans cette structure simplifiée, 
+                                            // dans une vraie app on passerait la fonction en prop. Pour l'instant, c'est visuel.
+                                            console.log("Sauvegarde signalement", d);
+                                            setPendingReport(null);
+                                            alert("Signalement enregistré !");
+                                        }} onCancel={() => setPendingReport(null)} />
+                                    </div>
+                                </Card>
+                            </div>
+                        )}
+
+                        {/* DETAIL NID (LECTURE SEULE) */}
+                        {selectedNestDetail && (
+                            <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
+                                <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
+                                    <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
+                                        <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><MapIcon size={16} className="text-sky-400"/> Détails du Nid</span>
+                                        <button onClick={() => setSelectedNestDetail(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
+                                    </div>
+                                    <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
+                                        <NestEditForm nest={selectedNestDetail} readOnly={true} onCancel={() => setSelectedNestDetail(null)} />
+                                    </div>
+                                </Card>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <Card className="p-6 border-0 shadow-xl rounded-3xl bg-white flex flex-col h-full">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-black text-lg text-slate-800 uppercase tracking-tighter">Documents Récents</h3>
+                            <div className="p-2 bg-slate-100 rounded-full"><FileText size={18} className="text-slate-400"/></div>
                         </div>
-                    )}
-                    <LeafletMap 
-                        markers={myMarkers} 
-                        isAddingMode={isAddingMode} 
-                        onMapClick={(ll) => {
-                            if(isAddingMode) {
-                                setPendingReport({
-                                    id: Date.now(),
-                                    clientId: user.clientId,
-                                    lat: ll.lat,
-                                    lng: ll.lng,
-                                    address: "Nouveau signalement",
-                                    status: "reported_by_client",
-                                    title: "Signalement Client",
-                                });
-                                setIsAddingMode(false);
-                            }
-                        }}
-                    />
+                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                             {reports && reports.length > 0 ? reports.slice(0, 5).map(r => (
+                                 <div key={r.id} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center group hover:bg-slate-100 transition-colors cursor-pointer">
+                                     <div>
+                                         <p className="font-bold text-sm text-slate-700">{r.title}</p>
+                                         <p className="text-[10px] text-slate-400 font-bold uppercase">{r.date}</p>
+                                     </div>
+                                     <Download size={16} className="text-slate-300 group-hover:text-sky-600 transition-colors"/>
+                                 </div>
+                             )) : <p className="text-sm text-slate-400 italic text-center py-4">Aucun document disponible</p>}
+                        </div>
+                         <Button variant="outline" className="w-full mt-4 rounded-xl text-xs uppercase font-bold tracking-widest">Voir tous les documents</Button>
+                    </Card>
                     
-                    {pendingReport && (
-                        <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
-                             <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
-                                <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
-                                    <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><Crosshair size={16} className="text-sky-400"/> Signalement</span>
-                                    <button onClick={() => setPendingReport(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
-                                </div>
-                                <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
-                                    <ClientReportForm nest={pendingReport} onSave={async (d) => {
-                                        // Ici, on devrait appeler une fonction pour sauvegarder, mais comme ClientSpace n'a pas accès direct à updateFirebase dans cette structure simplifiée, 
-                                        // dans une vraie app on passerait la fonction en prop. Pour l'instant, c'est visuel.
-                                        console.log("Sauvegarde signalement", d);
-                                        setPendingReport(null);
-                                        alert("Signalement enregistré !");
-                                    }} onCancel={() => setPendingReport(null)} />
-                                </div>
-                            </Card>
+                     <Card className="p-6 border-0 shadow-xl rounded-3xl bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
+                        <div className="relative z-10">
+                            <AlertTriangle size={32} className="text-orange-400 mb-3 mx-auto"/>
+                            <h3 className="font-black text-lg uppercase tracking-tighter mb-2">Besoin d'une intervention ?</h3>
+                            <p className="text-xs text-slate-400 mb-4 px-4">Une urgence ou un nid non traité ? Contactez notre équipe technique.</p>
+                            <Button variant="sky" className="w-full rounded-xl text-xs uppercase font-black tracking-widest">Demander un passage</Button>
                         </div>
-                    )}
+                    </Card>
                 </div>
             </div>
         </div>
