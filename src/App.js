@@ -48,8 +48,9 @@ import {
   AlertTriangle,
   Download,
   FileSpreadsheet,
-  Waypoints,
-  FileDown
+  Activity, // Remplacement de Waypoints par Activity ou MapIcon pour le trajet
+  Cloud,
+  Wind
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -791,7 +792,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" className="h-12 rounded-2xl text-xs uppercase tracking-widest border-slate-200" onClick={optimizeRoute}>
-                        <Waypoints size={16}/> Optimiser Trajet
+                        <Activity size={16}/> Optimiser Trajet
                     </Button>
                     <Button variant={isAdding ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAdding(!isAdding)}>
                         {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
@@ -806,7 +807,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 )}
                 {routePath && (
                      <div className="absolute top-4 left-4 z-[500] bg-white text-slate-800 px-4 py-2 rounded-full shadow-lg text-xs font-bold flex items-center gap-2">
-                        <Waypoints size={14} className="text-blue-500"/> Trajet optimisé affiché
+                        <Activity size={14} className="text-blue-500"/> Trajet optimisé affiché
                         <button onClick={() => setRoutePath(null)} className="ml-2 text-slate-400 hover:text-red-500"><X size={14}/></button>
                     </div>
                 )}
@@ -1137,12 +1138,7 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
     const [editingRep, setEditingRep] = useState(null);
     return (
         <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
-            <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS & RAPPORTS</h2>
-            <div className="flex gap-2">
-                 <Button variant="outline" onClick={() => generatePDF({ title: "Export Global", date: new Date().toISOString().split('T')[0], type: "Liste" }, { name: "Aerothau" }, [])}><FileDown size={16}/> Exporter PDF</Button>
-                 <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button>
-            </div>
-            </div>
+            <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS & RAPPORTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button></div>
             <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
