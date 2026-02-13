@@ -53,7 +53,8 @@ import {
   Wind,
   Upload,
   File,
-  FileCheck
+  FileCheck,
+  Loader2
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -97,23 +98,29 @@ const exportToCSV = (data, filename) => {
 };
 
 // Fonction de génération PDF Robuste (Supporte Rapports Complets et Fiches Nids)
-const generatePDF = (type, data, extraData = {}) => {
-    const loadScript = (src) => new Promise((resolve) => {
+const generatePDF = async (type, data, extraData = {}, onStart, onEnd) => {
+    if (onStart) onStart();
+
+    const loadScript = (src) => new Promise((resolve, reject) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
         const script = document.createElement('script');
         script.src = src;
         script.onload = resolve;
+        script.onerror = reject;
         document.body.appendChild(script);
     });
 
-    Promise.all([
-        loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"),
-        loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js")
-    ]).then(() => {
-        if (!window.jspdf) {
-            alert("Erreur: Librairie PDF non chargée. Réessayez.");
-            return;
-        }
+    try {
+        await Promise.all([
+            loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"),
+            loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js")
+        ]);
+
+        // Petit délai pour assurer l'initialisation
+        await new Promise(r => setTimeout(r, 500));
+
+        if (!window.jspdf) throw new Error("La librairie PDF n'a pas pu être chargée.");
+        
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         const today = new Date().toLocaleDateString('fr-FR');
@@ -129,7 +136,7 @@ const generatePDF = (type, data, extraData = {}) => {
 
         if (type === 'nest_detail') {
             // --- FICHE NID INDIVIDUELLE ---
-            const nest = data;
+            const nest = data || {};
             const clientName = extraData.clientName || "Inconnu";
             
             doc.text("FICHE D'IDENTIFICATION NID", 20, 32);
@@ -138,15 +145,15 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, 55);
             doc.setFontSize(11);
             doc.text(`Client : ${clientName}`, 20, 62);
-            doc.text(`Adresse : ${nest.address}`, 20, 68);
-            doc.text(`Statut : ${nest.status}`, 20, 74);
-            doc.text(`Œufs : ${nest.eggs}`, 20, 80);
+            doc.text(`Adresse : ${nest.address || "Non renseignée"}`, 20, 68);
+            doc.text(`Statut : ${nest.status || "Inconnu"}`, 20, 74);
+            doc.text(`Œufs : ${nest.eggs || 0}`, 20, 80);
             doc.text(`Notes : ${nest.comments || "Aucune"}`, 20, 86);
 
             if (nest.photo) {
                 try {
                     doc.addImage(nest.photo, 'JPEG', 20, 100, 100, 75);
-                } catch(e) {}
+                } catch(e) { console.warn("Image error", e); }
             }
             doc.save(`Fiche_Nid_${nest.id}.pdf`);
             
@@ -178,9 +185,9 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text("Détail des Nids", 20, 105);
             const nestRows = markers.map(m => [
                 m.title || "Nid",
-                m.address,
-                m.status,
-                m.eggs
+                m.address || "",
+                m.status || "",
+                m.eggs || 0
             ]);
             doc.autoTable({
                 startY: 110,
@@ -217,7 +224,12 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`Titre : ${report.title}`, 20, 55);
             doc.save(`${report.title}.pdf`);
         }
-    }).catch(e => console.error("PDF Error", e));
+    } catch (e) {
+        console.error("PDF Generation Error", e);
+        alert("Erreur lors de la génération du PDF. Vérifiez votre connexion.");
+    } finally {
+        if (onEnd) onEnd();
+    }
 };
 
 // --- COMPOSANTS UI DE BASE ---
@@ -531,8 +543,10 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
     );
 };
 
-const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly = false }) => {
+const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly = false, onGeneratePDF }) => {
   const [formData, setFormData] = useState({ title: "", comments: "", eggs: 0, status: "present", clientId: "", ...nest });
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -550,9 +564,11 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
     }
   };
 
-  const downloadNestPDF = () => {
-     const clientName = clients.find(c => c.id === nest.clientId)?.name || "Non assigné";
-     generatePDF('nest_detail', nest, { clientName });
+  const handleDownloadPDF = () => {
+     if(onGeneratePDF) {
+         setIsGenerating(true);
+         onGeneratePDF(nest, () => setIsGenerating(false));
+     }
   };
 
   if (readOnly) return (
@@ -642,7 +658,10 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Notes Techniques</label><textarea className="w-full p-2 border rounded-lg text-sm h-20 mt-1" placeholder="Accès, détails..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/></div>
       
       {/* BOUTON RAPPORT PDF */}
-      <Button variant="secondary" className="w-full border-slate-300 text-slate-700 mt-2" onClick={downloadNestPDF}><FileText size={16}/> 📄 Générer Fiche PDF</Button>
+      <Button variant="secondary" disabled={isGenerating} className="w-full border-slate-300 text-slate-700 mt-2" onClick={handleDownloadPDF}>
+          {isGenerating ? <Loader2 className="animate-spin" size={16}/> : <FileText size={16}/>} 
+          {isGenerating ? " Génération..." : " Générer Fiche PDF"}
+      </Button>
 
       <div className="flex gap-2 mt-4">
         {onDelete && (
@@ -1000,6 +1019,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                                     onSave={async(u) => { await onUpdateNest(u); setSelectedMarker(null); }} 
                                     onCancel={() => setSelectedMarker(null)}
                                     onDelete={async(u) => { if(window.confirm("Supprimer ce nid ?")) { await onDeleteNest(u); setSelectedMarker(null); } }}
+                                    onGeneratePDF={(n, cb) => generatePDF('nest_detail', n, { clientName: clients.find(c => c.id === n.clientId)?.name }, () => {}, cb)}
                                 />
                             </div>
                         </Card>
@@ -1112,7 +1132,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
       </Card>
       {selectedNest && (
         <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-          <Card className="bg-white rounded-3xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border-0 text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Modifier le nid</h3><NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} /></Card>
+          <Card className="bg-white rounded-3xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border-0 text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Modifier le nid</h3><NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} onGeneratePDF={(n, cb) => generatePDF('nest_detail', n, { clientName: clients.find(c => c.id === n.clientId)?.name }, () => {}, cb)}/></Card>
         </div>
       )}
     </div>
@@ -1396,12 +1416,15 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                     <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
                 </Card>
                 
+                {/* WIDGET STATS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
+                    {/* suppression du widget météo demandé */}
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
                 </div>
             </div>
             
+            {/* DOCUMENTS RECENTS ET CARTE */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                  <div className="lg:col-span-2 h-[600px] flex flex-col gap-6 text-slate-800">
                     <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
