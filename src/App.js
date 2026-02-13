@@ -47,7 +47,9 @@ import {
   Eye,
   AlertTriangle,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Route,
+  FileDown
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -88,6 +90,81 @@ const exportToCSV = (data, filename) => {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+};
+
+// Fonction de génération PDF (Feature 1)
+const generatePDF = (report, client, markers) => {
+    const loadScript = (src) => new Promise((resolve) => {
+        if (document.querySelector(`script[src="${src}"]`)) return resolve();
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        document.body.appendChild(script);
+    });
+
+    Promise.all([
+        loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"),
+        loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js")
+    ]).then(() => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // En-tête
+        doc.setFillColor(15, 23, 42); // Slate 900
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.text("AEROTHAU", 20, 25);
+        doc.setFontSize(10);
+        doc.text("Rapport d'intervention", 20, 32);
+        doc.text(`Date : ${report.date}`, 180, 25, { align: 'right' });
+
+        // Info Client
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(14);
+        doc.text("Client :", 20, 55);
+        doc.setFontSize(12);
+        doc.text(client.name || "Inconnu", 20, 62);
+        doc.setFontSize(10);
+        doc.text(client.address || "", 20, 67);
+
+        // Stats
+        const totalEggs = markers.reduce((acc, curr) => acc + (curr.eggs || 0), 0);
+        const treated = markers.filter(m => m.status.includes('sterilized')).length;
+        
+        doc.setDrawColor(200, 200, 200);
+        doc.line(20, 75, 190, 75);
+        
+        doc.text(`Nids traités : ${treated} / ${markers.length}`, 20, 85);
+        doc.text(`Oeufs stérilisés : ${totalEggs}`, 100, 85);
+
+        // Tableau
+        const tableBody = markers.map(m => [
+            m.title || "Nid",
+            m.address,
+            m.status === 'present' ? 'Actif' : 'Traité',
+            m.eggs + " oeufs",
+            m.comments || "-"
+        ]);
+
+        doc.autoTable({
+            startY: 95,
+            head: [['Référence', 'Localisation', 'Statut', 'Contenu', 'Notes']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: { fillColor: [14, 165, 233] }, // Sky 500
+        });
+
+        // Pied de page
+        const pageCount = doc.internal.getNumberOfPages();
+        for(let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.text('Document généré par Aerothau Gestion - www.aerothau.fr', 105, 290, { align: 'center' });
+        }
+
+        doc.save(`Rapport_${report.title.replace(/\s+/g, '_')}.pdf`);
+    });
 };
 
 // --- COMPOSANTS UI DE BASE ---
@@ -418,37 +495,60 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
 
 // --- 3. CARTE & VUES PRINCIPALES ---
 
-const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }) => {
+const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, routePath }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
-  const tileLayerRef = useRef(null); // Ref pour le calque de tuiles
-  const [mapType, setMapType] = useState("satellite"); // 'satellite' ou 'plan'
+  const routeLayerRef = useRef(null); // Nouveau calque pour le trajet
+  const tileLayerRef = useRef(null);
+  const [mapType, setMapType] = useState("satellite");
 
   const tileUrls = {
       satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       plan: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
   };
 
-  const tileAttributions = {
-      satellite: 'Esri',
-      plan: 'OpenStreetMap'
-  };
-
-  // Gestion du changement de fond de carte
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L || !tileLayerRef.current) return;
-      // Changer l'URL du calque existant
       tileLayerRef.current.setUrl(tileUrls[mapType]);
   }, [mapType]);
 
+  // DESSIN DU TRAJET (Feature 4)
+  useEffect(() => {
+      if (!mapInstanceRef.current || !window.L) return;
+      const L = window.L;
+      
+      // Nettoyer l'ancien trajet
+      if (routeLayerRef.current) {
+          routeLayerRef.current.clearLayers();
+      } else {
+          routeLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current);
+      }
+
+      // Tracer le nouveau trajet
+      if (routePath && routePath.length > 1) {
+          const pointList = routePath.map(m => [m.lat, m.lng]);
+          // Ligne principale
+          const polyline = L.polyline(pointList, {
+              color: '#3b82f6', // Bleu
+              weight: 4,
+              opacity: 0.8,
+              dashArray: '10, 10', // Pointillés
+              lineJoin: 'round'
+          }).addTo(routeLayerRef.current);
+
+          // Zoomer pour voir tout le trajet
+          mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+      }
+
+  }, [routePath]);
 
   const updateMarkers = useCallback(() => {
     if (!mapInstanceRef.current || !markersLayerRef.current || !window.L) return;
     const L = window.L;
     markersLayerRef.current.clearLayers();
     markers.forEach(m => {
-      let color = "#64748b"; // Slate default
+      let color = "#64748b"; 
       if (m.status === "present") color = "#ef4444"; 
       else if (m.status === "temp") color = "#94a3b8"; 
       else if (m.status === "sterilized_1") color = "#84cc16"; 
@@ -492,19 +592,14 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
         mapInstanceRef.current = map;
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         
-        // Initialisation du calque de tuiles
         tileLayerRef.current = L.tileLayer(tileUrls.satellite, { attribution: 'Esri' }).addTo(map);
-
         markersLayerRef.current = L.layerGroup().addTo(map);
         
         map.on('click', (e) => onMapClick && onMapClick(e.latlng));
-        
-        // Initial update
         updateMarkers();
     }
-  }, []); // Only runs once on mount
+  }, []); // Only runs once
 
-  // Update markers when props change
   useEffect(() => {
       updateMarkers();
   }, [updateMarkers]);
@@ -621,6 +716,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [mapCenter, setMapCenter] = useState(null);
     const [tempMarker, setTempMarker] = useState(null);
+    const [routePath, setRoutePath] = useState(null); // Feature 4: Route Optimization
 
     const handleSearch = useCallback(async (e) => {
         if (e.key === "Enter" && searchQuery.trim()) {
@@ -652,6 +748,38 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
         }
     };
 
+    // Feature 4: Optimisation de Tournée (Algorithme simple "Plus proche voisin")
+    const optimizeRoute = () => {
+        if (markers.length < 2) return alert("Il faut au moins 2 nids pour créer un trajet.");
+        
+        // On part arbitrairement du premier nid de la liste (ou idéalement de la position utilisateur)
+        let unvisited = [...markers];
+        let current = unvisited.shift();
+        let path = [current];
+
+        while (unvisited.length > 0) {
+            let nearest = null;
+            let minDetails = Infinity;
+            let nearestIndex = -1;
+
+            unvisited.forEach((m, idx) => {
+                const dist = Math.sqrt(Math.pow(m.lat - current.lat, 2) + Math.pow(m.lng - current.lng, 2));
+                if (dist < minDetails) {
+                    minDetails = dist;
+                    nearest = m;
+                    nearestIndex = idx;
+                }
+            });
+
+            if (nearest) {
+                path.push(nearest);
+                current = nearest;
+                unvisited.splice(nearestIndex, 1);
+            }
+        }
+        setRoutePath(path);
+    };
+
     const displayMarkers = useMemo(() => tempMarker ? [...markers, tempMarker] : markers, [markers, tempMarker]);
 
     return (
@@ -661,9 +789,14 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={20}/>
                     <input type="text" placeholder="Recherche d'adresse ou coordonnées GPS..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-0 rounded-2xl focus:ring-2 focus:ring-sky-500 text-sm font-medium transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
                 </div>
-                <Button variant={isAdding ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAdding(!isAdding)}>
-                    {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" className="h-12 rounded-2xl text-xs uppercase tracking-widest border-slate-200" onClick={optimizeRoute}>
+                        <Route size={16}/> Optimiser Trajet
+                    </Button>
+                    <Button variant={isAdding ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAdding(!isAdding)}>
+                        {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
+                    </Button>
+                </div>
             </Card>
             <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden border-8 border-white bg-white">
                 {tempMarker && !isAdding && (
@@ -671,11 +804,26 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                         📍 Cliquez sur le point gris pour valider
                     </div>
                 )}
-                <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} onMapClick={async (ll) => {
-                    if(!isAdding) return;
-                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present", eggs: 0, clientId: clients[0]?.id || "" };
-                    await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
-                }}/>
+                {routePath && (
+                     <div className="absolute top-4 left-4 z-[500] bg-white text-slate-800 px-4 py-2 rounded-full shadow-lg text-xs font-bold flex items-center gap-2">
+                        <Route size={14} className="text-blue-500"/> Trajet optimisé affiché
+                        <button onClick={() => setRoutePath(null)} className="ml-2 text-slate-400 hover:text-red-500"><X size={14}/></button>
+                    </div>
+                )}
+
+                <LeafletMap 
+                    markers={displayMarkers} 
+                    isAddingMode={isAdding} 
+                    center={mapCenter} 
+                    onMarkerClick={handleMarkerClick} 
+                    routePath={routePath} // Passage du trajet au composant carte
+                    onMapClick={async (ll) => {
+                        if(!isAdding) return;
+                        const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present", eggs: 0, clientId: clients[0]?.id || "" };
+                        await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
+                    }}
+                />
+                
                 {selectedMarker && selectedMarker.id !== "temp" && (
                     <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
                         <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
@@ -989,7 +1137,12 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
     const [editingRep, setEditingRep] = useState(null);
     return (
         <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
-            <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS & RAPPORTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button></div>
+            <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS & RAPPORTS</h2>
+            <div className="flex gap-2">
+                 <Button variant="outline" onClick={() => generatePDF({ title: "Export Global", date: new Date().toISOString().split('T')[0], type: "Liste" }, { name: "Aerothau" }, [])}><FileDown size={16}/> Exporter PDF</Button>
+                 <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button>
+            </div>
+            </div>
             <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
@@ -1001,6 +1154,14 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
                                     <td className="p-6 text-xs font-black uppercase text-slate-400">{clients.find(c => c.id === r.clientId)?.name || "Client supprimé"}</td>
                                     <td className="p-6"><Badge status={r.status}/></td>
                                     <td className="p-6 flex justify-end gap-3">
+                                        {/* Bouton de génération PDF (Feature 1) */}
+                                        <button 
+                                            onClick={() => generatePDF(r, clients.find(c => c.id === r.clientId) || {}, [])} 
+                                            className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all shadow-sm" 
+                                            title="Télécharger PDF"
+                                        >
+                                            <FileDown size={18}/>
+                                        </button>
                                         <button onClick={() => setEditingRep(r)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
                                         <button onClick={() => {if(window.confirm("Supprimer ce document ?")) onDeleteReport(r);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
                                     </td>
