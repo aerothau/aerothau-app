@@ -48,7 +48,7 @@ import {
   AlertTriangle,
   Download,
   FileSpreadsheet,
-  Activity, // Remplacement de Waypoints par Activity ou MapIcon pour le trajet
+  Activity,
   Cloud,
   Wind
 } from "lucide-react";
@@ -1138,7 +1138,12 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
     const [editingRep, setEditingRep] = useState(null);
     return (
         <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
-            <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS & RAPPORTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button></div>
+            <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS & RAPPORTS</h2>
+            <div className="flex gap-2">
+                 <Button variant="outline" onClick={() => generatePDF({ title: "Export Global", date: new Date().toISOString().split('T')[0], type: "Liste" }, { name: "Aerothau" }, [])}><FileDown size={16}/> Exporter PDF</Button>
+                 <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button>
+            </div>
+            </div>
             <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
