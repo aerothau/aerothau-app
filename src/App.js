@@ -48,7 +48,7 @@ import {
   AlertTriangle,
   Download,
   FileSpreadsheet,
-  Route,
+  Waypoints,
   FileDown
 } from "lucide-react";
 
@@ -1211,8 +1211,8 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                     <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
                 </Card>
                 
-                {/* WIDGET METEO & STATS */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-slate-900">
+                {/* WIDGET STATS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
                     {/* suppression du widget météo demandé */}
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
