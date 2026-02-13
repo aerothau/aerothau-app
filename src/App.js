@@ -46,7 +46,7 @@ import {
   MessageSquare,
   Eye,
   AlertTriangle,
-  Download, // On utilise Download à la place de FileDown
+  Download,
   FileSpreadsheet,
   Activity,
   Cloud,
@@ -410,6 +410,15 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
     }
   };
   
+  // Fonction pour ouvrir l'itinéraire
+  const openRoute = () => {
+    if (nest.lat && nest.lng) {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank');
+    } else {
+      alert("Coordonnées GPS manquantes pour cet itinéraire.");
+    }
+  };
+
   if (readOnly) return (
     <div className="space-y-4 text-slate-800">
       {nest.photo && (
@@ -469,7 +478,19 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Emplacement</label><textarea className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/></div>
+      <div>
+        <div className="flex justify-between items-center mb-1">
+            <label className="text-[10px] font-bold text-slate-400 uppercase">Emplacement</label>
+            <button 
+                type="button" 
+                onClick={openRoute} 
+                className="text-[10px] font-bold text-sky-600 uppercase flex items-center gap-1 hover:text-sky-700"
+            >
+                <Locate size={12}/> Voir Itinéraire
+            </button>
+        </div>
+        <textarea className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/>
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
             <select className="w-full p-2 border rounded-lg bg-white text-sm mt-1" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
