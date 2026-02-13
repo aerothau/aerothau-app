@@ -46,7 +46,7 @@ import {
   MessageSquare,
   Eye,
   AlertTriangle,
-  Download,
+  Download, // On utilise Download à la place de FileDown
   FileSpreadsheet,
   Activity,
   Cloud,
@@ -1140,7 +1140,7 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
         <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
             <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS & RAPPORTS</h2>
             <div className="flex gap-2">
-                 <Button variant="outline" onClick={() => generatePDF({ title: "Export Global", date: new Date().toISOString().split('T')[0], type: "Liste" }, { name: "Aerothau" }, [])}><FileDown size={16}/> Exporter PDF</Button>
+                 <Button variant="outline" onClick={() => generatePDF({ title: "Export Global", date: new Date().toISOString().split('T')[0], type: "Liste" }, { name: "Aerothau" }, [])}><Download size={16}/> Exporter PDF</Button>
                  <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button>
             </div>
             </div>
@@ -1161,7 +1161,7 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
                                             className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all shadow-sm" 
                                             title="Télécharger PDF"
                                         >
-                                            <FileDown size={18}/>
+                                            <Download size={18}/>
                                         </button>
                                         <button onClick={() => setEditingRep(r)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
                                         <button onClick={() => {if(window.confirm("Supprimer ce document ?")) onDeleteReport(r);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
