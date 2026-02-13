@@ -52,8 +52,8 @@ import {
   Cloud,
   Wind,
   Upload,
-  FileCheck,
-  FileInput
+  File,
+  FileCheck
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -96,9 +96,8 @@ const exportToCSV = (data, filename) => {
   document.body.removeChild(link);
 };
 
-// Fonction de génération PDF Robuste
+// Fonction de génération PDF Robuste (Supporte Rapports Complets et Fiches Nids)
 const generatePDF = (type, data, extraData = {}) => {
-    // Simulation de chargement des libs si nécessaire (dans un vrai projet, utiliser npm install jspdf jspdf-autotable)
     const loadScript = (src) => new Promise((resolve) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
         const script = document.createElement('script');
@@ -129,42 +128,94 @@ const generatePDF = (type, data, extraData = {}) => {
         doc.text(`Document généré le : ${today}`, 190, 25, { align: 'right' });
 
         if (type === 'nest_detail') {
+            // --- FICHE NID INDIVIDUELLE ---
             const nest = data;
             const clientName = extraData.clientName || "Inconnu";
             
-            doc.setFontSize(16);
-            doc.text("FICHE D'IDENTIFICATION NID", 20, 50);
-            
+            doc.text("FICHE D'IDENTIFICATION NID", 20, 32);
             doc.setTextColor(0, 0, 0);
-            doc.setFontSize(12);
-            doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, 65);
-            doc.text(`Client : ${clientName}`, 20, 72);
-            doc.text(`Adresse : ${nest.address}`, 20, 79);
-            doc.text(`Statut : ${nest.status}`, 20, 86);
-            doc.text(`Œufs : ${nest.eggs}`, 20, 93);
-            doc.text(`Notes : ${nest.comments || "Aucune"}`, 20, 100);
+            doc.setFontSize(14);
+            doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, 55);
+            doc.setFontSize(11);
+            doc.text(`Client : ${clientName}`, 20, 62);
+            doc.text(`Adresse : ${nest.address}`, 20, 68);
+            doc.text(`Statut : ${nest.status}`, 20, 74);
+            doc.text(`Œufs : ${nest.eggs}`, 20, 80);
+            doc.text(`Notes : ${nest.comments || "Aucune"}`, 20, 86);
 
             if (nest.photo) {
                 try {
-                    doc.addImage(nest.photo, 'JPEG', 20, 110, 100, 75);
+                    doc.addImage(nest.photo, 'JPEG', 20, 100, 100, 75);
                 } catch(e) {}
             }
-            
             doc.save(`Fiche_Nid_${nest.id}.pdf`);
             
-        } else {
-            // Rapport Global
-            const report = data;
-            doc.text("RAPPORT / DOCUMENT", 20, 50);
-            doc.setTextColor(0, 0, 0);
-            doc.setFontSize(12);
-            doc.text(`Titre : ${report.title}`, 20, 65);
-            doc.text(`Date du document : ${report.date}`, 20, 72);
-            doc.text(`Type : ${report.type}`, 20, 79);
+        } else if (type === 'complete_report') {
+            // --- RAPPORT COMPLET CLIENT ---
+            const client = extraData.client || { name: "Client Inconnu" };
+            const markers = extraData.markers || [];
+            const interventions = extraData.interventions || [];
+
+            doc.text("RAPPORT D'ACTIVITÉ COMPLET", 20, 32);
             
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(16);
+            doc.text(`Client : ${client.name}`, 20, 55);
             doc.setFontSize(10);
-            doc.text("Ce document est certifié par Aerothau.", 20, 100);
-            doc.save(`Document_${report.title}.pdf`);
+            doc.text(client.address || "", 20, 60);
+
+            // Stats
+            const totalEggs = markers.reduce((acc, curr) => acc + (curr.eggs || 0), 0);
+            const treated = markers.filter(m => m.status && m.status.includes('sterilized')).length;
+            
+            doc.setFillColor(240, 240, 240);
+            doc.rect(20, 70, 170, 20, 'F');
+            doc.text(`Total Nids : ${markers.length}`, 30, 82);
+            doc.text(`Traités : ${treated}`, 80, 82);
+            doc.text(`Œufs stérilisés : ${totalEggs}`, 130, 82);
+
+            // Tableau Nids
+            doc.text("Détail des Nids", 20, 105);
+            const nestRows = markers.map(m => [
+                m.title || "Nid",
+                m.address,
+                m.status,
+                m.eggs
+            ]);
+            doc.autoTable({
+                startY: 110,
+                head: [['Référence', 'Localisation', 'Statut', 'Oeufs']],
+                body: nestRows,
+                theme: 'grid',
+                headStyles: { fillColor: [14, 165, 233] },
+            });
+
+            // Tableau Interventions
+            const finalY = doc.lastAutoTable.finalY + 15;
+            doc.text("Historique Interventions", 20, finalY);
+            const intRows = interventions.map(i => [
+                i.date,
+                i.status,
+                i.technician || "-",
+                i.notes || ""
+            ]);
+            doc.autoTable({
+                startY: finalY + 5,
+                head: [['Date', 'Statut', 'Agent', 'Notes']],
+                body: intRows,
+                theme: 'grid',
+                headStyles: { fillColor: [15, 23, 42] },
+            });
+
+            doc.save(`Rapport_Complet_${client.name.replace(/\s+/g, '_')}.pdf`);
+
+        } else {
+            // Document simple
+            const report = data;
+            doc.text("DOCUMENT", 20, 32);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Titre : ${report.title}`, 20, 55);
+            doc.save(`${report.title}.pdf`);
         }
     }).catch(e => console.error("PDF Error", e));
 };
@@ -209,9 +260,7 @@ const Badge = ({ status }) => {
     sterilized_1: "1er Passage",
     sterilized_2: "2ème Passage",
     reported_by_client: "Signalement",
-    temp: "À valider",
-    sent_by_admin: "Reçu d'Aerothau",
-    sent_by_client: "Envoyé par Client"
+    temp: "À valider"
   };
 
   return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
@@ -375,63 +424,108 @@ const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCance
     );
 };
   
-const ReportEditForm = ({ report, clients, onSave, onCancel, userRole = "admin" }) => {
+const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCancel, userRole = "admin" }) => {
     // Si c'est un client, l'auteur est "client", sinon "admin"
     const [formData, setFormData] = useState({ 
         title: "", 
         date: new Date().toISOString().split("T")[0], 
-        type: "Fichier", 
+        type: "Fichier", // Default
         status: userRole === 'admin' ? "Envoyé" : "En attente", 
         clientId: userRole === 'admin' ? (clients.length > 0 ? clients[0].id : "") : report.clientId, 
         author: userRole === 'admin' ? "admin" : "client",
+        nestId: "", // Pour la fiche nid
         ...report 
     });
 
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
-            setFormData({ ...formData, title: file.name, type: file.name.split('.').pop().toUpperCase() });
+            setFormData({ ...formData, title: file.name, type: "Fichier", status: "Envoyé" });
         }
     };
 
     return (
       <div className="space-y-4 text-slate-800">
-        <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase">Fichier</label>
-            <div className="relative mt-1">
-                <input type="file" className="hidden" id="doc-upload" onChange={handleFileUpload}/>
-                <label htmlFor="doc-upload" className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 text-slate-500 transition-colors">
-                    <Upload size={24}/> 
-                    <span className="text-xs font-bold uppercase">Cliquez pour déposer un fichier</span>
-                </label>
-            </div>
-        </div>
         
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom du document</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Plan d'accès.pdf" /></div>
-        
+        {/* Choix du type de document (Seulement pour Admin) */}
         {userRole === 'admin' && (
-            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Destinataire (Client)</label>
-              <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
-                <option value="">-- Choisir --</option>
-                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+            <div className="grid grid-cols-3 gap-2 mb-2">
+                <button 
+                    className={`p-2 rounded text-xs font-bold border ${formData.type === 'Fichier' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}
+                    onClick={() => setFormData({...formData, type: 'Fichier', title: ""})}
+                >
+                    Upload Fichier
+                </button>
+                <button 
+                    className={`p-2 rounded text-xs font-bold border ${formData.type === 'Rapport Complet' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}
+                    onClick={() => setFormData({...formData, type: 'Rapport Complet', title: "Rapport Complet - " + (clients.find(c => c.id === formData.clientId)?.name || "")})}
+                >
+                    Rapport Complet
+                </button>
+                <button 
+                    className={`p-2 rounded text-xs font-bold border ${formData.type === 'Fiche Nid' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`}
+                    onClick={() => setFormData({...formData, type: 'Fiche Nid', title: "Fiche Nid"})}
+                >
+                    Fiche Nid
+                </button>
             </div>
         )}
 
+        {/* Formulaire Upload */}
+        {formData.type === 'Fichier' && (
+            <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Fichier</label>
+                <div className="relative mt-1">
+                    <input type="file" className="hidden" id="doc-upload" onChange={handleFileUpload}/>
+                    <label htmlFor="doc-upload" className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 text-slate-500 transition-colors">
+                        <Upload size={24}/> 
+                        <span className="text-xs font-bold uppercase">{formData.title ? "Fichier: " + formData.title : "Cliquez pour déposer"}</span>
+                    </label>
+                </div>
+            </div>
+        )}
+
+        {/* Sélection Client (Toujours nécessaire) */}
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">{userRole === 'admin' ? "Destinataire" : "Concerne"}</label>
+          <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => {
+              const cid = parseInt(e.target.value);
+              const clientName = clients.find(c => c.id === cid)?.name || "";
+              let newTitle = formData.title;
+              if (formData.type === 'Rapport Complet') newTitle = "Rapport Complet - " + clientName;
+              
+              setFormData({ ...formData, clientId: cid, title: newTitle });
+          }}>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+
+        {/* Sélection Nid (Uniquement pour Fiche Nid) */}
+        {formData.type === 'Fiche Nid' && (
+             <div><label className="text-[10px] font-bold text-slate-400 uppercase">Sélectionner le Nid</label>
+                <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.nestId || ""} onChange={(e) => {
+                     const nid = parseInt(e.target.value);
+                     const nestTitle = markers.find(m => m.id === nid)?.title || ("Nid #" + nid);
+                     setFormData({ ...formData, nestId: nid, title: "Fiche - " + nestTitle });
+                }}>
+                    <option value="">-- Choisir un nid --</option>
+                    {markers.filter(m => m.clientId === formData.clientId).map(m => (
+                        <option key={m.id} value={m.id}>{m.title || m.address}</option>
+                    ))}
+                </select>
+            </div>
+        )}
+
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom du document</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
+        
         {userRole === 'admin' && (
             <div className="grid grid-cols-2 gap-4">
                 <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-                <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-                    <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
-                        <option value="Autre">Autre</option><option value="PDF">PDF</option><option value="IMG">Image</option>
-                    </select>
-                </div>
             </div>
         )}
 
         <div className="flex gap-2 pt-4">
           <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
-          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>{userRole === 'admin' ? "Envoyer au client" : "Transmettre à Aerothau"}</Button>
+          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>{userRole === 'admin' ? "Enregistrer" : "Transmettre"}</Button>
         </div>
       </div>
     );
@@ -1187,7 +1281,7 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
 
             {(isCreating || editingInt) && (
                 <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white text-slate-800">
+                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating && !editingInt?.clientId ? "Nouvelle Mission" : "Détails Mission"}</h3>
                             <button onClick={() => {setEditingInt(null); setIsCreating(false);}} className="text-slate-400 hover:text-slate-600 p-1.5 bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
@@ -1200,35 +1294,61 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
     );
 };
 
-const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
+const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport, onDeleteReport }) => {
     const [isCreating, setIsCreating] = useState(false);
     const [editingRep, setEditingRep] = useState(null);
+
+    // Fonction de filtrage pour n'afficher que les documents de l'admin ou du client
+    const [filter, setFilter] = useState('all'); // 'all', 'admin', 'client'
+
+    const filteredReports = useMemo(() => {
+        if (filter === 'admin') return reports.filter(r => r.author === 'admin');
+        if (filter === 'client') return reports.filter(r => r.author === 'client');
+        return reports;
+    }, [reports, filter]);
+
     return (
         <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
-            <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS & RAPPORTS</h2>
-            <div className="flex gap-2">
-                 <Button variant="outline" onClick={() => generatePDF({ title: "Export Global", date: new Date().toISOString().split('T')[0], type: "Liste" }, { name: "Aerothau" }, [])}><Download size={16}/> Exporter PDF</Button>
-                 <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Nouveau Document</Button>
+            <div className="flex justify-between items-center flex-wrap gap-4">
+                <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS</h2>
+                <div className="flex gap-2">
+                     <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-100">
+                        <button onClick={() => setFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>Tous</button>
+                        <button onClick={() => setFilter('client')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === 'client' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>Reçus Client</button>
+                    </div>
+                     <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Ajouter</Button>
+                </div>
             </div>
-            </div>
+            
             <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Nom du document</th><th className="p-6">Client concerné</th><th className="p-6">Statut de validation</th><th className="p-6 text-right">Actions</th></tr></thead>
+                        <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest">
+                            <tr><th className="p-6">Document</th><th className="p-6">Client / Source</th><th className="p-6">Date</th><th className="p-6">Type</th><th className="p-6 text-right">Actions</th></tr>
+                        </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {reports.length === 0 ? <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-bold uppercase italic tracking-widest">Aucun document en base</td></tr> : reports.map(r => (
+                            {filteredReports.length === 0 ? <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold uppercase italic tracking-widest">Aucun document trouvé</td></tr> : filteredReports.map(r => (
                                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-6 font-black flex items-center gap-4 text-slate-700 tracking-tight"><div className="p-2.5 bg-slate-100 text-slate-500 rounded-xl"><FileText size={20}/></div> {r.title}</td>
-                                    <td className="p-6 text-xs font-black uppercase text-slate-400">{clients.find(c => c.id === r.clientId)?.name || "Client supprimé"}</td>
-                                    <td className="p-6"><Badge status={r.status}/></td>
+                                    <td className="p-6 font-black flex items-center gap-4 text-slate-700 tracking-tight">
+                                        <div className={`p-2.5 rounded-xl ${r.author === 'client' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'}`}>
+                                            {r.author === 'client' ? <FileCheck size={20}/> : <FileText size={20}/>}
+                                        </div> 
+                                        {r.title}
+                                    </td>
+                                    <td className="p-6">
+                                        <span className="text-xs font-black uppercase text-slate-700">{clients.find(c => c.id === r.clientId)?.name || "Client supprimé"}</span>
+                                        <div className="text-[10px] text-slate-400">{r.author === 'client' ? "Envoyé par le client" : "Généré par Aerothau"}</div>
+                                    </td>
+                                    <td className="p-6 text-xs font-bold text-slate-500">{r.date}</td>
+                                    <td className="p-6"><Badge status={r.type === 'Fiche Nid' ? 'reported_by_client' : (r.type === 'Rapport Complet' ? 'sterilized_2' : 'Planifié')}/></td>
                                     <td className="p-6 flex justify-end gap-3">
-                                        {/* Bouton de génération PDF (Feature 1) */}
+                                        {/* Bouton Télécharger / Imprimer (Feature 1 & 2) */}
                                         <button 
-                                            onClick={() => generatePDF(r, clients.find(c => c.id === r.clientId) || {}, [])} 
+                                            onClick={() => generatePDF(r.type === 'Fiche Nid' ? 'nest_detail' : (r.type === 'Rapport Complet' ? 'complete_report' : 'file'), r.type === 'Fiche Nid' ? markers.find(m => m.id === r.nestId) : r, { client: clients.find(c => c.id === r.clientId), markers: markers.filter(m => m.clientId === r.clientId), interventions: interventions.filter(i => i.clientId === r.clientId) })} 
                                             className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all shadow-sm" 
-                                            title="Télécharger PDF"
+                                            title="Télécharger / Imprimer"
                                         >
-                                            <Download size={18}/>
+                                            <Printer size={18}/>
                                         </button>
                                         <button onClick={() => setEditingRep(r)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
                                         <button onClick={() => {if(window.confirm("Supprimer ce document ?")) onDeleteReport(r);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
@@ -1239,11 +1359,12 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
                     </table>
                 </div>
             </Card>
+
             {(isCreating || editingRep) && (
                 <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
                     <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white text-slate-800">
                         <div className="flex justify-between items-center mb-8"><h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating ? "Nouveau Document" : "Modifier"}</h3><button onClick={() => {setEditingRep(null); setIsCreating(false);}} className="text-slate-400 p-1.5 bg-slate-100 rounded-full"><X size={20}/></button></div>
-                        <ReportEditForm report={editingRep} clients={clients} onSave={async (d) => { await onUpdateReport(d); setEditingRep(null); setIsCreating(false); }} onCancel={() => {setEditingRep(null); setIsCreating(false);}} />
+                        <ReportEditForm report={editingRep || {id: Date.now()}} clients={clients} markers={markers} interventions={interventions} onSave={async (d) => { await onUpdateReport(d); setEditingRep(null); setIsCreating(false); }} onCancel={() => {setEditingRep(null); setIsCreating(false);}} />
                     </Card>
                 </div>
             )}
@@ -1251,22 +1372,18 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
     );
 };
 
-const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateNest }) => {
+const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateNest, onUpdateReport }) => {
     const myMarkers = useMemo(() => markers.filter(m => m.clientId === user.clientId), [markers, user.clientId]);
+    const myReports = useMemo(() => reports.filter(r => r.clientId === user.clientId), [reports, user.clientId]);
     const neut = useMemo(() => myMarkers.filter(m => m.status && m.status.includes("sterilized")).length, [myMarkers]);
     
-    // Ajout de la fonction pour ouvrir le rapport client (si nécessaire, ici je remets le ClientReportForm pour l'ajout)
     const [pendingReport, setPendingReport] = useState(null);
     const [isAddingMode, setIsAddingMode] = useState(false);
-    
-    // NOUVEAU : État pour le détail d'un nid cliqué
     const [selectedNestDetail, setSelectedNestDetail] = useState(null);
+    const [isUploading, setIsUploading] = useState(false);
 
-    // Fonction pour envoyer une demande d'intervention
     const requestIntervention = async () => {
         if(window.confirm("Confirmer la demande d'intervention urgente ?")) {
-            // Création d'une intervention fictive "En attente"
-            // Dans une vraie app, on l'ajouterait à Firebase
             alert("Votre demande a été transmise à nos équipes. Nous vous contacterons sous 24h.");
         }
     };
@@ -1279,15 +1396,12 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                     <Plane className="absolute -right-20 -bottom-20 h-64 w-64 text-white/5 rotate-12" />
                 </Card>
                 
-                {/* WIDGET STATS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
-                    {/* suppression du widget météo demandé */}
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
                 </div>
             </div>
             
-            {/* DOCUMENTS RECENTS ET CARTE */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                  <div className="lg:col-span-2 h-[600px] flex flex-col gap-6 text-slate-800">
                     <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
@@ -1380,7 +1494,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                      </thead>
                                      <tbody className="divide-y divide-slate-50">
                                          {myMarkers.map(m => (
-                                             <tr key={m.id} className="hover:bg-slate-50 transition-colors cursor-pointer">
+                                             <tr key={m.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedNestDetail(m)}>
                                                  <td className="p-3 pl-6">
                                                      <div className="font-bold text-slate-700">{m.title || "Nid #" + m.id.toString().slice(-4)}</div>
                                                      <div className="text-[10px] text-slate-400 truncate max-w-[100px]">{m.address}</div>
@@ -1401,14 +1515,57 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                         </div>
                     </Card>
                     
-                     <Card className="p-6 border-0 shadow-xl rounded-3xl bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden shrink-0">
-                        <div className="relative z-10">
-                            <AlertTriangle size={32} className="text-orange-400 mb-3 mx-auto"/>
-                            <h3 className="font-black text-lg uppercase tracking-tighter mb-2">Besoin d'une intervention ?</h3>
-                            <p className="text-xs text-slate-400 mb-4 px-4">Une urgence ou un nid non traité ? Contactez notre équipe technique.</p>
-                            <Button variant="sky" className="w-full rounded-xl text-xs uppercase font-black tracking-widest" onClick={requestIntervention}>Demander un passage</Button>
+                    {/* ESPACE DOCUMENTAIRE CLIENT (NOUVEAU) */}
+                    <Card className="p-0 border-0 shadow-xl rounded-3xl bg-white flex flex-col flex-1 overflow-hidden relative">
+                         <div className="p-6 border-b border-slate-50 flex justify-between items-center mb-0 shrink-0">
+                            <h3 className="font-black text-lg text-slate-800 uppercase tracking-tighter">Documents</h3>
+                            <button onClick={() => setIsUploading(true)} className="p-2 bg-sky-50 text-sky-600 rounded-full hover:bg-sky-600 hover:text-white transition-colors"><Upload size={18}/></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
+                             {/* Documents reçus (Admin -> Client) */}
+                             {myReports.filter(r => r.author === 'admin').map(r => (
+                                 <div key={r.id} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-slate-100">
+                                     <div className="flex items-center gap-3">
+                                         <div className="p-2 bg-white rounded-lg text-slate-400"><FileText size={16}/></div>
+                                         <div>
+                                             <p className="font-bold text-xs text-slate-700">{r.title}</p>
+                                             <p className="text-[9px] font-bold text-slate-400 uppercase">Reçu le {r.date}</p>
+                                         </div>
+                                     </div>
+                                     <Download size={14} className="text-slate-300 group-hover:text-sky-600" onClick={() => generatePDF('file', r)}/>
+                                 </div>
+                             ))}
+                             {/* Documents envoyés (Client -> Admin) */}
+                             {myReports.filter(r => r.author === 'client').map(r => (
+                                 <div key={r.id} className="p-3 bg-purple-50 rounded-xl flex justify-between items-center group">
+                                     <div className="flex items-center gap-3">
+                                         <div className="p-2 bg-white rounded-lg text-purple-400"><Send size={16}/></div>
+                                         <div>
+                                             <p className="font-bold text-xs text-purple-700">{r.title}</p>
+                                             <p className="text-[9px] font-bold text-purple-400 uppercase">Envoyé le {r.date}</p>
+                                         </div>
+                                     </div>
+                                     <CheckCircle size={14} className="text-purple-300"/>
+                                 </div>
+                             ))}
                         </div>
                     </Card>
+                    
+                    {/* Modal Upload Client */}
+                    {isUploading && (
+                         <div className="absolute inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                            <Card className="p-6 w-full shadow-2xl border-0 rounded-3xl bg-white text-slate-800">
+                                <div className="flex justify-between items-center mb-6"><h3 className="font-black text-lg uppercase tracking-tighter">Transmettre un document</h3><button onClick={() => setIsUploading(false)}><X size={20} className="text-slate-400"/></button></div>
+                                <ReportEditForm 
+                                    report={{id: Date.now(), clientId: user.clientId}} 
+                                    clients={clients} 
+                                    userRole="client"
+                                    onSave={async (d) => { await onUpdateReport(d); setIsUploading(false); }} 
+                                    onCancel={() => setIsUploading(false)} 
+                                />
+                            </Card>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -1540,7 +1697,7 @@ export default function AerothauApp() {
                 {view === "clients" && <ClientManagement clients={clients} setSelectedClient={setSelectedClient} setView={setView} onCreateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => deleteFromFirebase("clients", c.id)} />}
                 {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} />}
                 {view === "schedule" && <ScheduleView interventions={interventions} clients={clients} onUpdateIntervention={async (i) => updateFirebase("interventions", i)} onDeleteIntervention={async (i) => deleteFromFirebase("interventions", i.id)} />}
-                {view === "reports" && <ReportsView reports={reports} clients={clients} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => deleteFromFirebase("reports", r.id)} />}
+                {view === "reports" && <ReportsView reports={reports} clients={clients} markers={markers} interventions={interventions} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => deleteFromFirebase("reports", r.id)} />}
               </>
             ) : (
                 <ClientSpace 
@@ -1550,6 +1707,7 @@ export default function AerothauApp() {
                     clients={clients} 
                     reports={reports} 
                     onUpdateNest={async (n) => updateFirebase("markers", n)}
+                    onUpdateReport={async (r) => updateFirebase("reports", r)}
                 />
             )}
           </div>
