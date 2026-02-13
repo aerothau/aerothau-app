@@ -96,7 +96,7 @@ const exportToCSV = (data, filename) => {
   document.body.removeChild(link);
 };
 
-// Fonction de génération PDF Robuste (Supporte Rapports Complets et Fiches Nids)
+// Fonction de génération PDF Robuste
 const generatePDF = (type, data, extraData = {}) => {
     const loadScript = (src) => new Promise((resolve) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
@@ -430,11 +430,11 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
     const [formData, setFormData] = useState({ 
         title: "", 
         date: new Date().toISOString().split("T")[0], 
-        type: "Fichier", // Default
+        type: "Fichier", 
         status: userRole === 'admin' ? "Envoyé" : "En attente", 
         clientId: userRole === 'admin' ? (clients.length > 0 ? clients[0].id : "") : report.clientId, 
         author: userRole === 'admin' ? "admin" : "client",
-        nestId: "", // Pour la fiche nid
+        nestId: "", 
         ...report 
     });
 
@@ -1287,7 +1287,7 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
 
             {(isCreating || editingInt) && (
                 <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white text-slate-800">
+                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating && !editingInt?.clientId ? "Nouvelle Mission" : "Détails Mission"}</h3>
                             <button onClick={() => {setEditingInt(null); setIsCreating(false);}} className="text-slate-400 hover:text-slate-600 p-1.5 bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
@@ -1337,7 +1337,7 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
                                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="p-6 font-black flex items-center gap-4 text-slate-700 tracking-tight">
                                         <div className={`p-2.5 rounded-xl ${r.author === 'client' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'}`}>
-                                            {r.author === 'client' ? <FileCheck size={20}/> : <FileText size={20}/>}
+                                            {r.author === 'client' ? <FileCheck size={20}/> : <File size={20}/>}
                                         </div> 
                                         {r.title}
                                     </td>
@@ -1535,7 +1535,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                              {myReports.filter(r => r.author === 'admin').map(r => (
                                  <div key={r.id} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-slate-100">
                                      <div className="flex items-center gap-3">
-                                         <div className="p-2 bg-white rounded-lg text-slate-400"><FileText size={16}/></div>
+                                         <div className="p-2 bg-white rounded-lg text-slate-400"><File size={16}/></div>
                                          <div>
                                              <p className="font-bold text-xs text-slate-700">{r.title}</p>
                                              <p className="text-[9px] font-bold text-slate-400 uppercase">Reçu le {r.date}</p>
