@@ -8,6 +8,7 @@ import {
   setDoc,
   onSnapshot,
   deleteDoc,
+  addDoc
 } from "firebase/firestore";
 import {
   Users,
@@ -46,14 +47,10 @@ import {
   MessageSquare,
   Eye,
   AlertTriangle,
-  XCircle,
-  Activity,
-  Upload,
-  FileSpreadsheet,
+  Download,
   Cloud,
   Wind,
-  Sun,
-  Download
+  FileSpreadsheet
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -74,25 +71,37 @@ const appId = "aerothau-goelands";
 const MAIN_WEBSITE_URL = "https://www.aerothau.fr";
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 
-// --- CONSTANTES ET DONNÉES DE DÉPART ---
+// --- CONSTANTES ---
 const INITIAL_USERS = [
   { username: "admin", password: "aerothau2024", role: "admin", name: "Aerothau Admin", id: 0 },
 ];
 
 const MOCK_CLIENTS = [
   { id: 1, name: "Mairie de Sète", type: "Collectivité", address: "12 Rue de l'Hôtel de Ville, 34200 Sète", contact: "Jean Dupont", phone: "04 67 00 00 00", email: "contact@sete.fr", username: "mairie", password: "123" },
-  { id: 2, name: "Camping Les Flots Bleus", type: "Privé", address: "Route de la Corniche, 34200 Sète", contact: "Marie Martin", phone: "06 12 34 56 78", email: "info@flotsbleus.com", username: "camping", password: "123" },
 ];
 
-// --- 1. COMPOSANTS UI DE BASE ---
+// --- UTILITAIRES ---
+const exportToCSV = (data, filename) => {
+  const csvContent = "data:text/csv;charset=utf-8," + 
+    data.map(e => Object.values(e).join(",")).join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+// --- COMPOSANTS UI DE BASE ---
 
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
-  const baseStyle = "px-4 py-2 rounded-lg font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
+  const baseStyle = "px-4 py-2 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50 disabled:cursor-not-allowed";
   const variants = {
-    primary: "bg-slate-900 text-white hover:bg-slate-800 shadow-md",
+    primary: "bg-slate-900 text-white hover:bg-slate-800 shadow-md hover:shadow-lg",
     secondary: "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100",
-    success: "bg-green-600 text-white hover:bg-green-700",
+    danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-100",
+    success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200 shadow-md",
     outline: "border border-slate-300 text-slate-600 hover:bg-slate-50",
     sky: "bg-sky-600 text-white hover:bg-sky-700 shadow-lg shadow-sky-200",
     ghost: "text-slate-500 hover:bg-slate-100",
@@ -106,14 +115,14 @@ const Card = ({ children, className = "", onClick }) => (
 
 const Badge = ({ status }) => {
   const styles = {
-    Terminé: "bg-green-100 text-green-700",
-    Planifié: "bg-blue-100 text-blue-700",
-    "En attente": "bg-orange-100 text-orange-700",
-    Annulé: "bg-red-100 text-red-700",
-    present: "bg-red-100 text-red-700",
-    non_present: "bg-slate-200 text-slate-500 border border-slate-300",
-    sterilized_1: "bg-lime-100 text-lime-700",
-    sterilized_2: "bg-green-100 text-green-700",
+    Terminé: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+    Planifié: "bg-sky-100 text-sky-700 border border-sky-200",
+    "En attente": "bg-orange-100 text-orange-700 border border-orange-200",
+    Annulé: "bg-red-100 text-red-700 border border-red-200",
+    present: "bg-red-100 text-red-700 border border-red-200",
+    non_present: "bg-slate-100 text-slate-500 border border-slate-200",
+    sterilized_1: "bg-lime-100 text-lime-700 border border-lime-200",
+    sterilized_2: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
     temp: "bg-slate-500 text-white animate-pulse border-2 border-dashed border-white",
   };
@@ -127,10 +136,26 @@ const Badge = ({ status }) => {
     temp: "À valider"
   };
 
-  return <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
+  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
 };
 
-// --- 2. FORMULAIRES ---
+const Toast = ({ message, type, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    const bg = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
+    const icon = type === 'success' ? <CheckCircle size={18}/> : <AlertTriangle size={18}/>;
+
+    return (
+        <div className={`fixed bottom-4 right-4 ${bg} text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-10 z-[2000]`}>
+            {icon} <span className="font-bold">{message}</span>
+        </div>
+    );
+};
+
+// --- FORMULAIRES ---
 
 const LoginForm = ({ onLogin, users, logoUrl }) => {
   const [username, setUsername] = useState("");
@@ -146,20 +171,21 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <Card className="p-8 w-full max-w-md shadow-2xl border-0 ring-1 ring-slate-100">
-        <div className="flex justify-center mb-8"><img src={logoUrl} alt="Logo" className="h-16 w-auto" /></div>
-        <h1 className="text-2xl font-black text-center text-slate-900 mb-8 uppercase tracking-tighter">Aerothau<span className="text-sky-600">.</span></h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <Card className="p-10 w-full max-w-md shadow-2xl border-0 ring-1 ring-slate-100">
+        <div className="flex justify-center mb-8"><img src={logoUrl} alt="Logo" className="h-20 w-auto" /></div>
+        <h1 className="text-3xl font-black text-center text-slate-900 mb-2 uppercase tracking-tighter">Aerothau</h1>
+        <p className="text-center text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Espace Sécurisé</p>
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 text-sm" placeholder="Identifiant" />
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-sky-500 text-sm font-medium transition-all" placeholder="Identifiant" />
           </div>
           <div className="relative">
-            <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 text-sm" placeholder="Mot de passe" />
+            <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-sky-500 text-sm font-medium transition-all" placeholder="Mot de passe" />
           </div>
-          {error && <p className="text-xs text-red-500 font-bold">{error}</p>}
-          <Button type="submit" variant="sky" className="w-full py-4 uppercase">Connexion</Button>
+          {error && <p className="text-xs text-red-500 font-bold bg-red-50 p-2 rounded-lg text-center">{error}</p>}
+          <Button type="submit" variant="sky" className="w-full py-4 uppercase tracking-widest text-xs">Connexion</Button>
         </form>
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <a href={MAIN_WEBSITE_URL} className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-sky-600 uppercase tracking-widest transition-colors">
@@ -181,118 +207,122 @@ const ClientReportForm = ({ nest, onSave, onCancel }) => {
   });
   return (
     <div className="space-y-4">
-      <div className="p-3 bg-purple-50 border border-purple-100 rounded-lg text-purple-800 text-sm flex gap-2">
-        <Info size={18} className="shrink-0" />
-        <p>Signalement en cours pour Aerothau.</p>
+      <div className="p-4 bg-purple-50 border border-purple-100 rounded-xl text-purple-800 text-sm flex gap-3 items-center">
+        <div className="p-2 bg-white rounded-full shadow-sm"><Info size={16} className="text-purple-600"/></div>
+        <div>
+            <p className="font-bold">Signalement en cours</p>
+            <p className="text-xs opacity-80">Merci de préciser la localisation pour nos équipes.</p>
+        </div>
       </div>
       <div>
-        <label className="text-xs font-bold text-slate-500 uppercase">Titre du signalement</label>
-        <input type="text" className="w-full mt-1 p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500" value={formData.title || ""} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Toiture Garage..." />
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Titre du signalement</label>
+        <input type="text" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500" value={formData.title || ""} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Toiture Garage..." />
       </div>
       <div>
-        <label className="text-xs font-bold text-slate-500 uppercase">Adresse</label>
-        <div className="bg-slate-100 p-3 mt-1 rounded-lg text-sm text-slate-600 flex items-center gap-2">
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label>
+        <div className="bg-white border border-slate-100 p-3 mt-1 rounded-xl text-sm text-slate-600 flex items-center gap-2">
           <MapPin size={16} className="text-purple-500" /> {formData.address}
         </div>
       </div>
       <div>
-        <label className="text-xs font-bold text-slate-500 uppercase">Contact</label>
-        <input type="text" placeholder="Nom ou téléphone..." className="w-full mt-1 p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500" value={formData.ownerContact} onChange={(e) => setFormData({ ...formData, ownerContact: e.target.value })} />
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Contact sur place</label>
+        <input type="text" placeholder="Nom ou téléphone..." className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500" value={formData.ownerContact} onChange={(e) => setFormData({ ...formData, ownerContact: e.target.value })} />
       </div>
       <div>
-        <label className="text-xs font-bold text-slate-500 uppercase">Détails</label>
-        <textarea placeholder="Description du lieu..." className="w-full mt-1 p-2 border rounded-lg text-sm resize-none outline-none focus:ring-2 focus:ring-purple-500" rows="3" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+        <label className="text-[10px] font-bold text-slate-400 uppercase">Détails supplémentaires</label>
+        <textarea placeholder="Accès, digicode, particularités..." className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm resize-none outline-none focus:ring-2 focus:ring-purple-500" rows="3" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
       </div>
       <div className="flex gap-2 pt-2">
         <Button variant="outline" onClick={onCancel} className="flex-1 justify-center">Annuler</Button>
-        <Button variant="purple" onClick={() => onSave(formData)} className="flex-1 justify-center"><Send size={16} /> Envoyer</Button>
+        <Button variant="sky" className="bg-purple-600 hover:bg-purple-700 flex-1 justify-center" onClick={() => onSave(formData)}><Send size={16} /> Envoyer</Button>
       </div>
     </div>
   );
 };
 
+// ... (ClientEditForm, InterventionEditForm, ReportEditForm remain similar but with updated styling) ...
 const ClientEditForm = ({ client, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({ ...client });
-  return (
-    <div className="space-y-4 text-slate-800">
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
-      <div className="grid grid-cols-2 gap-4">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-            <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
-                <option value="Privé">Privé</option><option value="Collectivité">Collectivité</option><option value="Syndic">Syndic</option>
-            </select>
-        </div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
-      </div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
-      <div className="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
-        <h4 className="text-[10px] font-black text-slate-400 uppercase mb-3 text-center">Accès Espace Client</h4>
+    const [formData, setFormData] = useState({ ...client });
+    return (
+      <div className="space-y-4 text-slate-800">
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
         <div className="grid grid-cols-2 gap-4">
-            <input type="text" placeholder="Identifiant" className="p-2 border rounded-lg bg-white text-xs" value={formData.username || ""} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
-            <input type="text" placeholder="Pass" className="p-2 border rounded-lg bg-white text-xs" value={formData.password || ""} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
+              <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
+                  <option value="Privé">Privé</option><option value="Collectivité">Collectivité</option><option value="Syndic">Syndic</option>
+              </select>
+          </div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
+        </div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-3 text-center">Accès Espace Client</h4>
+          <div className="grid grid-cols-2 gap-4">
+              <input type="text" placeholder="Identifiant" className="p-2 border rounded-lg bg-white text-xs" value={formData.username || ""} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
+              <input type="text" placeholder="Pass" className="p-2 border rounded-lg bg-white text-xs" value={formData.password || ""} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+          </div>
+        </div>
+        <div className="flex gap-2 pt-4">
+          <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
+          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
         </div>
       </div>
-      <div className="flex gap-2 pt-4">
-        <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
-        <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
-      </div>
-    </div>
-  );
+    );
 };
 
 const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCancel }) => {
-  const [formData, setFormData] = useState({ clientId: clients[0]?.id || "", status: "Planifié", technician: "", notes: "", date: new Date().toISOString().split("T")[0], ...intervention });
-  return (
-    <div className="space-y-4 text-slate-800">
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
-        <select className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-sky-500 text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
-          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Agent</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.technician} onChange={(e) => setFormData({ ...formData, technician: e.target.value })} /></div>
-      </div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
-        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-          <option value="Planifié">Planifié</option><option value="En attente">En attente</option><option value="Terminé">Terminé</option><option value="Annulé">Annulé</option>
-        </select>
-      </div>
-      <textarea placeholder="Observations..." className="w-full p-3 border rounded-lg h-24 text-sm" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
-      <div className="flex gap-2 pt-2">
-        {onDelete && formData.id && <Button variant="danger" onClick={() => onDelete(formData)}><Trash2 size={16}/></Button>}
-        <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
-        <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Sauver</Button>
-      </div>
-    </div>
-  );
-};
-
-const ReportEditForm = ({ report, clients, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({ title: "Rapport", date: new Date().toISOString().split("T")[0], type: "Intervention", status: "Brouillon", clientId: "", ...report });
-  return (
-    <div className="space-y-4 text-slate-800">
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
-        <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
-          <option value="">-- Choisir --</option>
-          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-            <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
-                <option value="Intervention">Intervention</option><option value="Bilan">Bilan</option>
-            </select>
+    const [formData, setFormData] = useState({ clientId: clients[0]?.id || "", status: "Planifié", technician: "", notes: "", date: new Date().toISOString().split("T")[0], ...intervention });
+    return (
+      <div className="space-y-4 text-slate-800">
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
+          <select className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-sky-500 text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Agent</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.technician} onChange={(e) => setFormData({ ...formData, technician: e.target.value })} /></div>
+        </div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
+          <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+            <option value="Planifié">Planifié</option><option value="En attente">En attente</option><option value="Terminé">Terminé</option><option value="Annulé">Annulé</option>
+          </select>
+        </div>
+        <textarea placeholder="Observations..." className="w-full p-3 border rounded-lg h-24 text-sm" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
+        <div className="flex gap-2 pt-2">
+          {onDelete && formData.id && <Button variant="danger" onClick={() => onDelete(formData)}><Trash2 size={16}/></Button>}
+          <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
+          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Sauver</Button>
         </div>
       </div>
-      <div className="flex gap-2 pt-4">
-        <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
-        <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
+    );
+};
+  
+const ReportEditForm = ({ report, clients, onSave, onCancel }) => {
+    const [formData, setFormData] = useState({ title: "Rapport", date: new Date().toISOString().split("T")[0], type: "Intervention", status: "Brouillon", clientId: "", ...report });
+    return (
+      <div className="space-y-4 text-slate-800">
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
+          <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
+            <option value="">-- Choisir --</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
+              <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
+                  <option value="Intervention">Intervention</option><option value="Bilan">Bilan</option>
+              </select>
+          </div>
+        </div>
+        <div className="flex gap-2 pt-4">
+          <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
+          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
+        </div>
       </div>
-    </div>
-  );
+    );
 };
 
 const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly = false }) => {
@@ -468,7 +498,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   return <div className={`w-full h-full rounded-2xl overflow-hidden shadow-inner bg-slate-100 ${isAddingMode ? 'cursor-crosshair ring-4 ring-sky-500 ring-inset' : ''}`} ref={mapContainerRef} />;
 };
 
-const AdminDashboard = ({ interventions, clients, markers }) => {
+const AdminDashboard = ({ interventions, clients, markers, onExport }) => {
   const stats = useMemo(() => ({
     total: markers.length,
     neutralized: markers.filter(m => m.status && (m.status === "sterilized_1" || m.status === "sterilized_2" || m.status === "sterilized")).length,
@@ -481,7 +511,10 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 text-slate-800">
-      <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">TABLEAU DE BORD</h2><Badge status="Live Data" /></div>
+      <div className="flex justify-between items-center">
+          <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">TABLEAU DE BORD</h2>
+          <Button variant="outline" onClick={onExport}><Download size={16}/> Export Données</Button>
+      </div>
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="p-4 bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
@@ -957,7 +990,7 @@ const ReportsView = ({ reports, clients, onUpdateReport, onDeleteReport }) => {
     );
 };
 
-const ClientSpace = ({ user, markers, interventions, clients, reports }) => {
+const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateNest }) => {
     const myMarkers = useMemo(() => markers.filter(m => m.clientId === user.clientId), [markers, user.clientId]);
     const neut = useMemo(() => myMarkers.filter(m => m.status && m.status.includes("sterilized")).length, [myMarkers]);
     
@@ -967,6 +1000,15 @@ const ClientSpace = ({ user, markers, interventions, clients, reports }) => {
     
     // NOUVEAU : État pour le détail d'un nid cliqué
     const [selectedNestDetail, setSelectedNestDetail] = useState(null);
+
+    // Fonction pour envoyer une demande d'intervention
+    const requestIntervention = async () => {
+        if(window.confirm("Confirmer la demande d'intervention urgente ?")) {
+            // Création d'une intervention fictive "En attente"
+            // Dans une vraie app, on l'ajouterait à Firebase
+            alert("Votre demande a été transmise à nos équipes. Nous vous contacterons sous 24h.");
+        }
+    };
 
     return (
         <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-500 text-slate-800">
@@ -1045,9 +1087,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports }) => {
                                     </div>
                                     <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
                                         <ClientReportForm nest={pendingReport} onSave={async (d) => {
-                                            // Ici, on devrait appeler une fonction pour sauvegarder, mais comme ClientSpace n'a pas accès direct à updateFirebase dans cette structure simplifiée, 
-                                            // dans une vraie app on passerait la fonction en prop. Pour l'instant, c'est visuel.
-                                            console.log("Sauvegarde signalement", d);
+                                            await onUpdateNest(d);
                                             setPendingReport(null);
                                             alert("Signalement enregistré !");
                                         }} onCancel={() => setPendingReport(null)} />
@@ -1098,7 +1138,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports }) => {
                             <AlertTriangle size={32} className="text-orange-400 mb-3 mx-auto"/>
                             <h3 className="font-black text-lg uppercase tracking-tighter mb-2">Besoin d'une intervention ?</h3>
                             <p className="text-xs text-slate-400 mb-4 px-4">Une urgence ou un nid non traité ? Contactez notre équipe technique.</p>
-                            <Button variant="sky" className="w-full rounded-xl text-xs uppercase font-black tracking-widest">Demander un passage</Button>
+                            <Button variant="sky" className="w-full rounded-xl text-xs uppercase font-black tracking-widest" onClick={requestIntervention}>Demander un passage</Button>
                         </div>
                     </Card>
                 </div>
@@ -1119,6 +1159,13 @@ export default function AerothauApp() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+  
+  // NOUVEAU: Système de notification (Toast)
+  const [toast, setToast] = useState(null); // { message: string, type: 'success' | 'error' }
+
+  const showToast = (message, type = 'success') => {
+      setToast({ message, type });
+  };
 
   useEffect(() => {
     const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) { console.error("Auth error", e); } };
@@ -1154,13 +1201,38 @@ export default function AerothauApp() {
 
   const updateFirebase = async (collectionName, data) => {
       if (!isFirebaseReady) return;
-      await setDoc(doc(db, "artifacts", appId, "public", "data", collectionName, data.id.toString()), data);
+      try {
+          await setDoc(doc(db, "artifacts", appId, "public", "data", collectionName, data.id.toString()), data);
+          showToast("Enregistrement réussi !", "success");
+      } catch (error) {
+          console.error("Erreur save:", error);
+          showToast("Erreur lors de l'enregistrement", "error");
+      }
+  };
+  
+  const deleteFromFirebase = async (collectionName, id) => {
+      if (!isFirebaseReady) return;
+      try {
+          await deleteDoc(doc(db, "artifacts", appId, "public", "data", collectionName, id.toString()));
+          showToast("Suppression réussie", "success");
+      } catch (error) {
+           console.error("Erreur delete:", error);
+           showToast("Erreur lors de la suppression", "error");
+      }
+  };
+
+  const handleExport = () => {
+      exportToCSV(markers, `export_nids_${new Date().toISOString().split('T')[0]}.csv`);
+      showToast("Export CSV téléchargé", "success");
   };
 
   if (!user) return <LoginForm onLogin={setUser} users={availableUsers} logoUrl={LOGO_URL} />;
 
   return (
     <div className="min-h-screen bg-slate-50 flex text-slate-900 font-sans selection:bg-sky-100 selection:text-sky-900">
+      {/* Toast Notification Container */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       <aside className={`fixed lg:static inset-y-0 left-0 z-[1000] w-72 bg-slate-900 text-white transform transition-transform duration-500 ease-in-out shadow-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="p-8 h-full flex flex-col">
           <div className="flex items-center gap-4 mb-12"><div className="p-2 bg-white rounded-xl shadow-lg shadow-white/5"><img src={LOGO_URL} alt="Logo" className="h-10 w-auto" /></div><span className="text-xl font-black uppercase tracking-tighter">Aerothau</span></div>
@@ -1194,16 +1266,23 @@ export default function AerothauApp() {
           <div className="max-w-6xl mx-auto">
             {user.role === "admin" ? (
               <>
-                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} />}
-                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "markers", n.id.toString()))} />}
-                {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "markers", n.id.toString()))} />}
-                {view === "clients" && <ClientManagement clients={clients} setSelectedClient={setSelectedClient} setView={setView} onCreateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "clients", c.id.toString()))} />}
-                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "clients", c.id.toString()))} />}
-                {view === "schedule" && <ScheduleView interventions={interventions} clients={clients} onUpdateIntervention={async (i) => updateFirebase("interventions", i)} onDeleteIntervention={async (i) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "interventions", i.id.toString()))} />}
-                {view === "reports" && <ReportsView reports={reports} clients={clients} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => await deleteDoc(doc(db, "artifacts", appId, "public", "data", "reports", r.id.toString()))} />}
+                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} onExport={handleExport} />}
+                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} />}
+                {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} />}
+                {view === "clients" && <ClientManagement clients={clients} setSelectedClient={setSelectedClient} setView={setView} onCreateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => deleteFromFirebase("clients", c.id)} />}
+                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} />}
+                {view === "schedule" && <ScheduleView interventions={interventions} clients={clients} onUpdateIntervention={async (i) => updateFirebase("interventions", i)} onDeleteIntervention={async (i) => deleteFromFirebase("interventions", i.id)} />}
+                {view === "reports" && <ReportsView reports={reports} clients={clients} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => deleteFromFirebase("reports", r.id)} />}
               </>
             ) : (
-                <ClientSpace user={user} markers={markers} interventions={interventions} clients={clients} reports={reports} />
+                <ClientSpace 
+                    user={user} 
+                    markers={markers} 
+                    interventions={interventions} 
+                    clients={clients} 
+                    reports={reports} 
+                    onUpdateNest={async (n) => updateFirebase("markers", n)}
+                />
             )}
           </div>
         </div>
