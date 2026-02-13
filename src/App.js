@@ -1241,7 +1241,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                 </div>
             </div>
             
-            {/* DOCUMENTS RECENTS */}
+            {/* DOCUMENTS RECENTS ET CARTE */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                  <div className="lg:col-span-2 h-[600px] flex flex-col gap-6 text-slate-800">
                     <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
@@ -1314,27 +1314,48 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                     </div>
                 </div>
 
-                <div className="space-y-6">
-                    <Card className="p-6 border-0 shadow-xl rounded-3xl bg-white flex flex-col h-full">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-lg text-slate-800 uppercase tracking-tighter">Documents Récents</h3>
-                            <div className="p-2 bg-slate-100 rounded-full"><FileText size={18} className="text-slate-400"/></div>
+                <div className="space-y-6 flex flex-col h-[600px]"> 
+                    {/* TABLEAU DES NIDS (Remplace Documents Récents) */}
+                    <Card className="p-0 border-0 shadow-xl rounded-3xl bg-white flex flex-col flex-1 overflow-hidden">
+                        <div className="p-6 border-b border-slate-50 flex justify-between items-center mb-0 shrink-0">
+                            <h3 className="font-black text-lg text-slate-800 uppercase tracking-tighter">État des Nids</h3>
+                            <div className="p-2 bg-slate-100 rounded-full"><Bird size={18} className="text-slate-400"/></div>
                         </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
-                             {reports && reports.length > 0 ? reports.slice(0, 5).map(r => (
-                                 <div key={r.id} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-center group hover:bg-slate-100 transition-colors cursor-pointer">
-                                     <div>
-                                         <p className="font-bold text-sm text-slate-700">{r.title}</p>
-                                         <p className="text-[10px] text-slate-400 font-bold uppercase">{r.date}</p>
-                                     </div>
-                                     <Download size={16} className="text-slate-300 group-hover:text-sky-600 transition-colors"/>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                             {myMarkers.length > 0 ? (
+                                 <table className="w-full text-left text-xs">
+                                     <thead className="bg-slate-50 text-slate-400 font-bold uppercase sticky top-0 z-10">
+                                         <tr>
+                                             <th className="p-3 pl-6">Ref</th>
+                                             <th className="p-3">Statut</th>
+                                             <th className="p-3 text-center">Œufs</th>
+                                             <th className="p-3 pr-6">Obs.</th>
+                                         </tr>
+                                     </thead>
+                                     <tbody className="divide-y divide-slate-50">
+                                         {myMarkers.map(m => (
+                                             <tr key={m.id} className="hover:bg-slate-50 transition-colors cursor-pointer">
+                                                 <td className="p-3 pl-6">
+                                                     <div className="font-bold text-slate-700">{m.title || "Nid #" + m.id.toString().slice(-4)}</div>
+                                                     <div className="text-[10px] text-slate-400 truncate max-w-[100px]">{m.address}</div>
+                                                 </td>
+                                                 <td className="p-3"><Badge status={m.status}/></td>
+                                                 <td className="p-3 text-center font-bold text-slate-600">{m.eggs}</td>
+                                                 <td className="p-3 pr-6 text-slate-500 italic truncate max-w-[100px]" title={m.comments}>{m.comments || "-"}</td>
+                                             </tr>
+                                         ))}
+                                     </tbody>
+                                 </table>
+                             ) : (
+                                 <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                                     <Bird size={32} className="mb-2 opacity-50"/>
+                                     <p>Aucun nid recensé pour le moment.</p>
                                  </div>
-                             )) : <p className="text-sm text-slate-400 italic text-center py-4">Aucun document disponible</p>}
+                             )}
                         </div>
-                         <Button variant="outline" className="w-full mt-4 rounded-xl text-xs uppercase font-bold tracking-widest">Voir tous les documents</Button>
                     </Card>
                     
-                     <Card className="p-6 border-0 shadow-xl rounded-3xl bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden">
+                     <Card className="p-6 border-0 shadow-xl rounded-3xl bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden shrink-0">
                         <div className="relative z-10">
                             <AlertTriangle size={32} className="text-orange-400 mb-3 mx-auto"/>
                             <h3 className="font-black text-lg uppercase tracking-tighter mb-2">Besoin d'une intervention ?</h3>
