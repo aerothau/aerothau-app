@@ -50,7 +50,9 @@ import {
   FileSpreadsheet,
   Activity,
   Cloud,
-  Wind
+  Wind,
+  Upload,
+  File as FileIcon
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -93,8 +95,8 @@ const exportToCSV = (data, filename) => {
   document.body.removeChild(link);
 };
 
-// Fonction de génération PDF (Feature 1)
-const generatePDF = (report, client, markers) => {
+// Fonction de génération PDF (Améliorée pour Fiche Nid)
+const generatePDF = (type, data, extraData = []) => {
     const loadScript = (src) => new Promise((resolve) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
         const script = document.createElement('script');
@@ -109,62 +111,111 @@ const generatePDF = (report, client, markers) => {
     ]).then(() => {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
+        const today = new Date().toLocaleDateString('fr-FR');
         
-        // En-tête
+        // En-tête Global
         doc.setFillColor(15, 23, 42); // Slate 900
         doc.rect(0, 0, 210, 40, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(22);
         doc.text("AEROTHAU", 20, 25);
         doc.setFontSize(10);
-        doc.text("Rapport d'intervention", 20, 32);
-        doc.text(`Date : ${report.date}`, 180, 25, { align: 'right' });
+        doc.text(`Généré le : ${today}`, 190, 25, { align: 'right' });
 
-        // Info Client
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(14);
-        doc.text("Client :", 20, 55);
-        doc.setFontSize(12);
-        doc.text(client.name || "Inconnu", 20, 62);
-        doc.setFontSize(10);
-        doc.text(client.address || "", 20, 67);
+        if (type === 'nest_detail') {
+            // --- FICHE NID INDIVIDUELLE ---
+            const nest = data;
+            const clientName = extraData.clientName || "Inconnu";
+            
+            doc.text("FICHE D'IDENTIFICATION NID", 20, 32);
+            
+            // Info Nid
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(16);
+            doc.text(`Réf: ${nest.title || "Nid #" + nest.id}`, 20, 55);
+            
+            doc.setFontSize(11);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Client : ${clientName}`, 20, 62);
+            doc.text(`Adresse : ${nest.address}`, 20, 68);
+            doc.text(`Coordonnées : ${nest.lat?.toFixed(5)}, ${nest.lng?.toFixed(5)}`, 20, 74);
+            
+            // Statut
+            doc.setFillColor(240, 240, 240);
+            doc.rect(140, 50, 50, 25, 'F');
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.text("STATUT ACTUEL", 165, 58, { align: 'center' });
+            doc.setFontSize(12);
+            doc.setTextColor(0, 100, 0);
+            doc.text(nest.status.toUpperCase().replace('_', ' '), 165, 68, { align: 'center' });
 
-        // Stats
-        const totalEggs = markers.reduce((acc, curr) => acc + (curr.eggs || 0), 0);
-        const treated = markers.filter(m => m.status.includes('sterilized')).length;
-        
-        doc.setDrawColor(200, 200, 200);
-        doc.line(20, 75, 190, 75);
-        
-        doc.text(`Nids traités : ${treated} / ${markers.length}`, 20, 85);
-        doc.text(`Oeufs stérilisés : ${totalEggs}`, 100, 85);
+            // Photo
+            if (nest.photo) {
+                try {
+                    doc.addImage(nest.photo, 'JPEG', 20, 85, 170, 100); // Image large
+                } catch(e) { doc.text("(Image non supportée)", 20, 100); }
+            } else {
+                doc.setDrawColor(200);
+                doc.rect(20, 85, 170, 100); // Placeholder
+                doc.text("Pas de photo disponible", 105, 135, { align: 'center' });
+            }
 
-        // Tableau
-        const tableBody = markers.map(m => [
-            m.title || "Nid",
-            m.address,
-            m.status === 'present' ? 'Actif' : 'Traité',
-            m.eggs + " oeufs",
-            m.comments || "-"
-        ]);
+            // Historique / Observations
+            doc.setFontSize(14);
+            doc.setTextColor(0, 0, 0);
+            doc.text("Observations & Historique", 20, 200);
+            
+            const comments = nest.comments ? [[today, "Observation", nest.comments]] : [];
+            const historyBody = [
+                ...comments,
+                ["--", "Création de la fiche", "Initialisation système"]
+            ];
 
-        doc.autoTable({
-            startY: 95,
-            head: [['Référence', 'Localisation', 'Statut', 'Contenu', 'Notes']],
-            body: tableBody,
-            theme: 'grid',
-            headStyles: { fillColor: [14, 165, 233] }, // Sky 500
-        });
+            doc.autoTable({
+                startY: 205,
+                head: [['Date', 'Type', 'Détails']],
+                body: historyBody,
+                theme: 'grid',
+                headStyles: { fillColor: [14, 165, 233] },
+            });
+            
+            doc.save(`Fiche_Nid_${nest.id}.pdf`);
+            
+        } else {
+            // --- RAPPORT GLOBAL (Existant) ---
+            const report = data;
+            const client = extraData.client || {};
+            const markers = extraData.markers || [];
+            
+            doc.text("Rapport d'intervention", 20, 32);
+            // ... (Reste de la logique existante pour le rapport global)
+            // Info Client
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(14);
+            doc.text("Client :", 20, 55);
+            doc.setFontSize(12);
+            doc.text(client.name || "Inconnu", 20, 62);
+            doc.setFontSize(10);
+            doc.text(client.address || "", 20, 67);
 
-        // Pied de page
-        const pageCount = doc.internal.getNumberOfPages();
-        for(let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.text('Document généré par Aerothau Gestion - www.aerothau.fr', 105, 290, { align: 'center' });
+            const tableBody = markers.map(m => [
+                m.title || "Nid",
+                m.address,
+                m.status === 'present' ? 'Actif' : 'Traité',
+                m.eggs + " oeufs",
+                m.comments || "-"
+            ]);
+
+            doc.autoTable({
+                startY: 95,
+                head: [['Référence', 'Localisation', 'Statut', 'Contenu', 'Notes']],
+                body: tableBody,
+                theme: 'grid',
+                headStyles: { fillColor: [14, 165, 233] },
+            });
+            doc.save(`Rapport_Global_${report.title || 'Aerothau'}.pdf`);
         }
-
-        doc.save(`Rapport_${report.title.replace(/\s+/g, '_')}.pdf`);
     });
 };
 
@@ -315,6 +366,7 @@ const ClientReportForm = ({ nest, onSave, onCancel }) => {
   );
 };
 
+// ... ClientEditForm, InterventionEditForm (restent identiques) ...
 const ClientEditForm = ({ client, onSave, onCancel }) => {
     const [formData, setFormData] = useState({ ...client });
     return (
@@ -373,11 +425,37 @@ const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCance
 };
   
 const ReportEditForm = ({ report, clients, onSave, onCancel }) => {
-    const [formData, setFormData] = useState({ title: "Rapport", date: new Date().toISOString().split("T")[0], type: "Intervention", status: "Brouillon", clientId: "", ...report });
+    // on utilise ici le type "Fichier" pour gérer l'upload
+    const [formData, setFormData] = useState({ 
+        title: "Nouveau Document", 
+        date: new Date().toISOString().split("T")[0], 
+        type: "Fichier", 
+        status: "Envoyé", 
+        clientId: clients.length > 0 ? clients[0].id : "", 
+        author: "admin",
+        ...report 
+    });
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setFormData({ ...formData, title: file.name, type: file.name.split('.').pop().toUpperCase() });
+        }
+    };
+
     return (
       <div className="space-y-4 text-slate-800">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
+        <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase">Fichier</label>
+            <div className="relative mt-1">
+                <input type="file" className="hidden" id="doc-upload" onChange={handleFileUpload}/>
+                <label htmlFor="doc-upload" className="w-full p-3 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 text-slate-500">
+                    <Upload size={16}/> Choisir un fichier
+                </label>
+            </div>
+        </div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom du document</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Destinataire (Client)</label>
           <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
             <option value="">-- Choisir --</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -385,15 +463,10 @@ const ReportEditForm = ({ report, clients, onSave, onCancel }) => {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-              <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
-                  <option value="Intervention">Intervention</option><option value="Bilan">Bilan</option>
-              </select>
-          </div>
         </div>
         <div className="flex gap-2 pt-4">
           <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
-          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
+          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Envoyer</Button>
         </div>
       </div>
     );
@@ -410,13 +483,17 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
     }
   };
   
-  // Fonction pour ouvrir l'itinéraire
   const openRoute = () => {
     if (nest.lat && nest.lng) {
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank');
     } else {
       alert("Coordonnées GPS manquantes pour cet itinéraire.");
     }
+  };
+
+  const downloadNestPDF = () => {
+     const clientName = clients.find(c => c.id === nest.clientId)?.name || "Non assigné";
+     generatePDF('nest_detail', nest, { clientName });
   };
 
   if (readOnly) return (
@@ -458,6 +535,12 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
 
   return (
     <div className="space-y-4 text-slate-800">
+      {/* Onglets simulés */}
+      <div className="flex border-b border-slate-200 mb-4">
+          <button className="px-4 py-2 text-sm font-bold text-sky-600 border-b-2 border-sky-600">Général</button>
+          <button className="px-4 py-2 text-sm font-bold text-slate-400" disabled>Historique & Rapports</button>
+      </div>
+
       <div>
         <label className="text-[10px] font-bold text-slate-400 uppercase">Photo du nid</label>
         {formData.photo ? (
@@ -504,6 +587,10 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
         <div><label className="text-[10px] font-bold text-slate-400 uppercase">Œufs</label><input type="number" className="w-full p-2 border rounded-lg text-sm mt-1" value={formData.eggs} onChange={(e) => setFormData({...formData, eggs: parseInt(e.target.value)})}/></div>
       </div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Notes Techniques</label><textarea className="w-full p-2 border rounded-lg text-sm h-20 mt-1" placeholder="Accès, détails..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/></div>
+      
+      {/* BOUTON RAPPORT PDF (Feature 1) */}
+      <Button variant="secondary" className="w-full border-slate-300 text-slate-700" onClick={downloadNestPDF}><FileText size={16}/> 📄 Générer Fiche PDF</Button>
+
       <div className="flex gap-2">
         {onDelete && (
              <Button variant="danger" onClick={() => onDelete(formData)} title="Supprimer ce nid"><Trash2 size={16}/></Button>
@@ -569,7 +656,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
     if (!mapInstanceRef.current || !markersLayerRef.current || !window.L) return;
     const L = window.L;
     markersLayerRef.current.clearLayers();
-    markers.forEach(m => {
+    markersRef.current.forEach(m => {
       let color = "#64748b"; 
       if (m.status === "present") color = "#ef4444"; 
       else if (m.status === "temp") color = "#94a3b8"; 
