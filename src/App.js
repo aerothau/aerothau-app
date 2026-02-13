@@ -791,7 +791,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" className="h-12 rounded-2xl text-xs uppercase tracking-widest border-slate-200" onClick={optimizeRoute}>
-                        <Route size={16}/> Optimiser Trajet
+                        <Waypoints size={16}/> Optimiser Trajet
                     </Button>
                     <Button variant={isAdding ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAdding(!isAdding)}>
                         {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
@@ -806,7 +806,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 )}
                 {routePath && (
                      <div className="absolute top-4 left-4 z-[500] bg-white text-slate-800 px-4 py-2 rounded-full shadow-lg text-xs font-bold flex items-center gap-2">
-                        <Route size={14} className="text-blue-500"/> Trajet optimisé affiché
+                        <Waypoints size={14} className="text-blue-500"/> Trajet optimisé affiché
                         <button onClick={() => setRoutePath(null)} className="ml-2 text-slate-400 hover:text-red-500"><X size={14}/></button>
                     </div>
                 )}
