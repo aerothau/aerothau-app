@@ -8,7 +8,6 @@ import {
   setDoc,
   onSnapshot,
   deleteDoc,
-  addDoc
 } from "firebase/firestore";
 import {
   Users,
@@ -48,8 +47,6 @@ import {
   Eye,
   AlertTriangle,
   Download,
-  Cloud,
-  Wind,
   FileSpreadsheet
 } from "lucide-react";
 
@@ -240,7 +237,6 @@ const ClientReportForm = ({ nest, onSave, onCancel }) => {
   );
 };
 
-// ... (ClientEditForm, InterventionEditForm, ReportEditForm remain similar but with updated styling) ...
 const ClientEditForm = ({ client, onSave, onCancel }) => {
     const [formData, setFormData] = useState({ ...client });
     return (
@@ -426,20 +422,32 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
-  const markersRef = useRef(markers);
+  const tileLayerRef = useRef(null); // Ref pour le calque de tuiles
+  const [mapType, setMapType] = useState("satellite"); // 'satellite' ou 'plan'
 
+  const tileUrls = {
+      satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      plan: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+  };
+
+  const tileAttributions = {
+      satellite: 'Esri',
+      plan: 'OpenStreetMap'
+  };
+
+  // Gestion du changement de fond de carte
   useEffect(() => {
-    markersRef.current = markers;
-    if (mapInstanceRef.current && window.L && mapInstanceRef.current._updateMarkers) {
-        mapInstanceRef.current._updateMarkers();
-    }
-  }, [markers]);
+      if (!mapInstanceRef.current || !window.L || !tileLayerRef.current) return;
+      // Changer l'URL du calque existant
+      tileLayerRef.current.setUrl(tileUrls[mapType]);
+  }, [mapType]);
+
 
   const updateMarkers = useCallback(() => {
     if (!mapInstanceRef.current || !markersLayerRef.current || !window.L) return;
     const L = window.L;
     markersLayerRef.current.clearLayers();
-    markersRef.current.forEach(m => {
+    markers.forEach(m => {
       let color = "#64748b"; // Slate default
       if (m.status === "present") color = "#ef4444"; 
       else if (m.status === "temp") color = "#94a3b8"; 
@@ -455,7 +463,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
       });
       L.marker([m.lat, m.lng], { icon }).on('click', (e) => { L.DomEvent.stopPropagation(e); onMarkerClick(m); }).addTo(markersLayerRef.current);
     });
-  }, [onMarkerClick]);
+  }, [markers, onMarkerClick]);
 
   useEffect(() => {
     if (mapInstanceRef.current || !mapContainerRef.current) return;
@@ -483,19 +491,46 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
         const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
         mapInstanceRef.current = map;
         L.control.zoom({ position: 'bottomright' }).addTo(map);
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map);
+        
+        // Initialisation du calque de tuiles
+        tileLayerRef.current = L.tileLayer(tileUrls.satellite, { attribution: 'Esri' }).addTo(map);
+
         markersLayerRef.current = L.layerGroup().addTo(map);
-        map._updateMarkers = updateMarkers;
+        
         map.on('click', (e) => onMapClick && onMapClick(e.latlng));
+        
+        // Initial update
         updateMarkers();
     }
+  }, []); // Only runs once on mount
 
-    return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
-  }, [onMapClick, updateMarkers]);
+  // Update markers when props change
+  useEffect(() => {
+      updateMarkers();
+  }, [updateMarkers]);
 
   useEffect(() => { if (mapInstanceRef.current && center) mapInstanceRef.current.setView([center.lat, center.lng], 18); }, [center]);
 
-  return <div className={`w-full h-full rounded-2xl overflow-hidden shadow-inner bg-slate-100 ${isAddingMode ? 'cursor-crosshair ring-4 ring-sky-500 ring-inset' : ''}`} ref={mapContainerRef} />;
+  return (
+      <div className="relative w-full h-full">
+          <div className={`w-full h-full rounded-2xl overflow-hidden shadow-inner bg-slate-100 ${isAddingMode ? 'cursor-crosshair ring-4 ring-sky-500 ring-inset' : ''}`} ref={mapContainerRef} />
+          {/* Bouton Toggle Carte */}
+          <div className="absolute top-4 right-4 z-[400] bg-white p-1 rounded-lg shadow-md flex gap-1">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setMapType('satellite'); }}
+                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${mapType === 'satellite' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                  Sat
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setMapType('plan'); }}
+                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${mapType === 'plan' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                  Plan
+              </button>
+          </div>
+      </div>
+  );
 };
 
 const AdminDashboard = ({ interventions, clients, markers, onExport }) => {
@@ -511,10 +546,7 @@ const AdminDashboard = ({ interventions, clients, markers, onExport }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 text-slate-800">
-      <div className="flex justify-between items-center">
-          <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">TABLEAU DE BORD</h2>
-          <Button variant="outline" onClick={onExport}><Download size={16}/> Export Données</Button>
-      </div>
+      <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">TABLEAU DE BORD</h2><Button variant="outline" onClick={onExport}><Download size={16}/> Export Données</Button></div>
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="p-4 bg-white border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
@@ -1020,21 +1052,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                 
                 {/* WIDGET METEO & STATS */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-slate-900">
-                    <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex flex-col justify-between bg-gradient-to-br from-sky-400 to-blue-600 text-white relative overflow-hidden">
-                        <div className="relative z-10">
-                            <div className="flex justify-between items-center mb-4">
-                                <span className="font-bold uppercase tracking-widest text-xs opacity-80">Météo de vol</span>
-                                <Cloud size={24} />
-                            </div>
-                            <div className="flex items-end gap-2">
-                                <span className="text-4xl font-black">18°C</span>
-                                <span className="text-sm font-bold mb-1 opacity-90">Vent: 12 km/h NO</span>
-                            </div>
-                            <p className="text-xs mt-4 font-medium bg-white/20 p-2 rounded-lg inline-block">✅ Conditions optimales</p>
-                        </div>
-                        <Wind className="absolute -right-4 -bottom-4 w-24 h-24 text-white/10" />
-                    </Card>
-
+                    {/* suppression du widget météo demandé */}
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
                     <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
                 </div>
