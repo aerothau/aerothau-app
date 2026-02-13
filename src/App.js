@@ -50,7 +50,10 @@ import {
   FileSpreadsheet,
   Activity,
   Cloud,
-  Wind
+  Wind,
+  Upload,
+  FileCheck,
+  FileInput
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -93,8 +96,9 @@ const exportToCSV = (data, filename) => {
   document.body.removeChild(link);
 };
 
-// Fonction de génération PDF
-const generatePDF = (report, client, markers) => {
+// Fonction de génération PDF Robuste
+const generatePDF = (type, data, extraData = {}) => {
+    // Simulation de chargement des libs si nécessaire (dans un vrai projet, utiliser npm install jspdf jspdf-autotable)
     const loadScript = (src) => new Promise((resolve) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
         const script = document.createElement('script');
@@ -107,65 +111,62 @@ const generatePDF = (report, client, markers) => {
         loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"),
         loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js")
     ]).then(() => {
+        if (!window.jspdf) {
+            alert("Erreur: Librairie PDF non chargée. Réessayez.");
+            return;
+        }
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
+        const today = new Date().toLocaleDateString('fr-FR');
         
-        // En-tête
+        // En-tête Global
         doc.setFillColor(15, 23, 42); // Slate 900
         doc.rect(0, 0, 210, 40, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(22);
         doc.text("AEROTHAU", 20, 25);
         doc.setFontSize(10);
-        doc.text("Rapport d'intervention", 20, 32);
-        doc.text(`Date : ${report.date}`, 180, 25, { align: 'right' });
+        doc.text(`Document généré le : ${today}`, 190, 25, { align: 'right' });
 
-        // Info Client
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(14);
-        doc.text("Client :", 20, 55);
-        doc.setFontSize(12);
-        doc.text(client.name || "Inconnu", 20, 62);
-        doc.setFontSize(10);
-        doc.text(client.address || "", 20, 67);
+        if (type === 'nest_detail') {
+            const nest = data;
+            const clientName = extraData.clientName || "Inconnu";
+            
+            doc.setFontSize(16);
+            doc.text("FICHE D'IDENTIFICATION NID", 20, 50);
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12);
+            doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, 65);
+            doc.text(`Client : ${clientName}`, 20, 72);
+            doc.text(`Adresse : ${nest.address}`, 20, 79);
+            doc.text(`Statut : ${nest.status}`, 20, 86);
+            doc.text(`Œufs : ${nest.eggs}`, 20, 93);
+            doc.text(`Notes : ${nest.comments || "Aucune"}`, 20, 100);
 
-        // Stats
-        const totalEggs = markers.reduce((acc, curr) => acc + (curr.eggs || 0), 0);
-        const treated = markers.filter(m => m.status.includes('sterilized')).length;
-        
-        doc.setDrawColor(200, 200, 200);
-        doc.line(20, 75, 190, 75);
-        
-        doc.text(`Nids traités : ${treated} / ${markers.length}`, 20, 85);
-        doc.text(`Oeufs stérilisés : ${totalEggs}`, 100, 85);
-
-        // Tableau
-        const tableBody = markers.map(m => [
-            m.title || "Nid",
-            m.address,
-            m.status === 'present' ? 'Actif' : 'Traité',
-            m.eggs + " oeufs",
-            m.comments || "-"
-        ]);
-
-        doc.autoTable({
-            startY: 95,
-            head: [['Référence', 'Localisation', 'Statut', 'Contenu', 'Notes']],
-            body: tableBody,
-            theme: 'grid',
-            headStyles: { fillColor: [14, 165, 233] }, // Sky 500
-        });
-
-        // Pied de page
-        const pageCount = doc.internal.getNumberOfPages();
-        for(let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.text('Document généré par Aerothau Gestion - www.aerothau.fr', 105, 290, { align: 'center' });
+            if (nest.photo) {
+                try {
+                    doc.addImage(nest.photo, 'JPEG', 20, 110, 100, 75);
+                } catch(e) {}
+            }
+            
+            doc.save(`Fiche_Nid_${nest.id}.pdf`);
+            
+        } else {
+            // Rapport Global
+            const report = data;
+            doc.text("RAPPORT / DOCUMENT", 20, 50);
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12);
+            doc.text(`Titre : ${report.title}`, 20, 65);
+            doc.text(`Date du document : ${report.date}`, 20, 72);
+            doc.text(`Type : ${report.type}`, 20, 79);
+            
+            doc.setFontSize(10);
+            doc.text("Ce document est certifié par Aerothau.", 20, 100);
+            doc.save(`Document_${report.title}.pdf`);
         }
-
-        doc.save(`Rapport_${report.title.replace(/\s+/g, '_')}.pdf`);
-    });
+    }).catch(e => console.error("PDF Error", e));
 };
 
 // --- COMPOSANTS UI DE BASE ---
@@ -208,7 +209,9 @@ const Badge = ({ status }) => {
     sterilized_1: "1er Passage",
     sterilized_2: "2ème Passage",
     reported_by_client: "Signalement",
-    temp: "À valider"
+    temp: "À valider",
+    sent_by_admin: "Reçu d'Aerothau",
+    sent_by_client: "Envoyé par Client"
   };
 
   return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
@@ -372,28 +375,63 @@ const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCance
     );
 };
   
-const ReportEditForm = ({ report, clients, onSave, onCancel }) => {
-    const [formData, setFormData] = useState({ title: "Rapport", date: new Date().toISOString().split("T")[0], type: "Intervention", status: "Brouillon", clientId: "", ...report });
+const ReportEditForm = ({ report, clients, onSave, onCancel, userRole = "admin" }) => {
+    // Si c'est un client, l'auteur est "client", sinon "admin"
+    const [formData, setFormData] = useState({ 
+        title: "", 
+        date: new Date().toISOString().split("T")[0], 
+        type: "Fichier", 
+        status: userRole === 'admin' ? "Envoyé" : "En attente", 
+        clientId: userRole === 'admin' ? (clients.length > 0 ? clients[0].id : "") : report.clientId, 
+        author: userRole === 'admin' ? "admin" : "client",
+        ...report 
+    });
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setFormData({ ...formData, title: file.name, type: file.name.split('.').pop().toUpperCase() });
+        }
+    };
+
     return (
       <div className="space-y-4 text-slate-800">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
-          <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
-            <option value="">-- Choisir --</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+        <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase">Fichier</label>
+            <div className="relative mt-1">
+                <input type="file" className="hidden" id="doc-upload" onChange={handleFileUpload}/>
+                <label htmlFor="doc-upload" className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 text-slate-500 transition-colors">
+                    <Upload size={24}/> 
+                    <span className="text-xs font-bold uppercase">Cliquez pour déposer un fichier</span>
+                </label>
+            </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-              <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
-                  <option value="Intervention">Intervention</option><option value="Bilan">Bilan</option>
+        
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom du document</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Plan d'accès.pdf" /></div>
+        
+        {userRole === 'admin' && (
+            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Destinataire (Client)</label>
+              <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
+                <option value="">-- Choisir --</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-          </div>
-        </div>
+            </div>
+        )}
+
+        {userRole === 'admin' && (
+            <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
+                <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
+                    <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
+                        <option value="Autre">Autre</option><option value="PDF">PDF</option><option value="IMG">Image</option>
+                    </select>
+                </div>
+            </div>
+        )}
+
         <div className="flex gap-2 pt-4">
           <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
-          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
+          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>{userRole === 'admin' ? "Envoyer au client" : "Transmettre à Aerothau"}</Button>
         </div>
       </div>
     );
@@ -509,10 +547,10 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
       </div>
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Notes Techniques</label><textarea className="w-full p-2 border rounded-lg text-sm h-20 mt-1" placeholder="Accès, détails..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/></div>
       
-      {/* BOUTON RAPPORT PDF (Feature 1) */}
-      <Button variant="secondary" className="w-full border-slate-300 text-slate-700" onClick={downloadNestPDF}><FileText size={16}/> 📄 Générer Fiche PDF</Button>
+      {/* BOUTON RAPPORT PDF */}
+      <Button variant="secondary" className="w-full border-slate-300 text-slate-700 mt-2" onClick={downloadNestPDF}><FileText size={16}/> 📄 Générer Fiche PDF</Button>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 mt-4">
         {onDelete && (
              <Button variant="danger" onClick={() => onDelete(formData)} title="Supprimer ce nid"><Trash2 size={16}/></Button>
         )}
@@ -543,7 +581,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       tileLayerRef.current.setUrl(tileUrls[mapType]);
   }, [mapType]);
 
-  // DESSIN DU TRAJET (Feature 4)
+  // DESSIN DU TRAJET
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L) return;
       const L = window.L;
@@ -1149,7 +1187,7 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
 
             {(isCreating || editingInt) && (
                 <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white">
+                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white text-slate-800">
                         <div className="flex justify-between items-center mb-8">
                             <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating && !editingInt?.clientId ? "Nouvelle Mission" : "Détails Mission"}</h3>
                             <button onClick={() => {setEditingInt(null); setIsCreating(false);}} className="text-slate-400 hover:text-slate-600 p-1.5 bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
