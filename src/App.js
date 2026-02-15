@@ -53,7 +53,10 @@ import {
   Wind,
   Upload,
   File,
-  FileCheck
+  FileCheck,
+  LayoutList,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 // --- CONFIGURATION FIREBASE ---
@@ -97,7 +100,7 @@ const exportToCSV = (data, filename) => {
   document.body.removeChild(link);
 };
 
-// Fonction de génération PDF
+// Fonction de génération PDF Robuste
 const generatePDF = (type, data, extraData = {}) => {
     const loadScript = (src) => new Promise((resolve) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
@@ -136,10 +139,11 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, 65);
             doc.text(`Client : ${clientName}`, 20, 72);
             doc.text(`Adresse : ${nest.address}`, 20, 79);
-            doc.text(`Statut : ${nest.status}`, 20, 86);
-            doc.text(`Œufs : ${nest.eggs}`, 20, 93);
-            doc.text(`Notes : ${nest.comments || "Aucune"}`, 20, 100);
-            if (nest.photo) { try { doc.addImage(nest.photo, 'JPEG', 20, 110, 100, 75); } catch(e) {} }
+            doc.text(`Coordonnées GPS : ${nest.lat?.toFixed(6)}, ${nest.lng?.toFixed(6)}`, 20, 86);
+            doc.text(`Statut : ${nest.status}`, 20, 93);
+            doc.text(`Œufs : ${nest.eggs}`, 20, 100);
+            doc.text(`Notes : ${nest.comments || "Aucune"}`, 20, 107);
+            if (nest.photo) { try { doc.addImage(nest.photo, 'JPEG', 20, 115, 100, 75); } catch(e) {} }
             doc.save(`Fiche_Nid_${nest.id}.pdf`);
         } else if (type === 'complete_report') {
             const client = extraData.client || { name: "Client Inconnu" };
@@ -176,6 +180,7 @@ const generatePDF = (type, data, extraData = {}) => {
 };
 
 // --- COMPOSANTS UI DE BASE ---
+
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
   const baseStyle = "px-4 py-2 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50 disabled:cursor-not-allowed";
   const variants = {
@@ -207,17 +212,7 @@ const Badge = ({ status }) => {
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
     temp: "bg-slate-500 text-white animate-pulse border-2 border-dashed border-white",
   };
-  
-  const labels = {
-    present: "Présent",
-    non_present: "Non présent",
-    sterilized_1: "1er Passage",
-    sterilized_2: "2ème Passage",
-    reported_by_client: "Signalement",
-    temp: "À valider"
-  };
-
-  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
+  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{status}</span>;
 };
 
 const Toast = ({ message, type, onClose }) => {
@@ -228,6 +223,7 @@ const Toast = ({ message, type, onClose }) => {
 };
 
 // --- FORMULAIRES ---
+
 const LoginForm = ({ onLogin, users, logoUrl }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -278,30 +274,127 @@ const ReportEditForm = ({ report, clients, onSave, onCancel, userRole = "admin" 
       </div>
     );
 };
+
 const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly = false, onGeneratePDF }) => {
   const [formData, setFormData] = useState({ title: "", comments: "", eggs: 0, status: "present", clientId: "", ...nest });
   const handlePhotoUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({ ...formData, photo: reader.result }); reader.readAsDataURL(file); } };
   const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
   
-  if (readOnly) return ( <div className="space-y-4"><h4 className="font-bold">{nest.title}</h4><p className="text-sm">{nest.address}</p><div className="flex gap-2"><Badge status={nest.status} /> <span>{nest.eggs} oeufs</span></div><Button variant="sky" className="w-full" onClick={onCancel}>Fermer</Button></div> );
+  // FICHE NID OPTIMISÉE (Lecture Seule)
+  if (readOnly) return (
+      <div className="space-y-6 text-slate-800">
+          {nest.photo && (
+              <div className="rounded-2xl overflow-hidden shadow-md border border-slate-100 h-48">
+                  <img src={nest.photo} alt="Nid" className="w-full h-full object-cover" />
+              </div>
+          )}
+          <div className="flex justify-between items-start">
+             <div>
+                <h4 className="font-black text-xl text-slate-900">{nest.title || "Nid sans nom"}</h4>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wide mt-1"><MapIcon size={12} className="inline mr-1"/>{nest.address}</p>
+             </div>
+             <Badge status={nest.status} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contenu</p>
+                  <p className="text-2xl font-black text-slate-800">{nest.eggs} <span className="text-sm font-normal text-slate-500">œufs</span></p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center flex flex-col justify-center items-center">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Coordonnées</p>
+                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded border border-slate-200">{nest.lat?.toFixed(5)}</p>
+                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded border border-slate-200 mt-1">{nest.lng?.toFixed(5)}</p>
+              </div>
+          </div>
+          
+          {nest.comments && (
+              <div className="bg-sky-50 p-4 rounded-xl border border-sky-100">
+                <p className="text-[10px] font-black text-sky-600 uppercase mb-1 flex items-center gap-2"><Info size={12}/> Observations</p>
+                <p className="text-sm text-sky-900 italic leading-relaxed">"{nest.comments}"</p>
+              </div>
+          )}
+          <Button variant="sky" className="w-full py-3" onClick={onCancel}>Fermer la fiche</Button>
+      </div>
+  );
   
+  // FICHE NID OPTIMISÉE (Mode Édition)
   return (
-    <div className="space-y-4">
-        <input className="w-full p-2 border rounded-lg" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre"/>
-        <select className="w-full p-2 border rounded-lg" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
-        <button type="button" onClick={openRoute} className="text-xs text-sky-600 flex items-center gap-1"><Locate size={12}/> Voir Itinéraire</button>
-        <textarea className="w-full p-2 border rounded-lg text-sm" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/>
-        <select className="w-full p-2 border rounded-lg" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
-            <option value="reported_by_client">Signalement</option>
-            <option value="present">Présent</option>
-            <option value="sterilized_1">1er Passage</option>
-            <option value="sterilized_2">2ème Passage</option>
-            <option value="non_present">Non présent</option>
-        </select>
-        <input type="number" className="w-full p-2 border rounded-lg" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="Oeufs"/>
-        <div className="relative"><input type="file" className="hidden" id="photo" onChange={handlePhotoUpload}/><label htmlFor="photo" className="w-full p-2 border border-dashed rounded-lg block text-center cursor-pointer">Photo</label></div>
-        {onGeneratePDF && <Button variant="secondary" className="w-full" onClick={()=>onGeneratePDF(nest)}>📄 PDF</Button>}
-        <div className="flex gap-2"><Button variant="outline" onClick={onCancel}>Fermer</Button><Button variant="success" onClick={()=>onSave(formData)}>Sauver</Button></div>
+    <div className="space-y-6 text-slate-800">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Colonne Gauche : Visuel & Statut */}
+            <div className="space-y-4">
+                 <div className="relative group">
+                    {formData.photo ? (
+                        <div className="relative h-40 rounded-2xl overflow-hidden shadow-md">
+                            <img src={formData.photo} className="w-full h-full object-cover" alt="Nid"/>
+                            <button onClick={() => setFormData({...formData, photo: null})} className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 transition-colors"><Trash2 size={14}/></button>
+                        </div>
+                    ) : (
+                        <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 h-40 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all group-hover:border-sky-400">
+                            <Camera size={32} className="text-slate-300 group-hover:text-sky-400 mb-2"/>
+                            <span className="text-xs font-black uppercase text-slate-400 group-hover:text-sky-500">Ajouter Photo</span>
+                            <input type="file" className="hidden" onChange={handlePhotoUpload}/>
+                        </label>
+                    )}
+                 </div>
+                 
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">État du nid</label>
+                    <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
+                        <option value="reported_by_client">🟣 Signalement Client</option>
+                        <option value="present">🔴 Présent (Actif)</option>
+                        <option value="sterilized_1">🟢 1er Passage (Traité)</option>
+                        <option value="sterilized_2">🟢 2ème Passage (Confirmé)</option>
+                        <option value="non_present">⚪ Non présent / Inactif</option>
+                    </select>
+                 </div>
+            </div>
+
+            {/* Colonne Droite : Infos & Loc */}
+            <div className="space-y-4">
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Identification</label>
+                    <input className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
+                </div>
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Client</label>
+                    <select className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>
+                        <option value="">-- Sélectionner --</option>
+                        {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                </div>
+                 <div className="flex gap-4">
+                    <div className="flex-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Œufs</label>
+                        <input type="number" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-center focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
+                    </div>
+                     <div className="flex-1 flex items-end">
+                         <button type="button" onClick={openRoute} className="w-full p-3 bg-sky-50 text-sky-600 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-sky-100 transition-colors flex items-center justify-center gap-2"><Locate size={14}/> GPS</button>
+                     </div>
+                </div>
+            </div>
+        </div>
+        
+        {/* Section Large : Adresse & Notes */}
+        <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Adresse précise</label>
+            <textarea className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none resize-none" rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/>
+            <div className="flex justify-end mt-1"><span className="text-[9px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">GPS: {formData.lat?.toFixed(6)}, {formData.lng?.toFixed(6)}</span></div>
+        </div>
+
+        <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Observations Techniques</label>
+            <textarea className="w-full p-3 border border-slate-200 rounded-xl text-sm h-20 focus:ring-2 focus:ring-sky-500 outline-none resize-none" placeholder="Accès difficile, hauteur, matériel nécessaire..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/>
+        </div>
+        
+        {onGeneratePDF && <Button variant="secondary" className="w-full border-slate-200 text-slate-600 hover:bg-slate-50" onClick={()=>onGeneratePDF(nest)}><Download size={16}/> Télécharger la fiche PDF</Button>}
+        
+        <div className="flex gap-3 pt-2 border-t border-slate-100">
+             {onDelete && <button onClick={() => onDelete(formData)} className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"><Trash2 size={20}/></button>}
+             <Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button>
+             <Button variant="success" className="flex-1 py-3" onClick={()=>onSave(formData)}>Enregistrer</Button>
+        </div>
     </div>
   );
 };
@@ -326,6 +419,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       plan: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
   };
 
+  // 1. Initialisation unique
   useEffect(() => {
     if (mapInstanceRef.current) return;
 
@@ -365,13 +459,14 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
 
-  // Fix pour éviter l'écran blanc : on force le redimensionnement, mais sans dépendre de isAddingMode pour le montage
+  // 2. Gestion Invalid Size
   useEffect(() => {
      if (mapInstanceRef.current) {
          setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 200);
      }
-  });
+  }, [isAddingMode]);
 
+  // 3. Mise à jour marqueurs
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L || !markersLayerRef.current) return;
       const L = window.L;
@@ -391,6 +486,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       });
   }, [markers]);
 
+  // 4. Trajet
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L || !routeLayerRef.current) return;
       routeLayerRef.current.clearLayers();
@@ -401,10 +497,12 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       }
   }, [routePath]);
 
+  // 5. Fond de carte
   useEffect(() => {
       if (mapInstanceRef.current && tileLayerRef.current) tileLayerRef.current.setUrl(tileUrls[mapType]);
   }, [mapType]);
 
+  // 6. Centrage
   useEffect(() => {
       if (mapInstanceRef.current && center) mapInstanceRef.current.setView([center.lat, center.lng], 18);
   }, [center]);
@@ -613,15 +711,69 @@ const AdminDashboard = ({ interventions, clients, markers, onExport }) => {
   );
 };
 
-// ... NestManagement, ClientManagement, ClientDetail, ScheduleView, ReportsView, ClientSpace ...
+// --- GESTION DES NIDS (MODIFIÉE) ---
 const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
   const [selectedNest, setSelectedNest] = useState(null);
   const handleFileUpload = async (event) => { /* ... */ }; 
+
   return (
-    <div className="space-y-6 text-slate-800">
-      <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2><Button variant="sky"><FileSpreadsheet size={18}/> Import Excel</Button></div>
-      <Card className="overflow-hidden border-0 shadow-xl rounded-3xl bg-white"><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Titre / Adresse</th><th className="p-6">État</th><th className="p-6 text-center">Œufs</th><th className="p-6 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-100 text-slate-800">{markers.map((m) => (<tr key={m.id} className="hover:bg-slate-50 transition-colors"><td className="p-6"><div className="font-bold">{m.title || "Sans titre"}</div><div className="text-xs text-slate-500">{m.address}</div></td><td className="p-6"><Badge status={m.status} /></td><td className="p-6 font-black text-sky-600 text-center">{m.eggs}</td><td className="p-6 flex justify-end gap-2"><button onClick={() => setSelectedNest(m)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18} /></button><button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18} /></button></td></tr>))}</tbody></table></div></Card>
-      {selectedNest && (<div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in"><Card className="bg-white rounded-3xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border-0 text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Modifier le nid</h3><NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} /></Card></div>)}
+    <div className="space-y-8 text-slate-800">
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
+        <Button variant="sky"><FileSpreadsheet size={18}/> Importer Excel</Button>
+      </div>
+
+      {clients.map(client => {
+          const clientNests = markers.filter(m => m.clientId === client.id);
+          if (clientNests.length === 0) return null;
+
+          return (
+              <Card key={client.id} className="overflow-hidden border-0 shadow-lg rounded-3xl bg-white mb-6">
+                <div className="bg-slate-900 p-4 text-white flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white/10 rounded-lg"><Users size={18} className="text-sky-400"/></div>
+                        <h3 className="font-black uppercase tracking-wide">{client.name}</h3>
+                    </div>
+                    <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold">{clientNests.length} Nids</span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50 text-slate-400 font-bold uppercase border-b border-slate-100">
+                            <tr><th className="p-4 pl-6">Réf / Adresse</th><th className="p-4">Statut</th><th className="p-4 text-center">Contenu</th><th className="p-4 text-right pr-6">Actions</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 text-slate-700">
+                            {clientNests.map((m) => (
+                                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="p-4 pl-6">
+                                        <div className="font-bold text-slate-900">{m.title || "Nid sans nom"}</div>
+                                        <div className="text-xs text-slate-400 truncate max-w-[200px]">{m.address}</div>
+                                    </td>
+                                    <td className="p-4"><Badge status={m.status} /></td>
+                                    <td className="p-4 text-center font-bold text-slate-600">{m.eggs} œuf(s)</td>
+                                    <td className="p-4 flex justify-end gap-2 pr-6">
+                                        <button onClick={() => setSelectedNest(m)} className="p-2 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-lg transition-all"><Edit size={16} /></button>
+                                        <button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all"><Trash2 size={16} /></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+              </Card>
+          );
+      })}
+
+      {selectedNest && (
+        <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
+          <Card className="bg-white rounded-3xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border-0 text-slate-800">
+              <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-black text-2xl mb-0 uppercase tracking-tighter text-slate-900">Édition Nid</h3>
+                  <button onClick={() => setSelectedNest(null)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
+              </div>
+              <NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} onGeneratePDF={(n, cb) => generatePDF('nest_detail', n, { clientName: clients.find(c => c.id === n.clientId)?.name }, () => {}, cb)} />
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
@@ -686,7 +838,6 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
     );
 };
 
-// --- AJOUT DU COMPOSANT MANQUANT ReportsView ---
 const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport, onDeleteReport }) => {
     const [isCreating, setIsCreating] = useState(false);
     const [editingRep, setEditingRep] = useState(null);
@@ -738,7 +889,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                 {isAddingMode ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Signaler un nid</>}
                             </Button>
                         </Card>
-                        <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden border-8 border-white bg-white">
+                        <div className={`flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white transition-all duration-300 ${isAddingMode ? 'border-8 border-sky-500' : 'border-8 border-white'}`}>
                             {isAddingMode && (
                                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce pointer-events-none">
                                     📍 Cliquez sur la carte pour signaler un nid
