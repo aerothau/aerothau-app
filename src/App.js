@@ -132,6 +132,7 @@ const generatePDF = (type, data, extraData = {}) => {
             const clientName = extraData.clientName || "Inconnu";
             
             doc.text("FICHE D'IDENTIFICATION NID", 20, 50);
+            
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(12);
             doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, 65);
@@ -159,7 +160,6 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`Client : ${client.name}`, 20, 65);
             doc.setFontSize(10);
             doc.text(client.address || "", 20, 72);
-
             const totalEggs = markers.reduce((acc, curr) => acc + (curr.eggs || 0), 0);
             const treated = markers.filter(m => m.status && m.status.includes('sterilized')).length;
             doc.setFillColor(240, 240, 240);
@@ -220,17 +220,7 @@ const Badge = ({ status }) => {
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
     temp: "bg-slate-500 text-white animate-pulse border-2 border-dashed border-white",
   };
-  
-  const labels = {
-    present: "Présent",
-    non_present: "Non présent",
-    sterilized_1: "1er Passage",
-    sterilized_2: "2ème Passage",
-    reported_by_client: "Signalement",
-    temp: "À valider"
-  };
-
-  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
+  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{status}</span>;
 };
 
 const Toast = ({ message, type, onClose }) => {
@@ -630,99 +620,134 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
   const tileLayerRef = useRef(null);
   const [mapType, setMapType] = useState("satellite");
 
+  const onMapClickRef = useRef(onMapClick);
+  const onMarkerClickRef = useRef(onMarkerClick);
+
+  useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
+  useEffect(() => { onMarkerClickRef.current = onMarkerClick; }, [onMarkerClick]);
+
   const tileUrls = {
       satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       plan: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
   };
 
   useEffect(() => {
-      if (!mapInstanceRef.current || !window.L || !tileLayerRef.current) return;
-      tileLayerRef.current.setUrl(tileUrls[mapType]);
-  }, [mapType]);
+    // Si la carte existe déjà, on met juste à jour les tuiles
+    if (mapInstanceRef.current && tileLayerRef.current && window.L) {
+        tileLayerRef.current.setUrl(tileUrls[mapType]);
+        return;
+    }
 
-  useEffect(() => {
-      if (!mapInstanceRef.current || !window.L) return;
-      const L = window.L;
-      if (routeLayerRef.current) routeLayerRef.current.clearLayers();
-      else if(mapInstanceRef.current) routeLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current);
-
-      if (routePath && routePath.length > 1 && routeLayerRef.current) {
-          const pointList = routePath.map(m => [m.lat, m.lng]);
-          const polyline = L.polyline(pointList, { color: '#3b82f6', weight: 4, opacity: 0.8, dashArray: '10, 10', lineJoin: 'round' }).addTo(routeLayerRef.current);
-          mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
-      }
-  }, [routePath]);
-
-  const updateMarkers = useCallback(() => {
-    if (!mapInstanceRef.current || !markersLayerRef.current || !window.L) return;
-    const L = window.L;
-    markersLayerRef.current.clearLayers();
-    markers.forEach(m => {
-      let color = "#64748b"; 
-      if (m.status === "present") color = "#ef4444"; 
-      else if (m.status === "temp") color = "#94a3b8"; 
-      else if (m.status === "sterilized_1") color = "#84cc16"; 
-      else if (m.status === "sterilized_2") color = "#22c55e"; 
-      else if (m.status === "reported_by_client") color = "#a855f7"; 
-      else if (m.status === "non_present") color = "#cbd5e1"; 
-
-      const icon = L.divIcon({
-        className: "custom-icon",
-        html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); ${m.status === 'temp' ? 'animation: pulse 1s infinite;' : 'transition: transform 0.2s;'}" onmouseover="this.style.transform='scale(1.3)'" onmouseout="this.style.transform='scale(1)'"></div>`,
-        iconSize: [22, 22], iconAnchor: [11, 11]
-      });
-      const marker = L.marker([m.lat, m.lng], { icon });
-      marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClick) onMarkerClick(m); });
-      marker.addTo(markersLayerRef.current);
-    });
-  }, [markers, onMarkerClick]);
-
-  useEffect(() => {
-    if (mapInstanceRef.current || !mapContainerRef.current) return;
-    
+    // Fonction d'initialisation réelle
     const initMap = () => {
+        if (!mapContainerRef.current) return;
+        if (mapInstanceRef.current) return;
+
         try {
             const L = window.L;
             if (!L || typeof L.map !== 'function') return;
 
             const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
             mapInstanceRef.current = map;
-            
+
             L.control.zoom({ position: 'bottomright' }).addTo(map);
-            tileLayerRef.current = L.tileLayer(tileUrls.satellite, { attribution: 'Esri' }).addTo(map);
+            tileLayerRef.current = L.tileLayer(tileUrls[mapType], { attribution: 'Esri' }).addTo(map);
             markersLayerRef.current = L.layerGroup().addTo(map);
             routeLayerRef.current = L.layerGroup().addTo(map);
-            
-            map.on('click', (e) => onMapClick && onMapClick(e.latlng));
+
+            // Gestion du clic avec la REF pour éviter les closures
+            map.on('click', (e) => {
+                if(onMapClickRef.current) onMapClickRef.current(e.latlng);
+            });
             
             // Force redraw
             setTimeout(() => map.invalidateSize(), 100);
             
-            // Initial update
-            updateMarkers();
-        } catch (e) { console.error("Map Error", e); }
+        } catch (e) {
+            console.error("Erreur init map:", e);
+        }
     };
 
     if (!window.L) {
         if(!document.getElementById('leaflet-script')) {
-            const link = document.createElement("link"); link.id = 'leaflet-css'; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
-            const script = document.createElement("script"); script.id = 'leaflet-script'; script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true; script.onload = initMap; document.head.appendChild(script);
+            const link = document.createElement("link");
+            link.id = 'leaflet-css'; link.rel = "stylesheet"; 
+            link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+            document.head.appendChild(link);
+            
+            const script = document.createElement("script");
+            script.id = 'leaflet-script';
+            script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+            script.async = true;
+            script.onload = initMap;
+            document.head.appendChild(script);
         } else {
             const script = document.getElementById('leaflet-script');
             script.addEventListener('load', initMap);
+             // Safety timeout
+             setTimeout(() => { if(window.L && !mapInstanceRef.current) initMap(); }, 500);
         }
-    } else { initMap(); }
-    
-    return () => {
-        if (mapInstanceRef.current) {
-            mapInstanceRef.current.remove();
-            mapInstanceRef.current = null;
-        }
+    } else {
+        initMap();
     }
-  }, []); // Run only once
+  }, []);
 
-  useEffect(() => { updateMarkers(); }, [updateMarkers]);
-  useEffect(() => { if (mapInstanceRef.current && center) mapInstanceRef.current.setView([center.lat, center.lng], 18); }, [center]);
+  // 3. Mise à jour des marqueurs
+  useEffect(() => {
+      if (!mapInstanceRef.current || !window.L || !markersLayerRef.current) return;
+      const L = window.L;
+      
+      markersLayerRef.current.clearLayers();
+      markers.forEach(m => {
+          let color = "#64748b"; 
+          if (m.status === "present") color = "#ef4444"; 
+          else if (m.status === "temp") color = "#94a3b8"; 
+          else if (m.status === "sterilized_1") color = "#84cc16"; 
+          else if (m.status === "sterilized_2") color = "#22c55e"; 
+          else if (m.status === "reported_by_client") color = "#a855f7"; 
+          else if (m.status === "non_present") color = "#cbd5e1"; 
+
+          const icon = L.divIcon({
+            className: "custom-icon",
+            html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.4); ${m.status === 'temp' ? 'animation: pulse 1s infinite;' : 'transition: transform 0.2s;'}" onmouseover="this.style.transform='scale(1.3)'" onmouseout="this.style.transform='scale(1)'"></div>`,
+            iconSize: [22, 22], iconAnchor: [11, 11]
+          });
+          
+          const marker = L.marker([m.lat, m.lng], { icon });
+          marker.on('click', (e) => { 
+              L.DomEvent.stopPropagation(e); 
+              if(onMarkerClickRef.current) onMarkerClickRef.current(m); 
+          });
+          marker.addTo(markersLayerRef.current);
+      });
+  }, [markers]);
+
+  // 4. Mise à jour du trajet
+  useEffect(() => {
+      if (!mapInstanceRef.current || !window.L || !routeLayerRef.current) return;
+      const L = window.L;
+      
+      routeLayerRef.current.clearLayers();
+      if (routePath && routePath.length > 1) {
+          const pointList = routePath.map(m => [m.lat, m.lng]);
+          const polyline = L.polyline(pointList, {
+              color: '#3b82f6', weight: 4, opacity: 0.8, dashArray: '10, 10', lineJoin: 'round'
+          }).addTo(routeLayerRef.current);
+          mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+      }
+  }, [routePath]);
+
+  // 5. Mise à jour du fond de carte
+  useEffect(() => {
+      if (!mapInstanceRef.current || !tileLayerRef.current) return;
+      tileLayerRef.current.setUrl(tileUrls[mapType]);
+  }, [mapType]);
+
+  // 6. Centrage
+  useEffect(() => {
+      if (!mapInstanceRef.current || !center) return;
+      mapInstanceRef.current.setView([center.lat, center.lng], 18);
+  }, [center]);
 
   return (
       <div className="relative w-full h-full">
@@ -959,7 +984,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
       </Card>
       {selectedNest && (
         <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-          <Card className="bg-white rounded-3xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border-0 text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Modifier le nid</h3><NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} onGeneratePDF={(n) => generatePDF('nest_detail', n, { clientName: clients.find(c => c.id === n.clientId)?.name })} /></Card>
+          <Card className="bg-white rounded-3xl p-8 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl border-0 text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Modifier le nid</h3><NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} /></Card>
         </div>
       )}
     </div>
