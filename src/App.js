@@ -207,7 +207,17 @@ const Badge = ({ status }) => {
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
     temp: "bg-slate-500 text-white animate-pulse border-2 border-dashed border-white",
   };
-  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{status}</span>;
+  
+  const labels = {
+    present: "Présent",
+    non_present: "Non présent",
+    sterilized_1: "1er Passage",
+    sterilized_2: "2ème Passage",
+    reported_by_client: "Signalement",
+    temp: "À valider"
+  };
+
+  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
 };
 
 const Toast = ({ message, type, onClose }) => {
@@ -281,7 +291,13 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
         <select className="w-full p-2 border rounded-lg" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
         <button type="button" onClick={openRoute} className="text-xs text-sky-600 flex items-center gap-1"><Locate size={12}/> Voir Itinéraire</button>
         <textarea className="w-full p-2 border rounded-lg text-sm" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/>
-        <select className="w-full p-2 border rounded-lg" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}><option value="present">Présent</option><option value="sterilized_1">1er Passage</option><option value="sterilized_2">2ème Passage</option><option value="non_present">Non présent</option></select>
+        <select className="w-full p-2 border rounded-lg" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
+            <option value="reported_by_client">Signalement</option>
+            <option value="present">Présent</option>
+            <option value="sterilized_1">1er Passage</option>
+            <option value="sterilized_2">2ème Passage</option>
+            <option value="non_present">Non présent</option>
+        </select>
         <input type="number" className="w-full p-2 border rounded-lg" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="Oeufs"/>
         <div className="relative"><input type="file" className="hidden" id="photo" onChange={handlePhotoUpload}/><label htmlFor="photo" className="w-full p-2 border border-dashed rounded-lg block text-center cursor-pointer">Photo</label></div>
         {onGeneratePDF && <Button variant="secondary" className="w-full" onClick={()=>onGeneratePDF(nest)}>📄 PDF</Button>}
@@ -444,9 +460,11 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
 
     const optimizeRoute = () => {
         if (markers.length < 2) return alert("Il faut au moins 2 nids pour créer un trajet.");
-        let unvisited = [...markers], current = unvisited.shift(), path = [current];
+        let unvisited = [...markers];
+        let current = unvisited.shift();
+        let path = [current];
         while (unvisited.length > 0) {
-            let nearest = null, minDetails = Infinity, nearestIndex = -1;
+            let nearest = null; let minDetails = Infinity; let nearestIndex = -1;
             unvisited.forEach((m, idx) => {
                 const dist = Math.sqrt(Math.pow(m.lat - current.lat, 2) + Math.pow(m.lng - current.lng, 2));
                 if (dist < minDetails) { minDetails = dist; nearest = m; nearestIndex = idx; }
@@ -473,16 +491,8 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 </div>
             </Card>
             
-            <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white">
-                {/* INDICATEUR D'AJOUT (CSS overlay simple) */}
-                {isAdding && (
-                     <div className="absolute inset-0 border-[6px] border-sky-500 z-[1000] pointer-events-none rounded-3xl flex items-start justify-center pt-4">
-                        <div className="bg-sky-500 text-white px-4 py-2 rounded-full font-bold shadow-lg text-sm">
-                            📍 Cliquez sur la carte pour placer le nid
-                        </div>
-                     </div>
-                )}
-                
+            {/* WRAPPER AVEC BORDURE POUR LE MODE AJOUT (Au lieu de toucher à la map directement) */}
+            <div className={`flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white transition-all duration-300 ${isAdding ? 'border-8 border-sky-500' : 'border-8 border-white'}`}>
                 {tempMarker && !isAdding && (<div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-800 text-white px-4 py-2 rounded-full text-xs font-bold animate-bounce pointer-events-none">📍 Cliquez sur le point gris pour valider</div>)}
                 {routePath && (<div className="absolute top-4 left-4 z-[500] bg-white text-slate-800 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2"><Activity size={14}/> Trajet affiché <button onClick={() => setRoutePath(null)}><X size={14}/></button></div>)}
 
