@@ -73,6 +73,7 @@ const appId = "aerothau-goelands";
 
 const MAIN_WEBSITE_URL = "https://www.aerothau.fr";
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
+const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; // Sète
 
 // --- CONSTANTES ---
 const INITIAL_USERS = [
@@ -96,7 +97,7 @@ const exportToCSV = (data, filename) => {
   document.body.removeChild(link);
 };
 
-// Fonction de génération PDF Robuste
+// Fonction de génération PDF
 const generatePDF = (type, data, extraData = {}) => {
     const loadScript = (src) => new Promise((resolve) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
@@ -175,7 +176,6 @@ const generatePDF = (type, data, extraData = {}) => {
 };
 
 // --- COMPOSANTS UI DE BASE ---
-
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
   const baseStyle = "px-4 py-2 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50 disabled:cursor-not-allowed";
   const variants = {
@@ -218,7 +218,6 @@ const Toast = ({ message, type, onClose }) => {
 };
 
 // --- FORMULAIRES ---
-
 const LoginForm = ({ onLogin, users, logoUrl }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -350,11 +349,12 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
 
+  // Fix pour éviter l'écran blanc : on force le redimensionnement, mais sans dépendre de isAddingMode pour le montage
   useEffect(() => {
      if (mapInstanceRef.current) {
          setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 200);
      }
-  }, [isAddingMode]);
+  });
 
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L || !markersLayerRef.current) return;
@@ -395,7 +395,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
 
   return (
       <div className="relative w-full h-full">
-          <div ref={mapContainerRef} className="w-full h-full bg-slate-200 rounded-2xl overflow-hidden" />
+          <div ref={mapContainerRef} className="w-full h-full bg-slate-200 rounded-2xl overflow-hidden" style={{ minHeight: '100%', zIndex: 0 }} />
           <div className="absolute top-4 right-4 z-[400] bg-white p-1 rounded-lg shadow-md flex gap-1">
               <button onClick={(e) => { e.stopPropagation(); setMapType('satellite'); }} className={`px-3 py-1.5 text-xs font-bold rounded-md ${mapType === 'satellite' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>Sat</button>
               <button onClick={(e) => { e.stopPropagation(); setMapType('plan'); }} className={`px-3 py-1.5 text-xs font-bold rounded-md ${mapType === 'plan' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>Plan</button>
@@ -473,8 +473,16 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 </div>
             </Card>
             
-            {/* WRAPPER AVEC BORDURE POUR LE MODE AJOUT (Au lieu de toucher à la map directement) */}
-            <div className={`flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white transition-all duration-300 ${isAdding ? 'border-8 border-sky-500' : 'border-8 border-white'}`}>
+            <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white">
+                {/* INDICATEUR D'AJOUT (CSS overlay simple) */}
+                {isAdding && (
+                     <div className="absolute inset-0 border-[6px] border-sky-500 z-[1000] pointer-events-none rounded-3xl flex items-start justify-center pt-4">
+                        <div className="bg-sky-500 text-white px-4 py-2 rounded-full font-bold shadow-lg text-sm">
+                            📍 Cliquez sur la carte pour placer le nid
+                        </div>
+                     </div>
+                )}
+                
                 {tempMarker && !isAdding && (<div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-800 text-white px-4 py-2 rounded-full text-xs font-bold animate-bounce pointer-events-none">📍 Cliquez sur le point gris pour valider</div>)}
                 {routePath && (<div className="absolute top-4 left-4 z-[500] bg-white text-slate-800 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2"><Activity size={14}/> Trajet affiché <button onClick={() => setRoutePath(null)}><X size={14}/></button></div>)}
 
@@ -720,7 +728,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                 {isAddingMode ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Signaler un nid</>}
                             </Button>
                         </Card>
-                        <div className={`flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white transition-all duration-300 ${isAddingMode ? 'border-8 border-sky-500' : 'border-8 border-white'}`}>
+                        <div className="flex-1 relative shadow-2xl rounded-3xl overflow-hidden border-8 border-white bg-white">
                             {isAddingMode && (
                                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce pointer-events-none">
                                     📍 Cliquez sur la carte pour signaler un nid
