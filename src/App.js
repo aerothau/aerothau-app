@@ -132,7 +132,6 @@ const generatePDF = (type, data, extraData = {}) => {
             const clientName = extraData.clientName || "Inconnu";
             
             doc.text("FICHE D'IDENTIFICATION NID", 20, 50);
-            
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(12);
             doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, 65);
@@ -160,8 +159,11 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`Client : ${client.name}`, 20, 65);
             doc.setFontSize(10);
             doc.text(client.address || "", 20, 72);
+
+            // Stats
             const totalEggs = markers.reduce((acc, curr) => acc + (curr.eggs || 0), 0);
             const treated = markers.filter(m => m.status && m.status.includes('sterilized')).length;
+            
             doc.setFillColor(240, 240, 240);
             doc.rect(20, 80, 170, 20, 'F');
             doc.text(`Total Nids : ${markers.length}`, 30, 92);
@@ -177,6 +179,7 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.autoTable({ startY: finalY + 5, head: [['Date', 'Statut', 'Agent', 'Notes']], body: intRows, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, });
 
             doc.save(`Rapport_Complet_${client.name.replace(/\s+/g, '_')}.pdf`);
+
         } else {
             const report = data;
             doc.text("DOCUMENT", 20, 50);
@@ -425,7 +428,6 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
             </div>
         )}
 
-        {/* Formulaire Upload */}
         {formData.type === 'Fichier' && (
             <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Fichier</label>
@@ -631,18 +633,13 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       plan: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
   };
 
+  // 1. Initialisation de la carte (une seule fois)
   useEffect(() => {
-    // Si la carte existe déjà, on met juste à jour les tuiles
-    if (mapInstanceRef.current && tileLayerRef.current && window.L) {
-        tileLayerRef.current.setUrl(tileUrls[mapType]);
-        return;
-    }
+    if (mapInstanceRef.current) return; // Sécurité
 
-    // Fonction d'initialisation réelle
     const initMap = () => {
         if (!mapContainerRef.current) return;
-        if (mapInstanceRef.current) return;
-
+        
         try {
             const L = window.L;
             if (!L || typeof L.map !== 'function') return;
@@ -651,16 +648,15 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
             mapInstanceRef.current = map;
 
             L.control.zoom({ position: 'bottomright' }).addTo(map);
-            tileLayerRef.current = L.tileLayer(tileUrls[mapType], { attribution: 'Esri' }).addTo(map);
+            tileLayerRef.current = L.tileLayer(tileUrls.satellite, { attribution: 'Esri' }).addTo(map);
             markersLayerRef.current = L.layerGroup().addTo(map);
             routeLayerRef.current = L.layerGroup().addTo(map);
 
-            // Gestion du clic avec la REF pour éviter les closures
+            // Clic via ref pour éviter les closures
             map.on('click', (e) => {
                 if(onMapClickRef.current) onMapClickRef.current(e.latlng);
             });
             
-            // Force redraw
             setTimeout(() => map.invalidateSize(), 100);
             
         } catch (e) {
@@ -684,7 +680,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
         } else {
             const script = document.getElementById('leaflet-script');
             script.addEventListener('load', initMap);
-             // Safety timeout
+             // Timeout de sécurité si le script est déjà chargé mais l'event loupé
              setTimeout(() => { if(window.L && !mapInstanceRef.current) initMap(); }, 500);
         }
     } else {
@@ -692,7 +688,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
     }
   }, []);
 
-  // 3. Mise à jour des marqueurs
+  // 2. Mise à jour des marqueurs (Séparée de l'init)
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L || !markersLayerRef.current) return;
       const L = window.L;
@@ -722,7 +718,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       });
   }, [markers]);
 
-  // 4. Mise à jour du trajet
+  // 3. Mise à jour du trajet
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L || !routeLayerRef.current) return;
       const L = window.L;
@@ -737,13 +733,13 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       }
   }, [routePath]);
 
-  // 5. Mise à jour du fond de carte
+  // 4. Mise à jour du fond de carte
   useEffect(() => {
       if (!mapInstanceRef.current || !tileLayerRef.current) return;
       tileLayerRef.current.setUrl(tileUrls[mapType]);
   }, [mapType]);
 
-  // 6. Centrage
+  // 5. Centrage
   useEffect(() => {
       if (!mapInstanceRef.current || !center) return;
       mapInstanceRef.current.setView([center.lat, center.lng], 18);
