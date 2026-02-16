@@ -8,6 +8,7 @@ import {
   setDoc,
   onSnapshot,
   deleteDoc,
+  query
 } from "firebase/firestore";
 import {
   Users,
@@ -95,19 +96,6 @@ const loadSheetJS = () => {
   });
 };
 
-const exportToCSV = (data, filename) => {
-  const csvContent = "data:text/csv;charset=utf-8," + 
-    data.map(e => Object.values(e).join(",")).join("\n");
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-// Fonction de génération PDF Robuste
 const generatePDF = (type, data, extraData = {}) => {
     const loadScript = (src) => new Promise((resolve) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
@@ -173,12 +161,6 @@ const generatePDF = (type, data, extraData = {}) => {
             const intRows = interventions.map(i => [i.date, i.status, i.technician || "-", i.notes || ""]);
             doc.autoTable({ startY: finalY + 5, head: [['Date', 'Statut', 'Agent', 'Notes']], body: intRows, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, });
             doc.save(`Rapport_Complet_${client.name.replace(/\s+/g, '_')}.pdf`);
-        } else {
-            const report = data;
-            doc.text("DOCUMENT", 20, 50);
-            doc.setTextColor(0, 0, 0);
-            doc.text(`Titre : ${report.title}`, 20, 65);
-            doc.save(`${report.title}.pdf`);
         }
     }).catch(e => console.error("PDF Error", e));
 };
@@ -216,7 +198,24 @@ const Badge = ({ status }) => {
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
     temp: "bg-slate-500 text-white animate-pulse border-2 border-dashed border-white",
   };
-  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{status}</span>;
+  
+  const labels = {
+    present: "Présent",
+    non_present: "Non présent",
+    sterilized_1: "1er Passage",
+    sterilized_2: "2ème Passage",
+    reported_by_client: "Signalement",
+    temp: "À valider"
+  };
+
+  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
+};
+
+const Toast = ({ message, type, onClose }) => {
+    useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
+    const bg = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
+    const icon = type === 'success' ? <CheckCircle size={18}/> : <AlertTriangle size={18}/>;
+    return <div className={`fixed bottom-4 right-4 ${bg} text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-10 z-[2000]`}>{icon} <span className="font-bold">{message}</span></div>;
 };
 
 // --- COMPOSANT LOGIN ---
@@ -258,31 +257,31 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 
 // --- COMPOSANTS DE FORMULAIRES ---
 
-const ClientReportForm = ({ nest, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({ title: "", ...nest, ownerContact: "", description: "", status: "reported_by_client" });
-  return (<div className="space-y-4"><input className="w-full p-2 border rounded-lg" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre" /><textarea className="w-full p-2 border rounded-lg" value={formData.description} onChange={e=>setFormData({...formData, description: e.target.value})} placeholder="Description" /><div className="flex gap-2"><Button variant="outline" onClick={onCancel}>Annuler</Button><Button variant="sky" onClick={()=>onSave(formData)}>Envoyer</Button></div></div>);
-};
-
 const ClientEditForm = ({ client, onSave, onCancel }) => {
     const [formData, setFormData] = useState({ ...client });
-    return (<div className="space-y-4"><input className="w-full p-2 border rounded-lg" value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} placeholder="Nom" /><input className="w-full p-2 border rounded-lg" value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} placeholder="Adresse" /><div className="flex gap-2"><Button variant="outline" onClick={onCancel}>Annuler</Button><Button variant="success" onClick={()=>onSave(formData)}>Sauver</Button></div></div>);
-};
-
-const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCancel }) => {
-    const [formData, setFormData] = useState({ clientId: clients[0]?.id || "", status: "Planifié", technician: "", notes: "", date: new Date().toISOString().split("T")[0], ...intervention });
-    return (<div className="space-y-4"><select className="w-full p-2 border rounded-lg" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><input type="date" className="w-full p-2 border rounded-lg" value={formData.date} onChange={e=>setFormData({...formData, date: e.target.value})}/><textarea className="w-full p-2 border rounded-lg" value={formData.notes} onChange={e=>setFormData({...formData, notes: e.target.value})} placeholder="Notes"/><div className="flex gap-2"><Button variant="outline" onClick={onCancel}>Annuler</Button><Button variant="success" onClick={()=>onSave(formData)}>Sauver</Button></div></div>);
-};
-
-const ReportEditForm = ({ report, clients, onSave, onCancel, userRole = "admin" }) => {
-    const [formData, setFormData] = useState({ title: "", date: new Date().toISOString().split("T")[0], type: "Fichier", status: "Envoyé", clientId: userRole === 'admin' ? (clients[0]?.id || "") : report.clientId, author: userRole === 'admin' ? "admin" : "client", nestId: "", ...report });
-    const handleFileUpload = (e) => { const file = e.target.files[0]; if(file) setFormData({...formData, title: file.name, type: "Fichier", status: "Envoyé"}); };
     return (
-      <div className="space-y-4">
-        {userRole === 'admin' && (<div className="grid grid-cols-3 gap-2 mb-2"><button className="p-2 border rounded text-xs" onClick={()=>setFormData({...formData, type: 'Fichier', title: ""})}>Upload</button><button className="p-2 border rounded text-xs" onClick={()=>setFormData({...formData, type: 'Rapport Complet', title: "Rapport - " + (clients.find(c=>c.id===formData.clientId)?.name||"")})}>Rapport</button><button className="p-2 border rounded text-xs" onClick={()=>setFormData({...formData, type: 'Fiche Nid', title: "Fiche Nid"})}>Fiche</button></div>)}
-        {formData.type === 'Fichier' && <input type="file" className="w-full p-2 border rounded-lg" onChange={handleFileUpload}/>}
-        {userRole === 'admin' && <select className="w-full p-2 border rounded-lg" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>}
-        <input className="w-full p-2 border rounded-lg" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Nom document"/>
-        <div className="flex gap-2"><Button variant="outline" onClick={onCancel}>Annuler</Button><Button variant="success" onClick={()=>onSave(formData)}>Valider</Button></div>
+      <div className="space-y-4 text-slate-800">
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
+              <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
+                  <option value="Privé">Privé</option><option value="Collectivité">Collectivité</option><option value="Syndic">Syndic</option>
+              </select>
+          </div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
+        </div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
+        <div className="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-3 text-center">Accès Espace Client</h4>
+          <div className="grid grid-cols-2 gap-4">
+              <input type="text" placeholder="Identifiant" className="p-2 border rounded-lg bg-white text-xs" value={formData.username || ""} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
+              <input type="text" placeholder="Pass" className="p-2 border rounded-lg bg-white text-xs" value={formData.password || ""} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+          </div>
+        </div>
+        <div className="flex gap-2 pt-4">
+          <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
+          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
+        </div>
       </div>
     );
 };
@@ -366,7 +365,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                     <input className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
                 </div>
                 <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Client</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Client</label>
                     <select className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>
                         <option value="">-- Sélectionner --</option>
                         {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
@@ -374,7 +373,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                 </div>
                  <div className="flex gap-4">
                     <div className="flex-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Œufs</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Œufs</label>
                         <input type="number" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-center focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
                     </div>
                      <div className="flex-1 flex items-end">
@@ -509,149 +508,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
   );
 };
 
-// --- COMPOSANTS DE VUE ---
-
-const AdminDashboard = ({ interventions, clients, markers }) => {
-  const stats = useMemo(() => ({
-    total: markers.length,
-    reported: markers.filter(m => m.status === "reported_by_client").length,
-    nonPresent: markers.filter(m => m.status === "non_present").length,
-    sterilized: markers.filter(m => m.status === "sterilized_2").length,
-  }), [markers]);
-
-  return (
-    <div className="space-y-8 animate-in fade-in duration-500 text-slate-800">
-      <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter">TABLEAU DE BORD</h2></div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg border-0 text-center relative overflow-hidden">
-            <div className="relative z-10"><Cloud size={20} className="mx-auto mb-1 opacity-70"/><div className="text-2xl font-black">18°C</div><div className="text-[10px] font-bold uppercase">✅ Vol Autorisé</div></div>
-            <Wind className="absolute -right-4 -bottom-4 w-16 h-16 text-white/10" />
-        </Card>
-        <Card className={`p-4 text-center border-0 shadow-lg ${stats.reported > 0 ? 'bg-red-600 text-white animate-pulse' : 'bg-white text-slate-400'}`}>
-            <AlertTriangle size={20} className="mx-auto mb-1"/><div className="text-2xl font-black">{stats.reported}</div><div className="text-[10px] font-bold uppercase">Signalements</div>
-        </Card>
-        <Card className="p-4 bg-white text-center shadow-sm"><span className="text-[10px] font-black uppercase text-slate-400">Non Présents</span><div className="text-2xl font-black">{stats.nonPresent}</div></Card>
-        <Card className="p-4 bg-white text-center shadow-sm"><span className="text-[10px] font-black uppercase text-emerald-500">Stérilisés</span><div className="text-2xl font-black text-emerald-600">{stats.sterilized}</div></Card>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {clients.map(client => {
-              const cNests = markers.filter(m => m.clientId === client.id);
-              const cReported = cNests.filter(m => m.status === "reported_by_client").length;
-              const cDone = cNests.filter(m => m.status === "sterilized_2").length;
-              if (cNests.length === 0) return null;
-              return (
-                  <Card key={client.id} className="p-6">
-                    <h4 className="font-black text-slate-800 uppercase tracking-tight mb-4 flex items-center gap-2 truncate"><Users size={16}/> {client.name}</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="p-2 bg-purple-50 rounded-lg text-center"><p className="text-[9px] font-black text-purple-400 uppercase">Alertes</p><p className="text-xl font-black text-purple-700">{cReported}</p></div>
-                        <div className="p-2 bg-emerald-50 rounded-lg text-center"><p className="text-[9px] font-black text-emerald-400 uppercase">Stérilisés</p><p className="text-xl font-black text-emerald-700">{cDone}</p></div>
-                    </div>
-                  </Card>
-              );
-          })}
-      </div>
-    </div>
-  );
-};
-
-const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
-  const [selectedNest, setSelectedNest] = useState(null);
-  const [isExporting, setIsExporting] = useState(false);
-
-  const handleExport = async () => {
-    setIsExporting(true);
-    const XLSX = await loadSheetJS();
-    const data = markers.map(m => ({
-      "Noms Client": clients.find(c => c.id === m.clientId)?.name || "Non assigné",
-      "ID": m.id,
-      "Etat du nids": m.status,
-      "nbr d'œuf": m.eggs,
-      "adresse precis": m.address,
-      "observation": m.comments || "",
-      "Latitude": m.lat,
-      "Longitude": m.lng
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    worksheet["!cols"] = [{ wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 40 }, { wch: 40 }, { wch: 15 }, { wch: 15 }];
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Gestion Nids");
-    XLSX.writeFile(workbook, `Aerothau_Nids_${new Date().toISOString().split('T')[0]}.xlsx`);
-    setIsExporting(false);
-  };
-
-  const handleImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const XLSX = await loadSheetJS();
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-        const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-        let count = 0;
-        for (const row of jsonData) {
-            const clientName = row["Noms Client"];
-            const client = clients.find(c => c.name === clientName);
-            const newNest = {
-                id: row["ID"] || Date.now() + count,
-                clientId: client ? client.id : (clients[0]?.id || ""),
-                status: row["Etat du nids"] || "present",
-                eggs: parseInt(row["nbr d'œuf"]) || 0,
-                address: row["adresse precis"] || "Adresse importée",
-                comments: row["observation"] || "",
-                lat: parseFloat(row["Latitude"]) || MAP_CENTER_DEFAULT.lat,
-                lng: parseFloat(row["Longitude"]) || MAP_CENTER_DEFAULT.lng,
-                title: row["Identification"] || "Nid " + (row["ID"] || count)
-            };
-            await onUpdateNest(newNest);
-            count++;
-        }
-        alert(`${count} nids importés ou mis à jour.`);
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  return (
-    <div className="space-y-8 text-slate-800">
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <h2 className="text-3xl font-black uppercase tracking-tighter">GESTION DES NIDS</h2>
-        <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleExport} disabled={isExporting}><Download size={18}/> Exporter Excel</Button>
-            <div className="relative">
-                <input type="file" accept=".xlsx" onChange={handleImport} className="hidden" id="import-excel-file" />
-                <label htmlFor="import-excel-file" className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase cursor-pointer hover:bg-sky-700 shadow-lg h-full"><Upload size={18}/> Importer Excel</label>
-            </div>
-        </div>
-      </div>
-      {clients.map(client => {
-          const clientNests = markers.filter(m => m.clientId === client.id);
-          if (clientNests.length === 0) return null;
-          return (
-              <Card key={client.id} className="overflow-hidden border-0 shadow-lg rounded-3xl mb-8">
-                  <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
-                      <div className="flex items-center gap-3"><Users size={20} className="text-sky-400"/><h3 className="font-black uppercase tracking-wide text-lg">{client.name}</h3></div>
-                      <span className="bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">{clientNests.length} Nids</span>
-                  </div>
-                  <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
-                          <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b"><tr><th className="p-4 pl-8">Réf / Adresse</th><th className="p-4">État</th><th className="p-4 text-center">Œufs</th><th className="p-4 text-right pr-8">Actions</th></tr></thead>
-                          <tbody className="divide-y divide-slate-100">{clientNests.map(m => (<tr key={m.id} className="hover:bg-slate-50 transition-colors"><td className="p-4 pl-8"><div className="font-bold text-slate-900 text-base">{m.title || "Nid"}</div><div className="text-xs text-slate-400 truncate max-w-[300px] flex items-center gap-1 mt-1"><MapPin size={10}/> {m.address}</div></td><td className="p-4"><Badge status={m.status}/></td><td className="p-4 text-center font-black text-slate-700">{m.eggs} <span className="font-normal opacity-50">œuf(s)</span></td><td className="p-4 flex justify-end gap-2 pr-8"><button onClick={() => setSelectedNest(m)} className="p-2.5 text-sky-600 bg-sky-50 rounded-xl hover:bg-sky-100 transition-colors"><Edit size={18}/></button><button onClick={() => { if(window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2.5 text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors"><Trash2 size={18}/></button></td></tr>))}</tbody>
-                      </table>
-                  </div>
-              </Card>
-          );
-      })}
-      {selectedNest && (
-        <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-          <Card className="bg-white rounded-[32px] p-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl border-0">
-              <div className="flex justify-between items-center mb-8 border-b pb-4"><h3 className="font-black text-3xl uppercase tracking-tighter text-slate-900">Édition du Nid</h3><button onClick={() => setSelectedNest(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={32} className="text-slate-400"/></button></div>
-              <NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} onGeneratePDF={(n, cb) => generatePDF('nest_detail', n, { clientName: clients.find(c => c.id === n.clientId)?.name }, () => {}, cb)}/>
-          </Card>
-        </div>
-      )}
-    </div>
-  );
-};
+// --- COMPOSANT MAP INTERFACE ---
 
 const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     const [selectedMarker, setSelectedMarker] = useState(null);
@@ -739,7 +596,186 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     );
 };
 
-// ... ClientManagement, ScheduleView, ReportsView, ClientSpace (Restent identiques) ...
+// --- COMPOSANT CLIENT DETAIL ---
+
+const ClientDetail = ({ selectedClient, setView, interventions, reports, markers, onUpdateClient, onDeleteClient }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const cInt = useMemo(() => interventions.filter(i => i.clientId === selectedClient.id), [interventions, selectedClient]);
+    const cNests = useMemo(() => markers.filter(m => m.clientId === selectedClient.id), [markers, selectedClient]);
+    return (
+        <div className="space-y-8 text-slate-800">
+            <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-0 shadow-md h-10">&larr; Retour</Button>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="space-y-8">
+                    <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white">
+                        {isEditing ? <ClientEditForm client={selectedClient} onSave={(d) => {onUpdateClient(d); setIsEditing(false);}} onCancel={() => setIsEditing(false)}/> : (
+                            <>
+                                <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter text-slate-900">{selectedClient.name}</h2>
+                                <div className="space-y-6 text-sm font-bold text-slate-600 uppercase">
+                                    <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><MapPin size={20} className="text-sky-500 shrink-0"/><p className="leading-tight text-xs">{selectedClient.address}</p></div>
+                                    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><Phone size={20} className="text-sky-500 shrink-0"/><p className="text-xs">{selectedClient.phone}</p></div>
+                                    <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-lg">
+                                        <p className="text-[10px] font-black opacity-50 tracking-widest text-center mb-4">ACCÈS ESPACE CLIENT</p>
+                                        <p className="text-xs tracking-widest mb-2"><span className="opacity-50">ID:</span> {selectedClient.username}</p>
+                                        <p className="text-xs tracking-widest"><span className="opacity-50">PASS:</span> {selectedClient.password}</p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-3 mt-8">
+                                    <Button variant="sky" className="w-full py-3 rounded-2xl uppercase tracking-widest text-xs font-black h-12" onClick={() => setIsEditing(true)}>Modifier</Button>
+                                    <Button variant="danger" className="w-full py-3 rounded-2xl uppercase tracking-widest text-xs font-black h-12" onClick={() => {if(window.confirm("Supprimer ce client ?")){onDeleteClient(selectedClient); setView("clients");}}}>Supprimer</Button>
+                                </div>
+                            </>
+                        )}
+                    </Card>
+                </div>
+                <div className="lg:col-span-2 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card className="p-6 shadow-lg border-0 rounded-3xl bg-slate-900 text-white"><p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2 text-center">Nids recensés</p><p className="text-5xl font-black text-sky-400 text-center">{cNests.length}</p></Card>
+                        <Card className="p-6 shadow-lg border-0 rounded-3xl bg-sky-600 text-white"><p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2 text-center">Missions effectuées</p><p className="text-5xl font-black text-white text-center">{cInt.filter(i => i.status === "Terminé").length}</p></Card>
+                    </div>
+                    <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white"><h3 className="text-xl font-black uppercase tracking-tighter mb-6 text-slate-900">HISTORIQUE DES PASSAGES</h3>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 text-slate-500"><tr><th className="p-4">Date</th><th className="p-4">Statut</th><th className="p-4">Notes</th></tr></thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {cInt.length === 0 ? <tr><td colSpan="3" className="p-8 text-center text-slate-400 font-bold uppercase text-xs italic">Aucune intervention</td></tr> : cInt.map(i => <tr key={i.id} className="hover:bg-slate-50 transition-colors"><td className="p-4 font-black text-slate-700">{i.date}</td><td className="p-4"><Badge status={i.status}/></td><td className="p-4 text-xs font-bold text-slate-500 italic truncate max-w-[200px]">{i.notes}</td></tr>)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- VUES ADMIN ---
+
+const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
+  const [selectedNest, setSelectedNest] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    const XLSX = await loadSheetJS();
+    const data = markers.map(m => ({
+      "Noms Client": clients.find(c => c.id === m.clientId)?.name || "Non assigné",
+      "ID": m.id,
+      "Etat du nids": m.status,
+      "nbr d'œuf": m.eggs,
+      "adresse precis": m.address,
+      "observation": m.comments || "",
+      "Latitude": m.lat,
+      "Longitude": m.lng
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Gestion Nids");
+    XLSX.writeFile(workbook, `Aerothau_Nids_${new Date().toISOString().split('T')[0]}.xlsx`);
+    setIsExporting(false);
+  };
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const XLSX = await loadSheetJS();
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+        let count = 0;
+        for (const row of jsonData) {
+            const clientName = row["Noms Client"];
+            const client = clients.find(c => c.name === clientName);
+            const newNest = {
+                id: row["ID"] || Date.now() + count,
+                clientId: client ? client.id : (clients[0]?.id || ""),
+                status: row["Etat du nids"] || "present",
+                eggs: parseInt(row["nbr d'œuf"]) || 0,
+                address: row["adresse precis"] || "Adresse importée",
+                comments: row["observation"] || "",
+                lat: parseFloat(row["Latitude"]) || MAP_CENTER_DEFAULT.lat,
+                lng: parseFloat(row["Longitude"]) || MAP_CENTER_DEFAULT.lng,
+                title: row["Identification"] || "Nid " + (row["ID"] || count)
+            };
+            await onUpdateNest(newNest);
+            count++;
+        }
+        alert(`${count} nids importés ou mis à jour.`);
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  return (
+    <div className="space-y-8 text-slate-800">
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
+        <div className="flex gap-2">
+            <Button variant="secondary" onClick={handleExport} disabled={isExporting}><Download size={18}/> Exporter Excel</Button>
+            <div className="relative">
+                <input type="file" accept=".xlsx" onChange={handleImport} className="hidden" id="import-excel-file" />
+                <label htmlFor="import-excel-file" className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase cursor-pointer hover:bg-sky-700 shadow-lg h-full">
+                    <Upload size={18}/> Importer Excel
+                </label>
+            </div>
+        </div>
+      </div>
+
+      {clients.map(client => {
+          const clientNests = markers.filter(m => m.clientId === client.id);
+          if (clientNests.length === 0) return null;
+          return (
+              <Card key={client.id} className="overflow-hidden border-0 shadow-lg rounded-3xl mb-8">
+                  <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-white/10 rounded-xl"><Users size={20} className="text-sky-400"/></div>
+                          <h3 className="font-black uppercase tracking-wide text-lg">{client.name}</h3>
+                      </div>
+                      <span className="bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">{clientNests.length} Nids</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b">
+                              <tr><th className="p-4 pl-8">Réf / Adresse</th><th className="p-4">Statut</th><th className="p-4 text-center">Contenu</th><th className="p-4 text-right pr-8">Actions</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {clientNests.map(m => (
+                                  <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
+                                      <td className="p-4 pl-8">
+                                          <div className="font-bold text-slate-900 text-base">{m.title || "Nid"}</div>
+                                          <div className="text-xs text-slate-400 truncate max-w-[300px] flex items-center gap-1 mt-1"><MapPin size={10}/> {m.address}</div>
+                                      </td>
+                                      <td className="p-4"><Badge status={m.status}/></td>
+                                      <td className="p-4 text-center font-black text-slate-700">{m.eggs} <span className="font-normal opacity-50">œuf(s)</span></td>
+                                      <td className="p-4 flex justify-end gap-2 pr-8">
+                                          <button onClick={() => setSelectedNest(m)} className="p-2.5 text-sky-600 bg-sky-50 rounded-xl hover:bg-sky-100 transition-colors"><Edit size={18}/></button>
+                                          <button onClick={() => { if(window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2.5 text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors"><Trash2 size={18}/></button>
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </Card>
+          );
+      })}
+
+      {selectedNest && (
+        <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
+          <Card className="bg-white rounded-[32px] p-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl border-0 text-slate-800">
+              <div className="flex justify-between items-center mb-8 border-b pb-4">
+                  <h3 className="font-black text-3xl uppercase tracking-tighter text-slate-900 flex items-center gap-3"><Edit size={28} className="text-sky-500"/> Édition Nid</h3>
+                  <button onClick={() => setSelectedNest(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={32} className="text-slate-400"/></button>
+              </div>
+              <NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} onGeneratePDF={(n, cb) => generatePDF('nest_detail', n, { clientName: clients.find(c => c.id === n.clientId)?.name }, () => {}, cb)} />
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ClientManagement = ({ clients, setSelectedClient, setView, onCreateClient, onDeleteClient }) => {
   const [isCreating, setIsCreating] = useState(false);
   return (
@@ -782,264 +818,12 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
 const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport, onDeleteReport }) => {
     const [isCreating, setIsCreating] = useState(false);
     const [editingRep, setEditingRep] = useState(null);
-    const [filter, setFilter] = useState('all'); 
     const filteredReports = useMemo(() => reports, [reports]);
     return (
         <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
             <div className="flex justify-between items-center flex-wrap gap-4"><h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Ajouter</Button></div>
             <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white"><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest"><tr><th className="p-6">Document</th><th className="p-6">Client / Source</th><th className="p-6">Date</th><th className="p-6">Type</th><th className="p-6 text-right">Actions</th></tr></thead><tbody className="divide-y divide-slate-100">{filteredReports.length === 0 ? <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold uppercase italic tracking-widest">Aucun document trouvé</td></tr> : filteredReports.map(r => (<tr key={r.id} className="hover:bg-slate-50 transition-colors"><td className="p-6 font-black flex items-center gap-4 text-slate-700 tracking-tight"><div className={`p-2.5 rounded-xl ${r.author === 'client' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'}`}>{r.author === 'client' ? <FileCheck size={20}/> : <File size={20}/>}</div> {r.title}</td><td className="p-6"><span className="text-xs font-black uppercase text-slate-700">{clients.find(c => c.id === r.clientId)?.name || "Client supprimé"}</span></td><td className="p-6 text-xs font-bold text-slate-500">{r.date}</td><td className="p-6"><Badge status={r.type === 'Fiche Nid' ? 'reported_by_client' : (r.type === 'Rapport Complet' ? 'sterilized_2' : 'Planifié')}/></td><td className="p-6 flex justify-end gap-3"><button onClick={() => generatePDF(r.type === 'Fiche Nid' ? 'nest_detail' : (r.type === 'Rapport Complet' ? 'complete_report' : 'file'), r.type === 'Fiche Nid' ? markers.find(m => m.id === r.nestId) : r, { client: clients.find(c => c.id === r.clientId), markers: markers.filter(m => m.clientId === r.clientId), interventions: interventions.filter(i => i.clientId === r.clientId) })} className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all shadow-sm" title="Télécharger / Imprimer"><Printer size={18}/></button><button onClick={() => setEditingRep(r)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button><button onClick={() => {if(window.confirm("Supprimer ce document ?")) onDeleteReport(r);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button></td></tr>))}</tbody></table></div></Card>
             {(isCreating || editingRep) && (<div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in"><Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white text-slate-800"><div className="flex justify-between items-center mb-8"><h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating ? "Nouveau Document" : "Modifier"}</h3><button onClick={() => {setEditingRep(null); setIsCreating(false);}} className="text-slate-400 p-1.5 bg-slate-100 rounded-full"><X size={20}/></button></div><ReportEditForm report={editingRep || {id: Date.now()}} clients={clients} markers={markers} interventions={interventions} onSave={async (d) => { await onUpdateReport(d); setEditingRep(null); setIsCreating(false); }} onCancel={() => {setEditingRep(null); setIsCreating(false);}} /></Card></div>)}
-        </div>
-    );
-};
-
-const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateNest, onUpdateReport }) => {
-    const myMarkers = useMemo(() => markers.filter(m => m.clientId === user.clientId), [markers, user.clientId]);
-    const myReports = useMemo(() => reports.filter(r => r.clientId === user.clientId), [reports, user.clientId]);
-    const neut = useMemo(() => myMarkers.filter(m => m.status && m.status.includes("sterilized")).length, [myMarkers]);
-    
-    const [pendingReport, setPendingReport] = useState(null);
-    const [isAddingMode, setIsAddingMode] = useState(false);
-    const [selectedNestDetail, setSelectedNestDetail] = useState(null);
-    const [isUploading, setIsUploading] = useState(false);
-    const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'map', 'list', 'documents'
-
-    const requestIntervention = async () => {
-        if(window.confirm("Confirmer la demande d'intervention urgente ?")) {
-            alert("Votre demande a été transmise à nos équipes. Nous vous contacterons sous 24h.");
-        }
-    };
-
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'dashboard':
-                return (
-                    <div className="space-y-10 animate-in fade-in duration-500">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
-                            <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
-                            <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
-                        </div>
-                    </div>
-                );
-            case 'map':
-                return (
-                    <div className="h-[600px] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-500">
-                        <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
-                            <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-500">Cartographie</div>
-                            <Button variant={isAddingMode ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAddingMode(!isAddingMode)}>
-                                {isAddingMode ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Signaler un nid</>}
-                            </Button>
-                        </Card>
-                        <div className={`flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white transition-all duration-300 ${isAddingMode ? 'border-8 border-sky-500' : 'border-8 border-white'}`}>
-                            {isAddingMode && (
-                                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce pointer-events-none">
-                                    📍 Cliquez sur la carte pour signaler un nid
-                                </div>
-                            )}
-                            <LeafletMap 
-                                markers={myMarkers} 
-                                isAddingMode={isAddingMode} 
-                                onMarkerClick={(m) => {
-                                    if(!isAddingMode) setSelectedNestDetail(m);
-                                }}
-                                onMapClick={(ll) => {
-                                    if(isAddingMode) {
-                                        setPendingReport({
-                                            id: Date.now(),
-                                            clientId: user.clientId,
-                                            lat: ll.lat,
-                                            lng: ll.lng,
-                                            address: "Nouveau signalement",
-                                            status: "reported_by_client",
-                                            title: "Signalement Client",
-                                        });
-                                        setIsAddingMode(false);
-                                    }
-                                }}
-                            />
-                            
-                            {/* FORMULAIRE SIGNALEMENT */}
-                            {pendingReport && (
-                                <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
-                                    <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
-                                        <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
-                                            <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><Crosshair size={16} className="text-sky-400"/> Signalement</span>
-                                            <button onClick={() => setPendingReport(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
-                                        </div>
-                                        <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
-                                            <ClientReportForm nest={pendingReport} onSave={async (d) => {
-                                                await onUpdateNest(d);
-                                                setPendingReport(null);
-                                                alert("Signalement enregistré !");
-                                            }} onCancel={() => setPendingReport(null)} />
-                                        </div>
-                                    </Card>
-                                </div>
-                            )}
-
-                            {/* DETAIL NID (LECTURE SEULE) */}
-                            {selectedNestDetail && (
-                                <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
-                                    <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
-                                        <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
-                                            <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><MapIcon size={16} className="text-sky-400"/> Détails du Nid</span>
-                                            <button onClick={() => setSelectedNestDetail(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
-                                        </div>
-                                        <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
-                                            <NestEditForm nest={selectedNestDetail} readOnly={true} onCancel={() => setSelectedNestDetail(null)} />
-                                        </div>
-                                    </Card>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            case 'list':
-                return (
-                     <Card className="p-0 border-0 shadow-xl rounded-3xl bg-white flex flex-col flex-1 overflow-hidden h-[600px] animate-in fade-in duration-500">
-                        <div className="p-6 border-b border-slate-50 flex justify-between items-center mb-0 shrink-0">
-                            <h3 className="font-black text-lg text-slate-800 uppercase tracking-tighter">État des Nids</h3>
-                            <div className="p-2 bg-slate-100 rounded-full"><Bird size={18} className="text-slate-400"/></div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
-                             {myMarkers.length > 0 ? (
-                                 <table className="w-full text-left text-xs">
-                                     <thead className="bg-slate-50 text-slate-400 font-bold uppercase sticky top-0 z-10">
-                                         <tr>
-                                             <th className="p-3 pl-6">Ref</th>
-                                             <th className="p-3">Statut</th>
-                                             <th className="p-3 text-center">Œufs</th>
-                                             <th className="p-3 pr-6">Obs.</th>
-                                         </tr>
-                                     </thead>
-                                     <tbody className="divide-y divide-slate-50">
-                                         {myMarkers.map(m => (
-                                             <tr key={m.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => { setSelectedNestDetail(m); setActiveTab('map'); }}>
-                                                 <td className="p-3 pl-6">
-                                                     <div className="font-bold text-slate-700">{m.title || "Nid #" + m.id.toString().slice(-4)}</div>
-                                                     <div className="text-[10px] text-slate-400 truncate max-w-[100px]">{m.address}</div>
-                                                 </td>
-                                                 <td className="p-3"><Badge status={m.status}/></td>
-                                                 <td className="p-3 text-center font-bold text-slate-600">{m.eggs}</td>
-                                                 <td className="p-3 pr-6 text-slate-500 italic truncate max-w-[100px]" title={m.comments}>{m.comments || "-"}</td>
-                                             </tr>
-                                         ))}
-                                     </tbody>
-                                 </table>
-                             ) : (
-                                 <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
-                                     <Bird size={32} className="mb-2 opacity-50"/>
-                                     <p>Aucun nid recensé pour le moment.</p>
-                                 </div>
-                             )}
-                        </div>
-                    </Card>
-                );
-            case 'documents':
-                return (
-                    <div className="h-[600px] flex flex-col gap-6 animate-in fade-in duration-500">
-                         <Card className="p-0 border-0 shadow-xl rounded-3xl bg-white flex flex-col flex-1 overflow-hidden relative">
-                             <div className="p-6 border-b border-slate-50 flex justify-between items-center mb-0 shrink-0">
-                                <h3 className="font-black text-lg text-slate-800 uppercase tracking-tighter">Documents</h3>
-                                <button onClick={() => setIsUploading(true)} className="p-2 bg-sky-50 text-sky-600 rounded-full hover:bg-sky-600 hover:text-white transition-colors"><Upload size={18}/></button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
-                                 {/* Documents reçus (Admin -> Client) */}
-                                 {myReports.filter(r => r.author === 'admin').map(r => (
-                                     <div key={r.id} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-slate-100">
-                                         <div className="flex items-center gap-3">
-                                             <div className="p-2 bg-white rounded-lg text-slate-400"><FileText size={16}/></div>
-                                             <div>
-                                                 <p className="font-bold text-xs text-slate-700">{r.title}</p>
-                                                 <p className="text-[9px] font-bold text-slate-400 uppercase">Reçu le {r.date}</p>
-                                             </div>
-                                         </div>
-                                         <Download size={14} className="text-slate-300 group-hover:text-sky-600" onClick={() => generatePDF('file', r)}/>
-                                     </div>
-                                 ))}
-                                 {/* Documents envoyés (Client -> Admin) */}
-                                 {myReports.filter(r => r.author === 'client').map(r => (
-                                     <div key={r.id} className="p-3 bg-purple-50 rounded-xl flex justify-between items-center group">
-                                         <div className="flex items-center gap-3">
-                                             <div className="p-2 bg-white rounded-lg text-purple-400"><Send size={16}/></div>
-                                             <div>
-                                                 <p className="font-bold text-xs text-purple-700">{r.title}</p>
-                                                 <p className="text-[9px] font-bold text-purple-400 uppercase">Envoyé le {r.date}</p>
-                                             </div>
-                                         </div>
-                                         <CheckCircle size={14} className="text-purple-300"/>
-                                     </div>
-                                 ))}
-                            </div>
-                        </Card>
-                        
-                        {/* Modal Upload Client */}
-                        {isUploading && (
-                             <div className="absolute inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-                                <Card className="p-6 w-full shadow-2xl border-0 rounded-3xl bg-white text-slate-800">
-                                    <div className="flex justify-between items-center mb-6"><h3 className="font-black text-lg uppercase tracking-tighter">Transmettre un document</h3><button onClick={() => setIsUploading(false)}><X size={20} className="text-slate-400"/></button></div>
-                                    <ReportEditForm 
-                                        report={{id: Date.now(), clientId: user.clientId}} 
-                                        clients={clients} 
-                                        userRole="client"
-                                        onSave={async (d) => { await onUpdateReport(d); setIsUploading(false); }} 
-                                        onCancel={() => setIsUploading(false)} 
-                                    />
-                                </Card>
-                            </div>
-                        )}
-                    </div>
-                );
-            default:
-                return null;
-        }
-    };
-
-    return (
-        <div className="space-y-6 text-slate-800 pb-20 md:pb-0">
-             <Card className="p-8 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0 mb-8">
-                <div className="relative z-10 flex justify-between items-start">
-                    <div>
-                         <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">Bonjour, {user.name}</h2>
-                         <p className="text-slate-400 font-bold max-w-lg text-xs tracking-widest uppercase">Espace Client Aerothau</p>
-                    </div>
-                    <button onClick={() => { if(window.confirm("Se déconnecter ?")) window.location.reload(); }} className="bg-red-500/20 hover:bg-red-500 text-white p-2 rounded-xl transition-colors">
-                        <LogOut size={20} />
-                    </button>
-                </div>
-                <Plane className="absolute -right-10 -bottom-10 h-48 w-48 text-white/5 rotate-12" />
-            </Card>
-
-            {/* NAVIGATION DES ONGLETS */}
-            <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar">
-                <button 
-                    onClick={() => setActiveTab('dashboard')} 
-                    className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'dashboard' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
-                >
-                    Tableau de bord
-                </button>
-                <button 
-                    onClick={() => setActiveTab('map')} 
-                    className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'map' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
-                >
-                    Carte Interactive
-                </button>
-                <button 
-                    onClick={() => setActiveTab('list')} 
-                    className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'list' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
-                >
-                    Liste des Nids
-                </button>
-                <button 
-                    onClick={() => setActiveTab('documents')} 
-                    className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'documents' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
-                >
-                    Documents
-                </button>
-            </div>
-
-            {/* CONTENU */}
-            {renderContent()}
         </div>
     );
 };
@@ -1162,7 +946,7 @@ export default function AerothauApp() {
                 {view === "reports" && <ReportsView reports={reports} clients={clients} markers={markers} interventions={interventions} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => deleteFromFirebase("reports", r.id)} />}
               </>
             ) : (
-                <ClientSpace user={user} markers={markers} interventions={interventions} clients={clients} reports={reports} onUpdateNest={async (n) => updateFirebase("markers", n)} onUpdateReport={async (r) => updateFirebase("reports", r)} />
+                <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} />
             )}
           </div>
         </div>
