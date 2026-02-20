@@ -128,14 +128,25 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text("FICHE D'IDENTIFICATION NID", 20, 50);
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(12);
-            doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, 65);
-            doc.text(`Client : ${clientName}`, 20, 72);
-            doc.text(`Adresse : ${nest.address}`, 20, 79);
-            doc.text(`Coordonnées GPS : ${nest.lat?.toFixed(6)}, ${nest.lng?.toFixed(6)}`, 20, 86);
-            doc.text(`Statut : ${nest.status}`, 20, 93);
-            doc.text(`Œufs : ${nest.eggs}`, 20, 100);
-            doc.text(`Notes : ${nest.comments || "Aucune"}`, 20, 107);
-            if (nest.photo) { try { doc.addImage(nest.photo, 'JPEG', 20, 115, 100, 75); } catch(e) {} }
+            
+            let y = 65;
+            doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, y); y += 7;
+            doc.text(`Client : ${clientName}`, 20, y); y += 7;
+            doc.text(`Adresse : ${nest.address}`, 20, y); y += 7;
+            doc.text(`Coordonnées GPS : ${nest.lat?.toFixed(6)}, ${nest.lng?.toFixed(6)}`, 20, y); y += 7;
+            doc.text(`Statut : ${nest.status}`, 20, y); y += 7;
+            doc.text(`Œufs : ${nest.eggs}`, 20, y); y += 7;
+            
+            if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 7; }
+            if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 7; }
+            if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 7; }
+            if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 7; }
+            
+            const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune"}`, 170);
+            doc.text(notesLines, 20, y);
+            y += (notesLines.length * 7);
+
+            if (nest.photo) { try { doc.addImage(nest.photo, 'JPEG', 20, y + 5, 100, 75); } catch(e) {} }
             doc.save(`Fiche_Nid_${nest.id}.pdf`);
         } else if (type === 'complete_report') {
             const client = extraData.client || { name: "Client Inconnu" };
@@ -192,6 +203,9 @@ const Badge = ({ status }) => {
     "En attente": "bg-orange-100 text-orange-700 border border-orange-200",
     Annulé: "bg-red-100 text-red-700 border border-red-200",
     present: "bg-red-100 text-red-700 border border-red-200",
+    present_high: "bg-red-100 text-red-700 border border-red-200",
+    present_medium: "bg-orange-100 text-orange-700 border border-orange-200",
+    present_low: "bg-yellow-100 text-yellow-700 border border-yellow-200",
     non_present: "bg-slate-100 text-slate-500 border border-slate-200",
     sterilized_1: "bg-lime-100 text-lime-700 border border-lime-200",
     sterilized_2: "bg-emerald-100 text-emerald-700 border border-emerald-200",
@@ -200,7 +214,10 @@ const Badge = ({ status }) => {
   };
   
   const labels = {
-    present: "Présent",
+    present: "Présent (Actif)",
+    present_high: "Priorité Haute",
+    present_medium: "Priorité Moyenne",
+    present_low: "Priorité Faible",
     non_present: "Non présent",
     sterilized_1: "1er Passage",
     sterilized_2: "2ème Passage",
@@ -255,7 +272,7 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
   );
 };
 
-// --- COMPOSANTS DE FORMULAIRES ---
+// --- COMPOSANTS DE FORMULAIRES ET ÉDITION ---
 
 const ClientEditForm = ({ client, onSave, onCancel }) => {
     const [formData, setFormData] = useState({ ...client });
@@ -287,10 +304,17 @@ const ClientEditForm = ({ client, onSave, onCancel }) => {
 };
 
 const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly = false, onGeneratePDF }) => {
-  const [formData, setFormData] = useState({ title: "", comments: "", eggs: 0, status: "present", clientId: "", ...nest });
+  const [formData, setFormData] = useState({ 
+      title: "", comments: "", eggs: 0, status: "present_high", clientId: "", 
+      lieux: "", dateVisite: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
+      ...nest 
+  });
+  
   const handlePhotoUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({ ...formData, photo: reader.result }); reader.readAsDataURL(file); } };
   const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
   
+  const hasExtraData = formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info;
+
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
           {nest.photo && (
@@ -318,6 +342,19 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
               </div>
           </div>
           
+          {hasExtraData && (
+             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm space-y-2">
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Layers size={14}/> Données Complémentaires</p>
+                 {nest.lieux && <p><strong className="text-slate-600">Lieux:</strong> {nest.lieux}</p>}
+                 {nest.dateVisite && <p><strong className="text-slate-600">Date visite:</strong> {nest.dateVisite}</p>}
+                 {nest.nbAdultes && <p><strong className="text-slate-600">Adultes:</strong> {nest.nbAdultes}</p>}
+                 {nest.nbPoussins && <p><strong className="text-slate-600">Poussins:</strong> {nest.nbPoussins}</p>}
+                 {nest.comportement && <p><strong className="text-slate-600">Comportement:</strong> {nest.comportement}</p>}
+                 {nest.remarques && <p><strong className="text-slate-600">Remarques:</strong> {nest.remarques}</p>}
+                 {nest.info && <p><strong className="text-slate-600">Info:</strong> {nest.info}</p>}
+             </div>
+          )}
+
           {nest.comments && (
               <div className="bg-sky-50 p-4 rounded-xl border border-sky-100">
                 <p className="text-[10px] font-black text-sky-600 uppercase mb-1 flex items-center gap-2"><Info size={12}/> Observations</p>
@@ -351,11 +388,17 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">État du nid</label>
                     <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
                         <option value="reported_by_client">🟣 Signalement Client</option>
-                        <option value="present">🔴 Présent (Actif)</option>
+                        <option value="present_high">🔴 Priorité Haute (Rouge)</option>
+                        <option value="present_medium">🟠 Priorité Moyenne (Orange)</option>
+                        <option value="present_low">🟡 Priorité Faible (Jaune)</option>
+                        <option value="present" className="text-slate-400">🔴 Présent (Ancien statut)</option>
                         <option value="sterilized_1">🟢 1er Passage (Traité)</option>
                         <option value="sterilized_2">🟢 2ème Passage (Confirmé)</option>
                         <option value="non_present">⚪ Non présent / Inactif</option>
                     </select>
+                    {formData.status === 'present_high' && <p className="text-[9px] mt-1.5 text-red-600 leading-tight font-medium bg-red-50 p-2 rounded-lg">Notoirement installé, poussins présents, public à proximité / conflits d’usage (écoles, ...).</p>}
+                    {formData.status === 'present_medium' && <p className="text-[9px] mt-1.5 text-orange-600 leading-tight font-medium bg-orange-50 p-2 rounded-lg">Installé (avec ou sans poussin), signalements de nuisance, risques modérés.</p>}
+                    {formData.status === 'present_low' && <p className="text-[9px] mt-1.5 text-yellow-600 leading-tight font-medium bg-yellow-50 p-2 rounded-lg">Observé, sans risque imminent de conflit avec la population.</p>}
                  </div>
             </div>
 
@@ -391,7 +434,44 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
 
         <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Observations Techniques</label>
-            <textarea className="w-full p-3 border border-slate-200 rounded-xl text-sm h-20 focus:ring-2 focus:ring-sky-500 outline-none resize-none" placeholder="Accès difficile, hauteur, matériel nécessaire..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/>
+            <textarea className="w-full p-3 border border-slate-200 rounded-xl text-sm h-16 focus:ring-2 focus:ring-sky-500 outline-none resize-none" placeholder="Accès difficile, hauteur, matériel nécessaire..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/>
+        </div>
+
+        {/* SECTION DONNÉES COMPLÉMENTAIRES (IMPORT XSLX) */}
+        <div className="pt-4 mt-4 border-t border-slate-100">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Layers size={14}/> Données Complémentaires (Importées)</label>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Lieux</label>
+                    <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.lieux || ""} onChange={e=>setFormData({...formData, lieux: e.target.value})} />
+                </div>
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Date visite</label>
+                    <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.dateVisite || ""} onChange={e=>setFormData({...formData, dateVisite: e.target.value})} />
+                </div>
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Nb Adultes</label>
+                    <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.nbAdultes || ""} onChange={e=>setFormData({...formData, nbAdultes: e.target.value})} />
+                </div>
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Nb Poussins</label>
+                    <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.nbPoussins || ""} onChange={e=>setFormData({...formData, nbPoussins: e.target.value})} />
+                </div>
+            </div>
+            <div className="mb-4">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Comportement</label>
+                <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.comportement || ""} onChange={e=>setFormData({...formData, comportement: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Remarques (Fichier)</label>
+                    <textarea className="w-full p-2 border border-slate-200 rounded-lg text-sm h-16 resize-none" value={formData.remarques || ""} onChange={e=>setFormData({...formData, remarques: e.target.value})} />
+                </div>
+                <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Infos Diverses</label>
+                    <textarea className="w-full p-2 border border-slate-200 rounded-lg text-sm h-16 resize-none" value={formData.info || ""} onChange={e=>setFormData({...formData, info: e.target.value})} />
+                </div>
+            </div>
         </div>
         
         {onGeneratePDF && <Button variant="secondary" className="w-full border-slate-200 text-slate-600 hover:bg-slate-50" onClick={()=>onGeneratePDF(nest)}><Download size={16}/> Télécharger la fiche PDF</Button>}
@@ -404,6 +484,158 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
     </div>
   );
 };
+
+const InterventionEditForm = ({ intervention, clients, onSave, onCancel, onDelete }) => {
+    const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], status: "Planifié", clientId: "", notes: "", technician: "", ...intervention });
+    return (
+        <div className="space-y-4 text-slate-800">
+            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
+                <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={e => setFormData({...formData, clientId: parseInt(e.target.value)})}>
+                    <option value="">-- Sélectionner un client --</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+            </div>
+            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
+                <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                    <option value="Planifié">Planifié</option>
+                    <option value="Terminé">Terminé</option>
+                    <option value="Annulé">Annulé</option>
+                </select>
+            </div>
+            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Technicien / Pilote</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.technician} onChange={e => setFormData({...formData, technician: e.target.value})} placeholder="Nom du télépilote / agent" /></div>
+            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Notes</label><textarea className="w-full p-2 border rounded-lg text-sm h-20 resize-none" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} /></div>
+            <div className="flex gap-2 pt-4 border-t border-slate-100">
+                {onDelete && intervention?.clientId && <button onClick={() => onDelete(formData)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 size={20}/></button>}
+                <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
+                <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
+            </div>
+        </div>
+    );
+};
+
+const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCancel }) => {
+    const [formData, setFormData] = useState({ title: "", type: "Rapport Complet", date: new Date().toLocaleDateString('fr-FR'), clientId: "", nestId: "", author: "admin", ...report });
+    const clientNests = markers.filter(m => m.clientId === formData.clientId);
+    return (
+        <div className="space-y-4 text-slate-800">
+            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre du document</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div>
+            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
+                <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
+                    <option value="Rapport Complet">Rapport Complet (Bilan)</option>
+                    <option value="Fiche Nid">Fiche Nid Détaillée</option>
+                    <option value="Devis / Facture">Devis / Facture</option>
+                    <option value="Autre">Autre</option>
+                </select>
+            </div>
+            <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client Associé</label>
+                <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={e => setFormData({...formData, clientId: parseInt(e.target.value)})}>
+                    <option value="">-- Sélectionner --</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+            </div>
+            {formData.type === "Fiche Nid" && (
+                <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nid Spécifique</label>
+                    <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.nestId} onChange={e => setFormData({...formData, nestId: parseInt(e.target.value)})}>
+                        <option value="">-- Sélectionner un nid --</option>
+                        {clientNests.map(n => <option key={n.id} value={n.id}>{n.title || "Nid " + n.id}</option>)}
+                    </select>
+                </div>
+            )}
+            <div className="flex gap-2 pt-4 border-t border-slate-100">
+                <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
+                <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
+            </div>
+        </div>
+    );
+};
+
+// --- VUES DU TABLEAU DE BORD ET INTERFACES ---
+
+const AdminDashboard = ({ interventions, clients, markers }) => {
+    // Calcul des statistiques globales pour Aerothau
+    const activeNests = markers.filter(m => m.status.startsWith('present')).length;
+    const sterilizedNests = markers.filter(m => m.status.startsWith('sterilized')).length;
+    const totalEggs = markers.reduce((sum, m) => sum + (m.eggs || 0), 0);
+    const pendingInterventions = interventions.filter(i => i.status !== 'Terminé').length;
+
+    return (
+        <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
+            <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">TABLEAU DE BORD</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card className="p-6 bg-white border-0 shadow-lg rounded-3xl flex flex-col justify-between">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="p-3 bg-red-50 text-red-600 rounded-2xl"><Bird size={24}/></div>
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nids Actifs</h3>
+                    </div>
+                    <p className="text-4xl font-black text-slate-800">{activeNests}</p>
+                </Card>
+
+                <Card className="p-6 bg-white border-0 shadow-lg rounded-3xl flex flex-col justify-between">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><CheckCircle size={24}/></div>
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nids Traités</h3>
+                    </div>
+                    <p className="text-4xl font-black text-slate-800">{sterilizedNests}</p>
+                </Card>
+
+                <Card className="p-6 bg-white border-0 shadow-lg rounded-3xl flex flex-col justify-between">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><Layers size={24}/></div>
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Œufs Stérilisés</h3>
+                    </div>
+                    <p className="text-4xl font-black text-slate-800">{totalEggs}</p>
+                </Card>
+
+                <Card className="p-6 bg-white border-0 shadow-lg rounded-3xl flex flex-col justify-between">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="p-3 bg-sky-50 text-sky-600 rounded-2xl"><Calendar size={24}/></div>
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Missions Prévues</h3>
+                    </div>
+                    <p className="text-4xl font-black text-slate-800">{pendingInterventions}</p>
+                </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <Card className="p-6 bg-white border-0 shadow-lg rounded-3xl">
+                    <h3 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-6 flex items-center gap-2"><Activity size={20} className="text-sky-500"/> Activité Récente</h3>
+                    <div className="space-y-4">
+                        {interventions.slice(-5).reverse().map(i => (
+                            <div key={i.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                <div>
+                                    <p className="font-bold text-sm text-slate-800">{clients.find(c => c.id === i.clientId)?.name || "Client Inconnu"}</p>
+                                    <p className="text-xs text-slate-500 font-medium mt-1">{i.date} {i.technician && `- Pilote: ${i.technician}`}</p>
+                                </div>
+                                <Badge status={i.status} />
+                            </div>
+                        ))}
+                        {interventions.length === 0 && <p className="text-sm text-slate-400 italic">Aucune activité planifiée ou terminée récemment.</p>}
+                    </div>
+                </Card>
+
+                <Card className="p-6 bg-white border-0 shadow-lg rounded-3xl">
+                    <h3 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-6 flex items-center gap-2"><Users size={20} className="text-sky-500"/> Répartition Clients (Top 5)</h3>
+                    <div className="space-y-4">
+                        {clients.slice(0, 5).map(c => {
+                            const clientNests = markers.filter(m => m.clientId === c.id).length;
+                            return (
+                                <div key={c.id} className="flex justify-between items-center p-4 border border-slate-100 rounded-2xl bg-white hover:bg-slate-50 transition-colors">
+                                    <span className="font-bold text-sm text-slate-700">{c.name}</span>
+                                    <span className="text-[10px] font-black bg-slate-900 text-white px-3 py-1.5 rounded-full uppercase tracking-widest">{clientNests} nids</span>
+                                </div>
+                            )
+                        })}
+                        {clients.length === 0 && <p className="text-sm text-slate-400 italic">Aucun client enregistré.</p>}
+                    </div>
+                </Card>
+            </div>
+        </div>
+    );
+};
+
 
 // --- CARTE (LEAFLET) ---
 
@@ -476,7 +708,9 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       markersLayerRef.current.clearLayers();
       markers.forEach(m => {
           let color = "#64748b"; 
-          if (m.status === "present") color = "#ef4444"; 
+          if (m.status === "present" || m.status === "present_high") color = "#ef4444"; // Rouge
+          else if (m.status === "present_medium") color = "#f97316"; // Orange
+          else if (m.status === "present_low") color = "#eab308"; // Jaune
           else if (m.status === "temp") color = "#94a3b8"; 
           else if (m.status === "sterilized_1") color = "#84cc16"; 
           else if (m.status === "sterilized_2") color = "#22c55e"; 
@@ -540,7 +774,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
 
     const handleMarkerClick = (marker) => {
         if (marker.id === "temp") {
-            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present", eggs: 0, clientId: clients[0]?.id || "" };
+            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
             onUpdateNest(newNest); setTempMarker(null); setSelectedMarker(newNest);
         } else {
             setSelectedMarker(marker);
@@ -574,7 +808,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
 
                 <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} onMapClick={async (ll) => {
                     if(!isAdding) return;
-                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present", eggs: 0, clientId: clients[0]?.id || "" };
+                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
                     await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
                 }}/>
                 
@@ -651,7 +885,7 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
 
 // --- VUES ADMIN ---
 
-const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
+const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests, clients }) => {
   const [selectedNest, setSelectedNest] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -666,7 +900,17 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
       "adresse precis": m.address,
       "observation": m.comments || "",
       "Latitude": m.lat,
-      "Longitude": m.lng
+      "Longitude": m.lng,
+      // Nouvelles colonnes exportées pour éviter la perte
+      "Lieux": m.lieux || "",
+      "Date de la visite": m.dateVisite || "",
+      "N° point": m.numPoint || "",
+      "Gps": m.gpsOriginal || "",
+      "Nb adulte": m.nbAdultes || "",
+      "Nd de Poussins (P=Poussin + S= semaine de développement)": m.nbPoussins || "",
+      "Comportement (Guetteur, Couve, Défend, Autres)": m.comportement || "",
+      "Remarques": m.remarques || "",
+      "info": m.info || ""
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
@@ -686,37 +930,70 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, clients }) => {
         const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         let count = 0;
         for (const row of jsonData) {
-            const clientName = row["Noms Client"];
-            const client = clients.find(c => c.name === clientName);
+            
+            // Traitement sécurisé des coordonnées GPS "43.16700300555649, 3.1758802259489407"
+            let lat = MAP_CENTER_DEFAULT.lat;
+            let lng = MAP_CENTER_DEFAULT.lng;
+            if (row["Gps"]) {
+                const parts = row["Gps"].toString().split(",");
+                if (parts.length === 2) {
+                    const pLat = parseFloat(parts[0].trim());
+                    const pLng = parseFloat(parts[1].trim());
+                    if(!isNaN(pLat) && !isNaN(pLng)) {
+                        lat = pLat;
+                        lng = pLng;
+                    }
+                }
+            } else if (row["Latitude"] && row["Longitude"]) {
+                lat = parseFloat(row["Latitude"]) || lat;
+                lng = parseFloat(row["Longitude"]) || lng;
+            }
+
+            const clientName = row["Noms Client"] || row["Lieux"];
+            const client = clients.find(c => c.name === clientName) || clients[0];
+            
             const newNest = {
-                id: row["ID"] || Date.now() + count,
-                clientId: client ? client.id : (clients[0]?.id || ""),
-                status: row["Etat du nids"] || "present",
+                id: row["ID"] || (row["N° point"] ? parseInt(row["N° point"]) + Date.now() : Date.now() + count),
+                clientId: client ? client.id : "",
+                status: row["Etat du nids"] || "present_high",
                 eggs: parseInt(row["nbr d'œuf"]) || 0,
-                address: row["adresse precis"] || "Adresse importée",
-                comments: row["observation"] || "",
-                lat: parseFloat(row["Latitude"]) || MAP_CENTER_DEFAULT.lat,
-                lng: parseFloat(row["Longitude"]) || MAP_CENTER_DEFAULT.lng,
-                title: row["Identification"] || "Nid " + (row["ID"] || count)
+                address: row["Adresse"] || row["adresse precis"] || "Adresse importée",
+                lat: lat,
+                lng: lng,
+                title: `N°${row["N° point"] || count} - ${row["Lieux"] || "Nid importé"}`,
+                comments: row["observation"] || "Import depuis fichier Excel.",
+                
+                // --- AJOUT DE TOUTES LES COLONNES DU FICHIER NARBONNE ---
+                lieux: row["Lieux"] || "",
+                dateVisite: row["Date de la visite"] || "",
+                info: row["info"] || "",
+                numPoint: row["N° point"] || "",
+                gpsOriginal: row["Gps"] || "",
+                nbAdultes: row["Nb adulte"] || "",
+                nbPoussins: row["Nd de Poussins (P=Poussin + S= semaine de développement)"] || "",
+                comportement: row["Comportement (Guetteur, Couve, Défend, Autres)"] || "",
+                remarques: row["Remarques"] || ""
             };
             await onUpdateNest(newNest);
             count++;
         }
-        alert(`${count} nids importés ou mis à jour.`);
+        alert(`${count} nids importés ou mis à jour avec succès.`);
     };
     reader.readAsArrayBuffer(file);
+    e.target.value = ""; // reset input
   };
 
   return (
     <div className="space-y-8 text-slate-800">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-3 flex-wrap">
+            <Button variant="danger" onClick={onDeleteAllNests}><Trash2 size={18}/> Supprimer TOUS les nids</Button>
             <Button variant="secondary" onClick={handleExport} disabled={isExporting}><Download size={18}/> Exporter Excel</Button>
             <div className="relative">
-                <input type="file" accept=".xlsx" onChange={handleImport} className="hidden" id="import-excel-file" />
+                <input type="file" accept=".xlsx, .csv" onChange={handleImport} className="hidden" id="import-excel-file" />
                 <label htmlFor="import-excel-file" className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase cursor-pointer hover:bg-sky-700 shadow-lg h-full">
-                    <Upload size={18}/> Importer Excel
+                    <Upload size={18}/> Importer Fichier (XLSX/CSV)
                 </label>
             </div>
         </div>
@@ -892,6 +1169,19 @@ export default function AerothauApp() {
       } catch (error) { showToast("Erreur de suppression", "error"); }
   };
 
+  const handleDeleteAllNests = async () => {
+      if (window.confirm("⚠️ ATTENTION : Êtes-vous sûr de vouloir supprimer TOUS les nids recensés ? Cette action est IRRÉVERSIBLE.")) {
+          try {
+              for (const marker of markers) {
+                  await deleteFromFirebase("markers", marker.id);
+              }
+              showToast("Tous les nids ont été supprimés avec succès.", "success");
+          } catch (error) {
+              showToast("Erreur lors de la suppression massive.", "error");
+          }
+      }
+  };
+
   if (!user) return <LoginForm onLogin={setUser} users={availableUsers} logoUrl={LOGO_URL} />;
 
   return (
@@ -939,7 +1229,7 @@ export default function AerothauApp() {
               <>
                 {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} />}
                 {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} />}
-                {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} />}
+                {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} onDeleteAllNests={handleDeleteAllNests} />}
                 {view === "clients" && <ClientManagement clients={clients} setSelectedClient={setSelectedClient} setView={setView} onCreateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => deleteFromFirebase("clients", c.id)} />}
                 {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} />}
                 {view === "schedule" && <ScheduleView interventions={interventions} clients={clients} onUpdateIntervention={async (i) => updateFirebase("interventions", i)} onDeleteIntervention={async (i) => deleteFromFirebase("interventions", i.id)} />}
