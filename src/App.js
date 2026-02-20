@@ -949,8 +949,27 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                 lng = parseFloat(row["Longitude"]) || lng;
             }
 
-            const clientName = row["Noms Client"] || row["Lieux"];
-            const client = clients.find(c => c.name === clientName) || clients[0];
+            // RECONNAISSANCE INTELLIGENTE DU CLIENT
+            const rawLocation = (row["Noms Client"] || row["Lieux"] || "").toString().toLowerCase();
+            let matchedClient = clients.find(c => c.name.toLowerCase() === rawLocation); // Match exact en premier
+            
+            if (!matchedClient) {
+                // Recherche par mots-clés spécifiques demandés par l'utilisateur
+                if (rawLocation.includes("narbonne")) {
+                    matchedClient = clients.find(c => c.name.toLowerCase().includes("narbonne"));
+                } else if (rawLocation.includes("meze") || rawLocation.includes("mèze")) {
+                    matchedClient = clients.find(c => c.name.toLowerCase().includes("meze") || c.name.toLowerCase().includes("mèze"));
+                } else if (rawLocation.includes("sete") || rawLocation.includes("sète")) {
+                    matchedClient = clients.find(c => c.name.toLowerCase().includes("sete") || c.name.toLowerCase().includes("sète"));
+                }
+                
+                // Si toujours pas trouvé, recherche partielle générique de secours
+                if(!matchedClient && rawLocation.length > 3) {
+                     matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
+                }
+            }
+            
+            const client = matchedClient || clients[0]; // Fallback au premier client par défaut si rien n'est trouvé
             
             const newNest = {
                 id: row["ID"] || (row["N° point"] ? parseInt(row["N° point"]) + Date.now() : Date.now() + count),
