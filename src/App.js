@@ -45,7 +45,8 @@ import {
   Activity,
   Cloud,
   Wind,
-  List as ListIcon
+  List as ListIcon,
+  Layers
 } from "lucide-react";
 
 // ============================================================================
@@ -147,6 +148,11 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`GPS : ${nest.lat?.toFixed(6)}, ${nest.lng?.toFixed(6)}`, 20, y); y += 8;
             doc.text(`Statut : ${nest.status}`, 20, y); y += 8;
             doc.text(`Contenu : ${nest.eggs} œuf(s)`, 20, y); y += 8;
+            
+            if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 8; }
+            if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 8; }
+            if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 8; }
+            if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
@@ -448,13 +454,16 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
 
 const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly = false, onGeneratePDF }) => {
   const [formData, setFormData] = useState({ 
-      title: "", comments: "", eggs: 0, status: "present", clientId: "", 
+      title: "", comments: "", eggs: 0, status: "present_high", clientId: "", 
+      lieux: "", dateVisite: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
       ...nest 
   });
   
   const handlePhotoUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({ ...formData, photo: reader.result }); reader.readAsDataURL(file); } };
   const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
   
+  const hasExtraData = formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info;
+
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
           {nest.photo && (
@@ -483,6 +492,20 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
               </div>
           </div>
           
+          {hasExtraData && (
+             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-sm space-y-3">
+                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Layers size={14}/> Données Fichier</p>
+                 <div className="grid grid-cols-2 gap-2 text-xs">
+                     {nest.lieux && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Lieux</span><span className="font-medium text-slate-700">{nest.lieux}</span></div>}
+                     {nest.dateVisite && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Date visite</span><span className="font-medium text-slate-700">{nest.dateVisite}</span></div>}
+                     {nest.nbAdultes && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Adultes</span><span className="font-medium text-slate-700">{nest.nbAdultes}</span></div>}
+                     {nest.nbPoussins && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Poussins</span><span className="font-medium text-slate-700">{nest.nbPoussins}</span></div>}
+                 </div>
+                 {nest.comportement && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Comportement</span><span className="font-medium text-slate-700 text-xs">{nest.comportement}</span></div>}
+                 {nest.remarques && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Remarques</span><span className="font-medium text-slate-700 text-xs italic">{nest.remarques}</span></div>}
+             </div>
+          )}
+
           {nest.comments && (
               <div className="bg-sky-50 p-5 rounded-2xl border border-sky-100">
                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Info size={14}/> Observations Équipe</p>
