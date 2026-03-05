@@ -1112,13 +1112,13 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
   };
 
   return (
-    <div className="space-y-8 text-slate-800">
+    <div className="space-y-8 text-slate-800 animate-in fade-in duration-300">
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
         <div className="flex gap-3 flex-wrap">
             <Button variant="outline" className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6 border-2 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={cleanGhosts}><Trash2 size={16}/> Purger Fantômes</Button>
             <Button variant="danger" onClick={onDeleteAllNests} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6"><Trash2 size={16}/> Tout purger</Button>
-            <Button variant="secondary" onClick={handleExport} disabled={isExporting} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6"><Download size={16}/> Exporter Excel</Button>
+            <Button variant="secondary" onClick={handleExport} disabled={isExporting} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6 border-2"><Download size={16}/> Exporter .xlsx</Button>
             <div className="relative">
                 <input type="file" accept=".xlsx, .csv" onChange={handleImport} className="hidden" id="import-excel-file" />
                 <label htmlFor="import-excel-file" className="flex items-center gap-2 bg-sky-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase cursor-pointer hover:bg-sky-700 shadow-xl shadow-sky-200 h-12 transition-all">
@@ -1132,31 +1132,31 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
           const clientNests = markers.filter(m => m.clientId === client.id);
           if (clientNests.length === 0) return null;
           return (
-              <Card key={client.id} className="overflow-hidden border-0 shadow-lg rounded-3xl mb-8">
-                  <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                          <div className="p-2 bg-white/10 rounded-xl"><Users size={20} className="text-sky-400"/></div>
-                          <h3 className="font-black uppercase tracking-wide text-lg">{client.name}</h3>
+              <Card key={client.id} className="overflow-hidden border-0 shadow-xl rounded-[32px] mb-8">
+                  <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                          <div className="p-3 bg-white/10 rounded-2xl"><Users size={20} className="text-sky-400"/></div>
+                          <h3 className="font-black uppercase tracking-widest text-lg">{client.name}</h3>
                       </div>
-                      <span className="bg-white/20 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest">{clientNests.length} Nids</span>
+                      <span className="bg-white/20 px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-inner">{clientNests.length} Nids</span>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto custom-scrollbar">
                       <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-slate-100">
-                              <tr><th className="p-4 pl-8">Réf / Adresse</th><th className="p-4">Statut</th><th className="p-4 text-center">Contenu</th><th className="p-4 text-right pr-8">Actions</th></tr>
+                              <tr><th className="p-5 pl-8">Réf / Adresse</th><th className="p-5">Statut</th><th className="p-5 text-center">Contenu</th><th className="p-5 text-right pr-8">Actions</th></tr>
                           </thead>
                           <tbody className="divide-y divide-slate-50">
                               {clientNests.map((m) => (
                                   <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
-                                      <td className="p-4 pl-8">
-                                          <div className="font-bold text-slate-900 text-base">{m.title || "Nid"}</div>
-                                          <div className="text-xs text-slate-400 truncate max-w-[300px] flex items-center gap-1 mt-1"><MapPin size={10}/> {m.address}</div>
+                                      <td className="p-5 pl-8">
+                                          <div className="font-black text-slate-800 text-base mb-1">{m.title || "Nid"}</div>
+                                          <div className="text-xs text-slate-400 font-medium truncate max-w-[350px] flex items-center gap-1"><MapPin size={12} className="text-slate-300"/> {m.address}</div>
                                       </td>
-                                      <td className="p-4"><Badge status={m.status}/></td>
-                                      <td className="p-4 text-center font-black text-slate-700">{m.eggs} <span className="font-normal opacity-50">œuf(s)</span></td>
-                                      <td className="p-4 flex justify-end gap-2 pr-8">
-                                          <button onClick={() => setSelectedNest(m)} className="p-2.5 text-sky-600 bg-sky-50 rounded-xl hover:bg-sky-100 transition-colors"><Edit size={16}/></button>
-                                          <button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2.5 text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors"><Trash2 size={16} /></button>
+                                      <td className="p-5"><Badge status={m.status}/></td>
+                                      <td className="p-5 text-center font-black text-slate-700 text-lg">{m.eggs} <span className="font-bold text-xs uppercase tracking-widest opacity-50">œuf(s)</span></td>
+                                      <td className="p-5 flex justify-end gap-3 pr-8">
+                                          <button onClick={() => setSelectedNest(m)} className="p-3 text-sky-600 bg-sky-50 rounded-xl hover:bg-sky-600 hover:text-white transition-colors shadow-sm"><Edit size={16}/></button>
+                                          <button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-3 text-red-500 bg-red-50 rounded-xl hover:bg-red-600 hover:text-white transition-colors shadow-sm"><Trash2 size={16} /></button>
                                       </td>
                                   </tr>
                               ))}
@@ -1168,11 +1168,11 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       })}
 
       {selectedNest && (
-        <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-          <Card className="bg-white rounded-3xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border-0">
-              <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-black text-2xl uppercase tracking-tighter text-slate-900">Édition du Nid</h3>
-                  <button onClick={() => setSelectedNest(null)} className="p-2 hover:bg-slate-100 rounded-full"><X size={24}/></button>
+        <div className="fixed inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+          <Card className="bg-white rounded-[32px] p-8 md:p-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl border-0">
+              <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-6">
+                  <h3 className="font-black text-3xl uppercase tracking-tighter text-slate-900 flex items-center gap-3"><Edit size={28} className="text-sky-500"/> Édition du Nid</h3>
+                  <button onClick={() => setSelectedNest(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={28} className="text-slate-400"/></button>
               </div>
               <NestEditForm nest={selectedNest} clients={clients} onSave={async (d) => { await onUpdateNest(d); setSelectedNest(null); }} onCancel={() => setSelectedNest(null)} onGeneratePDF={(n, cb) => generatePDF('nest_detail', n, { clientName: clients.find(c => c.id === n.clientId)?.name }, () => {}, cb)} />
           </Card>
@@ -1185,20 +1185,20 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
 const ClientManagement = ({ clients, setSelectedClient, setView, onCreateClient, onDeleteClient }) => {
   const [isCreating, setIsCreating] = useState(false);
   return (
-    <div className="space-y-8 text-slate-800">
-      <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter">CLIENTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={18} /> Nouveau Client</Button></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-slate-800">
+    <div className="space-y-8 text-slate-800 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter">CLIENTS</h2><Button variant="sky" className="rounded-2xl px-6 h-12 text-xs uppercase font-black tracking-widest" onClick={() => setIsCreating(true)}><Plus size={16} /> Nouveau</Button></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {clients.map((c) => (
-          <Card key={c.id} className="p-8 cursor-pointer hover:shadow-2xl transition-all group border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl bg-white" onClick={() => { setSelectedClient(c); setView("client-detail"); }}>
-            <div className="flex justify-between items-start mb-6"><div className="p-3 bg-sky-50 text-sky-600 rounded-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors duration-500 shadow-sm"><Users size={24} /></div><span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{c.type}</span></div>
+          <Card key={c.id} className="p-8 cursor-pointer hover:shadow-2xl transition-all group border-0 shadow-lg rounded-3xl bg-white" onClick={() => { setSelectedClient(c); setView("client-detail"); }}>
+            <div className="flex justify-between items-start mb-6"><div className="p-4 bg-sky-50 text-sky-600 rounded-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors duration-300 shadow-sm"><Users size={24} /></div><span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-3 py-1 rounded-md border border-slate-100">{c.type}</span></div>
             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter mb-2">{c.name}</h3>
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-wide truncate mt-4"><MapPin size={12} className="inline mr-2 text-sky-500" /> {c.address}</p>
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wide truncate mt-4 flex items-center gap-2"><MapPin size={14} className="text-sky-500" /> {c.address}</p>
           </Card>
         ))}
       </div>
       {isCreating && (
         <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-          <Card className="p-8 w-full max-w-lg shadow-2xl border-0 rounded-3xl text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Créer une fiche</h3><ClientEditForm client={{ id: Date.now(), name: "", type: "Privé", address: "", contact: "", phone: "", email: "" }} onSave={(d) => { onCreateClient(d); setIsCreating(false); }} onCancel={() => setIsCreating(false)} /></Card>
+          <Card className="p-8 w-full max-w-lg shadow-2xl border-0 rounded-[32px] text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Créer une fiche</h3><ClientEditForm client={{ id: Date.now(), name: "", type: "Privé", address: "", contact: "", phone: "", email: "" }} onSave={(d) => { onCreateClient(d); setIsCreating(false); }} onCancel={() => setIsCreating(false)} /></Card>
         </div>
       )}
     </div>
@@ -1211,19 +1211,19 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
     const cNests = useMemo(() => markers.filter(m => m.clientId === selectedClient.id), [markers, selectedClient]);
     
     return (
-        <div className="space-y-8 text-slate-800">
-            <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-0 shadow-md h-10">&larr; Retour</Button>
+        <div className="space-y-8 text-slate-800 animate-in fade-in duration-300">
+            <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-2 h-12 text-xs uppercase tracking-widest font-black">&larr; Retour Clients</Button>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="space-y-8">
-                    <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white">
+                    <Card className="p-8 border-0 shadow-xl rounded-[32px] bg-white">
                         {isEditing ? <ClientEditForm client={selectedClient} onSave={(d) => {onUpdateClient(d); setIsEditing(false);}} onCancel={() => setIsEditing(false)}/> : (
                             <>
-                                <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter text-slate-900">{selectedClient.name}</h2>
-                                <div className="space-y-6 text-sm font-bold text-slate-600 uppercase">
-                                    <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><MapPin size={20} className="text-sky-500 shrink-0"/><p className="leading-tight text-xs">{selectedClient.address}</p></div>
-                                    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><Phone size={20} className="text-sky-500 shrink-0"/><p className="text-xs">{selectedClient.phone}</p></div>
+                                <h2 className="text-2xl font-black mb-8 uppercase tracking-tighter text-slate-900">{selectedClient.name}</h2>
+                                <div className="space-y-4 text-sm font-bold text-slate-600 uppercase">
+                                    <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl"><MapPin size={20} className="text-sky-500 shrink-0"/><p className="leading-tight text-xs mt-0.5">{selectedClient.address}</p></div>
+                                    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl"><Phone size={20} className="text-sky-500 shrink-0"/><p className="text-xs">{selectedClient.phone}</p></div>
                                     
-                                    {selectedClient.extendedContacts && selectedClient.extendedContacts.length > 0 && (
+                                    {selectedClient.extendedContacts && (
                                         <div className="bg-sky-50 p-5 rounded-2xl border border-sky-100 mt-4 shadow-inner">
                                             <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-3 flex items-center gap-2"><Users size={14}/> Contacts de Survol</p>
                                             <div className="space-y-2">
@@ -1237,15 +1237,15 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
                                         </div>
                                     )}
 
-                                    <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-lg mt-8">
+                                    <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-xl mt-8">
                                         <p className="text-[10px] font-black opacity-50 tracking-widest text-center mb-4">ACCÈS ESPACE CLIENT</p>
-                                        <p className="text-xs tracking-widest mb-2"><span className="opacity-50">ID:</span> {selectedClient.username}</p>
-                                        <p className="text-xs tracking-widest"><span className="opacity-50">PASS:</span> {selectedClient.password}</p>
+                                        <p className="text-xs tracking-widest mb-2 font-mono"><span className="opacity-50 mr-2 font-sans">ID:</span>{selectedClient.username}</p>
+                                        <p className="text-xs tracking-widest font-mono"><span className="opacity-50 mr-2 font-sans">PASS:</span>{selectedClient.password}</p>
                                     </div>
                                 </div>
-                                <div className="flex flex-col gap-3 mt-8">
-                                    <Button variant="sky" className="w-full py-3 rounded-2xl uppercase tracking-widest text-xs font-black h-12" onClick={() => setIsEditing(true)}>Modifier</Button>
-                                    <Button variant="danger" className="w-full py-3 rounded-2xl uppercase tracking-widest text-xs font-black h-12" onClick={() => {if(window.confirm("Supprimer ce client ?")){onDeleteClient(selectedClient); setView("clients");}}}>Supprimer</Button>
+                                <div className="flex flex-col gap-3 mt-8 pt-6 border-t border-slate-100">
+                                    <Button variant="sky" className="w-full py-4 rounded-2xl uppercase tracking-widest text-xs" onClick={() => setIsEditing(true)}>Modifier la fiche</Button>
+                                    <Button variant="danger" className="w-full py-4 rounded-2xl uppercase tracking-widest text-xs bg-red-50 text-red-500 hover:bg-red-500 hover:text-white" onClick={() => {if(window.confirm("Supprimer ce client et toutes ses données ?")){onDeleteClient(selectedClient); setView("clients");}}}>Supprimer le client</Button>
                                 </div>
                             </>
                         )}
@@ -1253,15 +1253,30 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
                 </div>
                 <div className="lg:col-span-2 space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card className="p-6 shadow-lg border-0 rounded-3xl bg-slate-900 text-white"><p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2 text-center">Nids recensés</p><p className="text-5xl font-black text-sky-400 text-center">{cNests.length}</p></Card>
-                        <Card className="p-6 shadow-lg border-0 rounded-3xl bg-sky-600 text-white"><p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2 text-center">Missions effectuées</p><p className="text-5xl font-black text-white text-center">{cInt.filter(i => i.status === "Terminé").length}</p></Card>
+                        <Card className="p-8 shadow-xl border-0 rounded-[32px] bg-slate-900 text-white relative overflow-hidden">
+                            <div className="relative z-10">
+                                <p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2">Nids recensés</p>
+                                <p className="text-6xl font-black text-sky-400 tracking-tighter">{cNests.length}</p>
+                            </div>
+                            <Bird className="absolute -right-4 -bottom-4 w-32 h-32 text-white/5 transform -scale-x-100"/>
+                        </Card>
+                        <Card className="p-8 shadow-xl border-0 rounded-[32px] bg-sky-600 text-white relative overflow-hidden">
+                            <div className="relative z-10">
+                                <p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2">Missions effectuées</p>
+                                <p className="text-6xl font-black tracking-tighter">{cInt.filter(i => i.status === "Terminé").length}</p>
+                            </div>
+                            <CheckCircle className="absolute -right-4 -bottom-4 w-32 h-32 text-white/10"/>
+                        </Card>
                     </div>
-                    <Card className="p-8 border-0 shadow-xl rounded-3xl bg-white"><h3 className="text-xl font-black uppercase tracking-tighter mb-6 text-slate-900">HISTORIQUE DES PASSAGES</h3>
-                        <div className="overflow-x-auto">
+                    <Card className="p-0 border-0 shadow-xl rounded-[32px] bg-white overflow-hidden h-[400px] flex flex-col">
+                        <div className="p-6 bg-slate-50 border-b border-slate-100 shrink-0">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><Calendar size={16} className="text-sky-500"/> Historique des Passages</h3>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 text-slate-500"><tr><th className="p-4">Date</th><th className="p-4">Statut</th><th className="p-4">Notes</th></tr></thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {cInt.length === 0 ? <tr><td colSpan="3" className="p-8 text-center text-slate-400 font-bold uppercase text-xs italic">Aucune intervention</td></tr> : cInt.map(i => <tr key={i.id} className="hover:bg-slate-50 transition-colors"><td className="p-4 font-black text-slate-700">{i.date}</td><td className="p-4"><Badge status={i.status}/></td><td className="p-4 text-xs font-bold text-slate-500 italic truncate max-w-[200px]">{i.notes}</td></tr>)}
+                                <thead className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100"><tr><th className="pb-4">Date</th><th className="pb-4">Statut</th><th className="pb-4">Notes Intervention</th></tr></thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {cInt.length === 0 ? <tr><td colSpan="3" className="py-8 text-center text-slate-400 font-bold uppercase text-xs italic">Aucune intervention enregistrée</td></tr> : cInt.map(i => <tr key={i.id} className="hover:bg-slate-50/50 transition-colors"><td className="py-4 font-black text-slate-700">{i.date}</td><td className="py-4"><Badge status={i.status}/></td><td className="py-4 text-xs font-medium text-slate-500 italic max-w-[200px]">{i.notes || "-"}</td></tr>)}
                                 </tbody>
                             </table>
                         </div>
@@ -1286,20 +1301,22 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
         const days = [], dInM = daysInMonth(y, m);
         const startOffset = (firstDayOfMonth(y, m) + 6) % 7;
 
-        for (let i = 0; i < startOffset; i++) days.push(<div key={`empty-${i}`} className="h-28 bg-slate-50 border-slate-100 border" />);
+        for (let i = 0; i < startOffset; i++) days.push(<div key={`empty-${i}`} className="h-32 bg-slate-50/50 border-r border-b border-slate-100" />);
+        
         for (let d = 1; d <= dInM; d++) {
             const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
             const dayInts = interventions.filter(i => i.date === dateStr);
             const isToday = new Date().toISOString().split('T')[0] === dateStr;
+            
             days.push(
-                <div key={d} className={`h-28 border border-slate-100 p-2 hover:bg-sky-50 transition-all cursor-pointer relative group ${isToday ? 'bg-sky-50/50' : 'bg-white'}`} onClick={() => { setEditingInt({ id: Date.now(), date: dateStr }); setIsCreating(true); }}>
-                    <div className="flex justify-between items-center mb-1">
-                        <span className={`text-xs font-black w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-sky-600 text-white' : 'text-slate-400 group-hover:text-sky-600 transition-colors'}`}>{d}</span>
+                <div key={d} className={`h-32 border-r border-b border-slate-100 p-2 hover:bg-sky-50/50 transition-all cursor-pointer relative group flex flex-col ${isToday ? 'bg-sky-50/30' : 'bg-white'}`} onClick={() => { setEditingInt({ id: Date.now(), date: dateStr }); setIsCreating(true); }}>
+                    <div className="flex justify-end mb-1 shrink-0">
+                        <span className={`text-xs font-black w-7 h-7 flex items-center justify-center rounded-full transition-colors ${isToday ? 'bg-sky-500 text-white shadow-md' : 'text-slate-400 group-hover:text-sky-600 group-hover:bg-sky-100'}`}>{d}</span>
                     </div>
-                    <div className="space-y-1 overflow-y-auto max-h-[70px] custom-scrollbar pr-1">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-1.5">
                         {dayInts.map(i => (
-                            <div key={i.id} className="text-[9px] bg-slate-900 text-white px-2 py-1 rounded-lg truncate font-black uppercase tracking-tighter border-l-4 border-sky-400">
-                                {clients.find(c => c.id === i.clientId)?.name || "Agent Aerothau"}
+                            <div key={i.id} className={`text-[9px] px-2 py-1.5 rounded-lg truncate font-black uppercase tracking-tighter shadow-sm border-l-4 ${i.status === 'Terminé' ? 'bg-emerald-50 text-emerald-700 border-emerald-400' : 'bg-slate-900 text-white border-sky-400'}`}>
+                                {clients.find(c => c.id === i.clientId)?.name || "Mission"}
                             </div>
                         ))}
                     </div>
@@ -1310,44 +1327,47 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
     };
 
     return (
-        <div className="space-y-8 text-slate-800">
+        <div className="space-y-8 text-slate-800 animate-in fade-in duration-300">
             <div className="flex justify-between items-center flex-wrap gap-4">
                 <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">PLANNING</h2>
-                <div className="flex items-center gap-2 bg-white p-1 rounded-2xl shadow-lg border border-slate-100">
-                    <button onClick={() => setViewMode("calendar")} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === "calendar" ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Calendrier</button>
-                    <button onClick={() => setViewMode("list")} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${viewMode === "list" ? 'bg-sky-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>Liste</button>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center bg-white p-1 rounded-2xl shadow-sm border border-slate-200">
+                        <button onClick={() => setViewMode("calendar")} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === "calendar" ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Calendrier</button>
+                        <button onClick={() => setViewMode("list")} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === "list" ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Liste</button>
+                    </div>
+                    <Button variant="sky" className="rounded-2xl px-6 h-12 text-xs uppercase tracking-widest shadow-xl shadow-sky-200" onClick={() => setIsCreating(true)}><Plus size={16}/> Programmer</Button>
                 </div>
-                <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Programmer</Button>
             </div>
 
             {viewMode === "calendar" ? (
-                <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
+                <Card className="overflow-hidden border-0 shadow-2xl rounded-[32px] bg-white">
                     <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
-                        <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={24}/></button>
+                        <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))} className="p-3 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={24}/></button>
                         <h3 className="text-xl font-black uppercase tracking-widest">{currentDate.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</h3>
-                        <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronRight size={24}/></button>
+                        <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))} className="p-3 hover:bg-white/10 rounded-full transition-colors"><ChevronRight size={24}/></button>
                     </div>
-                    <div className="grid grid-cols-7 bg-slate-100 border-b">
-                        {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map(d => <div key={d} className="py-4 text-center text-[10px] font-black text-slate-500 uppercase tracking-widest">{d}</div>)}
+                    <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200">
+                        {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map(d => <div key={d} className="py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{d}</div>)}
                     </div>
-                    <div className="grid grid-cols-7 border-collapse">{renderCalendar()}</div>
+                    <div className="grid grid-cols-7 border-l border-slate-100">{renderCalendar()}</div>
                 </Card>
             ) : (
-                <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
+                <Card className="overflow-hidden border-0 shadow-2xl rounded-[32px] bg-white">
                     <div className="overflow-x-auto text-slate-800">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest">
-                                <tr><th className="p-6">Date</th><th className="p-6">Client bénéficiaire</th><th className="p-6">Statut mission</th><th className="p-6 text-right">Actions</th></tr>
+                            <thead className="bg-slate-50 text-slate-400 uppercase text-[10px] font-black tracking-widest border-b border-slate-100">
+                                <tr><th className="p-6 pl-8">Date</th><th className="p-6">Client / Site</th><th className="p-6">Pilote</th><th className="p-6">Statut</th><th className="p-6 text-right pr-8">Actions</th></tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {interventions.length === 0 ? <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest">Aucune intervention programmée</td></tr> : interventions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(i => (
-                                    <tr key={i.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-6 font-black text-sky-600">{i.date}</td>
-                                        <td className="p-6 font-bold uppercase text-slate-700 tracking-tight">{clients.find(c => c.id === i.clientId)?.name || "N/A"}</td>
+                            <tbody className="divide-y divide-slate-50">
+                                {interventions.length === 0 ? <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest">Aucune intervention</td></tr> : interventions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(i => (
+                                    <tr key={i.id} className="hover:bg-slate-50/80 transition-colors">
+                                        <td className="p-6 pl-8 font-black text-sky-600">{i.date}</td>
+                                        <td className="p-6 font-bold uppercase text-slate-800 tracking-tight">{clients.find(c => c.id === i.clientId)?.name || "Non assigné"}</td>
+                                        <td className="p-6 text-xs font-bold text-slate-500">{i.technician || "-"}</td>
                                         <td className="p-6"><Badge status={i.status}/></td>
-                                        <td className="p-6 flex justify-end gap-3">
-                                            <button onClick={() => setEditingInt(i)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
-                                            <button onClick={() => {if(window.confirm("Supprimer cette mission ?")) onDeleteIntervention(i);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
+                                        <td className="p-6 flex justify-end gap-2 pr-8">
+                                            <button onClick={() => setEditingInt(i)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all"><Edit size={18}/></button>
+                                            <button onClick={() => {if(window.confirm("Supprimer la mission ?")) onDeleteIntervention(i);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all"><Trash2 size={18}/></button>
                                         </td>
                                     </tr>
                                 ))}
@@ -1358,11 +1378,11 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
             )}
 
             {(isCreating || editingInt) && (
-                <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white">
-                        <div className="flex justify-between items-center mb-8">
-                            <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating && !editingInt?.clientId ? "Nouvelle Mission" : "Détails Mission"}</h3>
-                            <button onClick={() => {setEditingInt(null); setIsCreating(false);}} className="text-slate-400 hover:text-slate-600 p-1.5 bg-slate-100 rounded-full transition-colors"><X size={20}/></button>
+                <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                    <Card className="p-10 w-full max-w-md shadow-2xl border-0 rounded-[32px] bg-white">
+                        <div className="flex justify-between items-center mb-8 border-b pb-4">
+                            <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter flex items-center gap-3"><Calendar size={24} className="text-sky-500"/> {isCreating && !editingInt?.clientId ? "Nouveau Vol" : "Détails Mission"}</h3>
+                            <button onClick={() => {setEditingInt(null); setIsCreating(false);}} className="text-slate-400 hover:text-slate-800 p-2 bg-slate-50 rounded-full transition-colors"><X size={24}/></button>
                         </div>
                         <InterventionEditForm intervention={editingInt} clients={clients} onSave={async (d) => { await onUpdateIntervention(d); setEditingInt(null); setIsCreating(false); }} onDelete={onDeleteIntervention} onCancel={() => {setEditingInt(null); setIsCreating(false);}} />
                     </Card>
@@ -1387,46 +1407,46 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
         <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
             <div className="flex justify-between items-center flex-wrap gap-4">
                 <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">DOCUMENTS</h2>
-                <div className="flex gap-2">
-                     <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-100">
-                        <button onClick={() => setFilter('all')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>Tous</button>
-                        <button onClick={() => setFilter('client')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filter === 'client' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>Reçus Client</button>
+                <div className="flex items-center gap-3">
+                    <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-slate-200">
+                        <button onClick={() => setFilter('all')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'all' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Tous</button>
+                        <button onClick={() => setFilter('client')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === 'client' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Reçus Client</button>
                     </div>
-                     <Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={16}/> Ajouter</Button>
+                    <Button variant="sky" className="rounded-2xl px-6 h-12 text-xs uppercase tracking-widest shadow-xl shadow-sky-200" onClick={() => setIsCreating(true)}><Plus size={16}/> Créer Document</Button>
                 </div>
             </div>
             
-            <Card className="overflow-hidden border-0 shadow-2xl rounded-3xl bg-white">
-                <div className="overflow-x-auto">
+            <Card className="overflow-hidden border-0 shadow-2xl rounded-[32px] bg-white">
+                <div className="overflow-x-auto min-h-[400px]">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-widest">
-                            <tr><th className="p-6">Document</th><th className="p-6">Client / Source</th><th className="p-6">Date</th><th className="p-6">Type</th><th className="p-6 text-right">Actions</th></tr>
+                        <thead className="bg-slate-50 text-slate-400 uppercase text-[10px] font-black tracking-widest border-b border-slate-100">
+                            <tr><th className="p-6 pl-8">Document</th><th className="p-6">Client / Cible</th><th className="p-6">Date</th><th className="p-6">Catégorie</th><th className="p-6 text-right pr-8">Actions</th></tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {filteredReports.length === 0 ? <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold uppercase italic tracking-widest">Aucun document trouvé</td></tr> : filteredReports.map(r => (
-                                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-6 font-black flex items-center gap-4 text-slate-700 tracking-tight">
-                                        <div className={`p-2.5 rounded-xl ${r.author === 'client' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500'}`}>
+                        <tbody className="divide-y divide-slate-50">
+                            {filteredReports.length === 0 ? <tr><td colSpan="5" className="p-16 text-center text-slate-400 font-bold uppercase tracking-widest"><FileText size={40} className="mx-auto mb-4 opacity-20"/> Aucun document trouvé</td></tr> : filteredReports.map(r => (
+                                <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                                    <td className="p-6 pl-8 font-black flex items-center gap-4 text-slate-800 text-base">
+                                        <div className={`p-3 rounded-2xl ${r.author === 'client' ? 'bg-purple-100 text-purple-600 shadow-inner' : 'bg-slate-100 text-slate-500 shadow-inner'}`}>
                                             {r.author === 'client' ? <FileCheck size={20}/> : <File size={20}/>}
                                         </div> 
                                         {r.title}
                                     </td>
                                     <td className="p-6">
-                                        <span className="text-xs font-black uppercase text-slate-700">{clients.find(c => c.id === r.clientId)?.name || "Client supprimé"}</span>
-                                        <div className="text-[10px] text-slate-400">{r.author === 'client' ? "Envoyé par le client" : "Généré par Aerothau"}</div>
+                                        <span className="text-xs font-black uppercase text-slate-700 tracking-tight">{clients.find(c => c.id === r.clientId)?.name || "Non assigné"}</span>
+                                        <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">{r.author === 'client' ? "Envoyé par le client" : "Généré par Aerothau"}</div>
                                     </td>
-                                    <td className="p-6 text-xs font-bold text-slate-500">{r.date}</td>
+                                    <td className="p-6 text-xs font-black text-sky-600">{r.date}</td>
                                     <td className="p-6"><Badge status={r.type === 'Fiche Nid' ? 'reported_by_client' : (r.type === 'Rapport Complet' ? 'sterilized_2' : 'Planifié')}/></td>
-                                    <td className="p-6 flex justify-end gap-3">
+                                    <td className="p-6 flex justify-end gap-2 pr-8">
                                         <button 
                                             onClick={() => generatePDF(r.type === 'Fiche Nid' ? 'nest_detail' : (r.type === 'Rapport Complet' ? 'complete_report' : 'file'), r.type === 'Fiche Nid' ? markers.find(m => m.id === r.nestId) : r, { client: clients.find(c => c.id === r.clientId), markers: markers.filter(m => m.clientId === r.clientId), interventions: interventions.filter(i => i.clientId === r.clientId) })} 
-                                            className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all shadow-sm" 
-                                            title="Télécharger / Imprimer"
+                                            className="p-3 text-slate-600 hover:text-white bg-slate-50 hover:bg-slate-900 rounded-xl transition-all shadow-sm" 
+                                            title="Télécharger le PDF"
                                         >
-                                            <Printer size={18}/>
+                                            <Download size={18}/>
                                         </button>
-                                        <button onClick={() => setEditingRep(r)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
-                                        <button onClick={() => {if(window.confirm("Supprimer ce document ?")) onDeleteReport(r);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
+                                        <button onClick={() => setEditingRep(r)} className="p-3 text-sky-600 bg-sky-50 hover:bg-sky-600 hover:text-white rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
+                                        <button onClick={() => {if(window.confirm("Supprimer ce document définitivement ?")) onDeleteReport(r);}} className="p-3 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
                                     </td>
                                 </tr>
                             ))}
@@ -1436,9 +1456,12 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
             </Card>
 
             {(isCreating || editingRep) && (
-                <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
-                    <Card className="p-8 w-full max-w-md shadow-2xl border-0 rounded-3xl bg-white text-slate-800">
-                        <div className="flex justify-between items-center mb-8"><h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter">{isCreating ? "Nouveau Document" : "Modifier"}</h3><button onClick={() => {setEditingRep(null); setIsCreating(false);}} className="text-slate-400 p-1.5 bg-slate-100 rounded-full"><X size={20}/></button></div>
+                <div className="fixed inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                    <Card className="p-10 w-full max-w-md shadow-2xl border-0 rounded-[32px] bg-white text-slate-800">
+                        <div className="flex justify-between items-center mb-8 border-b pb-4">
+                            <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter flex items-center gap-3"><FileText size={24} className="text-sky-500"/> {isCreating ? "Nouveau Doc" : "Éditer"}</h3>
+                            <button onClick={() => {setEditingRep(null); setIsCreating(false);}} className="text-slate-400 hover:text-slate-800 p-2 bg-slate-50 rounded-full transition-colors"><X size={24}/></button>
+                        </div>
                         <ReportEditForm report={editingRep || {id: Date.now()}} clients={clients} markers={markers} interventions={interventions} onSave={async (d) => { await onUpdateReport(d); setEditingRep(null); setIsCreating(false); }} onCancel={() => {setEditingRep(null); setIsCreating(false);}} />
                     </Card>
                 </div>
@@ -1481,22 +1504,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
             case 'dashboard':
                 return (
                     <div className="space-y-8 animate-in fade-in duration-500">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-slate-900">
-                            <Card className="p-6 border-0 shadow-xl rounded-[32px] flex flex-col justify-between bg-gradient-to-br from-sky-400 to-blue-600 text-white relative overflow-hidden">
-                                <div className="relative z-10">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="font-black uppercase tracking-widest text-[10px] opacity-80">Météo Site</span>
-                                        <Cloud size={24} />
-                                    </div>
-                                    <div className="flex items-end gap-2 mb-3">
-                                        <span className="text-4xl font-black leading-none">18°C</span>
-                                        <span className="text-xs font-bold opacity-90 mb-1">Vent: 12km/h</span>
-                                    </div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-lg inline-block backdrop-blur-sm">✅ Conditions optimales</p>
-                                </div>
-                                <Wind className="absolute -right-6 -bottom-6 w-32 h-32 text-white/10" />
-                            </Card>
-
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-slate-900">
                             <Card className="p-8 border-0 shadow-xl rounded-[32px] flex flex-col justify-center bg-white relative overflow-hidden group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setActiveTab('map')}>
                                 <div className="relative z-10">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><MapPin size={14} className="text-sky-500"/> Surveillance Globale</p>
