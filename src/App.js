@@ -8,7 +8,6 @@ import {
   setDoc,
   onSnapshot,
   deleteDoc,
-  query
 } from "firebase/firestore";
 import {
   Users,
@@ -30,31 +29,22 @@ import {
   Map as MapIcon,
   Crosshair,
   Edit,
-  Save,
   Trash2,
   Key,
   User,
-  Clock,
   Send,
-  Bell,
   Info,
   Printer,
-  Grid,
-  List as ListIcon,
   Locate,
-  Layers,
   Camera,
-  MessageSquare,
-  Eye,
   AlertTriangle,
   Download,
-  FileSpreadsheet,
-  Activity,
-  Cloud,
-  Wind,
   Upload,
   File,
-  FileCheck
+  FileCheck,
+  Activity,
+  Cloud,
+  Wind
 } from "lucide-react";
 
 // ============================================================================
@@ -87,23 +77,26 @@ const MOCK_CLIENTS = [
   { id: 1, name: "Mairie de Sète", type: "Collectivité", address: "12 Rue de l'Hôtel de Ville, 34200 Sète", contact: "Jean Dupont", phone: "04 67 00 00 00", email: "contact@sete.fr", username: "mairie", password: "123" },
   { id: 2, name: "Mairie de Narbonne", type: "Collectivité", address: "Place de l'Hôtel de Ville, 11100 Narbonne", contact: "Contacts Multiples", phone: "Voir contacts", email: "", username: "narbonne", password: "123",
     extendedContacts: [
-        "Maison C. TRENET : Mme Manuelle NOYES (06.33.82.55.74) - Dir. Patrimoine",
-        "La Calandreta / La Jaquetona : Mme Sophie VAISSIERES (06.19.02.26.20) - Directrice",
-        "Cantine Resto Sud : M. Jean-Claude PELISSOU (06.26.70.19.45) - Dir. Enfance/Éducation",
-        "Ecoles Pasteur, Lamartine, Lakanal, Buisson : M. Louis AYMERIC (06.84.69.40.35) - Dir. Bâtiments"
+        "La maison de Charles TRENET : Mme Manuelle NOYES (06.33.82.55.74) de la Direction Patrimoine",
+        "La Calandreta/La Jaquetona proche du Resto Sud : Mme Sophie VAISSIERES (06.19.02.26.20) Directrice",
+        "La cantine Resto Sud : M. Jean-Claude PELISSOU (06.26.70.19.45), Dir. Enfance/Jeunesse/Éducation",
+        "Ecole Pasteur, Lamartine, Lakanal, Buisson : M. Louis AYMERIC (06.84.69.40.35), Dir. des Bâtiments"
     ]
   },
-  { id: 3, name: "Domitia Habitat (Narbonne)", type: "Syndic", address: "11100 Narbonne", contact: "Responsables Secteurs", phone: "Voir contacts", email: "", username: "domitia", password: "123",
+  { id: 3, name: "Domitia Habitat", type: "Syndic", address: "11100 Narbonne", contact: "Responsables Secteurs", phone: "Voir contacts", email: "", username: "domitia", password: "123",
     extendedContacts: [
-        "Centre-Ville, le pastouret : Mme BAUDEMONT (06.07.42.28.31) - c.baudemont@domitia-habitat.fr",
-        "Razimbaud, les Arènes : Mme ABAD (07.64.18.49.37) - s.abad@domitia-habitat.fr",
-        "St Jean St Pierre : M. ALBERT (07.86.09.47.11) - j.albert@domitia-habitat.fr",
-        "Berre Cesse, Anatole France... : M. MARCOU (06.07.37.81.81) - c.marcou@domitia-habitat.fr"
+        "Mme BAUDEMONT pour le secteur Centre-Ville, le pastouret... : c.baudemont@domitia-habitat.fr - 06.07.42.28.31",
+        "Mme ABAD pour le secteur Razimbaud, les Arènes... : s.abad@domitia-habitat.fr - 07.64.18.49.37",
+        "Monsieur ALBERT pour le secteur Saint Jean Saint Pierre : j.albert@domitia-habitat.fr - 07.86.09.47.11",
+        "Monsieur MARCOU pour le secteur Berre Cesse, Anatole France et les villages : c.marcou@domitia-habitat.fr - 06.07.37.81.81"
     ]
   }
 ];
 
-// --- UTILITAIRES ---
+// ============================================================================
+// 2. UTILITAIRES (Excel, CSV, PDF)
+// ============================================================================
+
 const loadSheetJS = () => {
   return new Promise((resolve) => {
     if (window.XLSX) return resolve(window.XLSX);
@@ -112,18 +105,6 @@ const loadSheetJS = () => {
     script.onload = () => resolve(window.XLSX);
     document.body.appendChild(script);
   });
-};
-
-const exportToCSV = (data, filename) => {
-  const csvContent = "data:text/csv;charset=utf-8," + 
-    data.map(e => Object.values(e).join(",")).join("\n");
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 };
 
 const generatePDF = (type, data, extraData = {}) => {
@@ -165,9 +146,6 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`GPS : ${nest.lat?.toFixed(6)}, ${nest.lng?.toFixed(6)}`, 20, y); y += 8;
             doc.text(`Statut : ${nest.status}`, 20, y); y += 8;
             doc.text(`Contenu : ${nest.eggs} œuf(s)`, 20, y); y += 8;
-            
-            if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 8; }
-            if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
@@ -331,12 +309,10 @@ const ClientReportForm = ({ nest, onSave, onCancel }) => {
 };
 
 const ClientEditForm = ({ client, onSave, onCancel }) => {
-    // Transformer le tableau en texte pour l'édition facile
     const initialExtendedContactsText = client.extendedContacts ? client.extendedContacts.join('\n') : "";
     const [formData, setFormData] = useState({ name: "", type: "Privé", address: "", phone: "", username: "", password: "", extendedContactsText: initialExtendedContactsText, ...client });
     
     const handleSave = () => {
-        // Transformer le texte en tableau avant la sauvegarde, en ignorant les lignes vides
         const contactsArray = formData.extendedContactsText
             .split('\n')
             .map(c => c.trim())
@@ -346,9 +322,7 @@ const ClientEditForm = ({ client, onSave, onCancel }) => {
             ...formData,
             extendedContacts: contactsArray.length > 0 ? contactsArray : null
         };
-        // Ne pas sauvegarder le champ texte temporaire
         delete dataToSave.extendedContactsText;
-        
         onSave(dataToSave);
     }
 
@@ -473,16 +447,13 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
 
 const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly = false, onGeneratePDF }) => {
   const [formData, setFormData] = useState({ 
-      title: "", comments: "", eggs: 0, status: "present_high", clientId: "", 
-      lieux: "", dateVisite: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
+      title: "", comments: "", eggs: 0, status: "present", clientId: "", 
       ...nest 
   });
   
   const handlePhotoUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({ ...formData, photo: reader.result }); reader.readAsDataURL(file); } };
   const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
   
-  const hasExtraData = formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info;
-
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
           {nest.photo && (
@@ -511,20 +482,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
               </div>
           </div>
           
-          {hasExtraData && (
-             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-sm space-y-3">
-                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Layers size={14}/> Données Fichier</p>
-                 <div className="grid grid-cols-2 gap-2 text-xs">
-                     {nest.lieux && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Lieux</span><span className="font-medium text-slate-700">{nest.lieux}</span></div>}
-                     {nest.dateVisite && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Date visite</span><span className="font-medium text-slate-700">{nest.dateVisite}</span></div>}
-                     {nest.nbAdultes && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Adultes</span><span className="font-medium text-slate-700">{nest.nbAdultes}</span></div>}
-                     {nest.nbPoussins && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Poussins</span><span className="font-medium text-slate-700">{nest.nbPoussins}</span></div>}
-                 </div>
-                 {nest.comportement && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Comportement</span><span className="font-medium text-slate-700 text-xs">{nest.comportement}</span></div>}
-                 {nest.remarques && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Remarques</span><span className="font-medium text-slate-700 text-xs italic">{nest.remarques}</span></div>}
-             </div>
-          )}
-
           {nest.comments && (
               <div className="bg-sky-50 p-5 rounded-2xl border border-sky-100">
                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Info size={14}/> Observations Équipe</p>
@@ -546,9 +503,9 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                             <button onClick={() => setFormData({...formData, photo: null})} className="absolute top-3 right-3 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors"><Trash2 size={16}/></button>
                         </div>
                     ) : (
-                        <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 bg-slate-50 h-48 rounded-3xl cursor-pointer hover:bg-sky-50 hover:border-sky-300 transition-colors group">
-                            <Camera size={40} className="text-slate-300 group-hover:text-sky-400 mb-3 transition-colors"/>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-sky-600 transition-colors">Prendre / Ajouter Photo</span>
+                        <label className="flex flex-col items-center justify-center border-2 border-dashed border-sky-300 bg-sky-50 text-sky-500 h-48 rounded-3xl cursor-pointer hover:bg-sky-100 transition-colors group">
+                            <Camera size={40} className="mb-3 transition-colors"/>
+                            <span className="text-[10px] font-black uppercase tracking-widest transition-colors">Ajouter Photo</span>
                             <input type="file" className="hidden" onChange={handlePhotoUpload}/>
                         </label>
                     )}
@@ -558,10 +515,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">État du nid</label>
                     <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
                         <option value="reported_by_client">🟣 Signalement Client</option>
-                        <option value="present_high">🔴 Priorité Haute (Rouge)</option>
-                        <option value="present_medium">🟠 Priorité Moyenne (Orange)</option>
-                        <option value="present_low">🟡 Priorité Faible (Jaune)</option>
-                        <option value="present">🔴 Présent (Classique)</option>
+                        <option value="present">🔴 Présent (Actif)</option>
                         <option value="sterilized_1">🟢 1er Passage (Traité)</option>
                         <option value="sterilized_2">🟢 2ème Passage (Confirmé)</option>
                         <option value="non_present">⚪ Non présent / Inactif</option>
@@ -575,9 +529,9 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                     <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
                 </div>
                 <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Client Associé</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Client</label>
                     <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>
-                        <option value="">-- Indépendant --</option>
+                        <option value="">-- Sélectionner --</option>
                         {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
@@ -587,7 +541,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                         <input type="number" className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-xl font-black text-center text-sky-600 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
                     </div>
                      <div className="flex-1 flex items-end">
-                         <button type="button" onClick={openRoute} className="w-full h-[58px] bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-md"><Locate size={16}/> Voir GPS</button>
+                         <button type="button" onClick={openRoute} className="w-full h-[58px] bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-md"><Locate size={16}/> GPS</button>
                      </div>
                 </div>
             </div>
@@ -595,8 +549,8 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
         
         <div>
             <div className="flex justify-between items-end mb-1 pl-1 pr-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Adresse complète</label>
-                <span className="text-[9px] font-mono font-bold text-sky-500 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">GPS: {formData.lat?.toFixed(5)}, {formData.lng?.toFixed(5)}</span>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Adresse / Localisation</label>
+                <span className="text-[9px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md">GPS: {formData.lat?.toFixed(5)}, {formData.lng?.toFixed(5)}</span>
             </div>
             <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} placeholder="Numéro, Rue, Bâtiment..."/>
         </div>
@@ -605,22 +559,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Observations Techniques</label>
             <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm h-24 focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" placeholder="Accès difficile, type de toiture, nacelle nécessaire..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/>
         </div>
-
-        {/* SECTION IMPORTÉE MASQUABLE */}
-        {hasExtraData && (
-            <div className="pt-4 border-t border-slate-100">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 pl-1"><Layers size={14}/> Champs Import Excel</label>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Lieux" value={formData.lieux || ""} onChange={e=>setFormData({...formData, lieux: e.target.value})} />
-                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Date visite" value={formData.dateVisite || ""} onChange={e=>setFormData({...formData, dateVisite: e.target.value})} />
-                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Adultes" value={formData.nbAdultes || ""} onChange={e=>setFormData({...formData, nbAdultes: e.target.value})} />
-                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Poussins" value={formData.nbPoussins || ""} onChange={e=>setFormData({...formData, nbPoussins: e.target.value})} />
-                </div>
-                <input className="w-full p-3 bg-slate-50 border-0 rounded-xl text-xs mb-3" placeholder="Comportement" value={formData.comportement || ""} onChange={e=>setFormData({...formData, comportement: e.target.value})} />
-            </div>
-        )}
-        
-        {onGeneratePDF && <Button variant="secondary" className="w-full py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={()=>onGeneratePDF(nest)}><Printer size={16}/> Générer Fiche PDF</Button>}
         
         <div className="flex gap-3 pt-4 border-t border-slate-100">
              {onDelete && <button onClick={() => onDelete(formData)} className="p-4 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-2xl transition-colors"><Trash2 size={20}/></button>}
@@ -655,7 +593,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
 
   useEffect(() => {
     if (mapInstanceRef.current) return;
-
     const initMap = () => {
         if (!mapContainerRef.current) return;
         try {
@@ -787,7 +724,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
 
     const handleMarkerClick = (marker) => {
         if (marker.id === "temp") {
-            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
+            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present", eggs: 0, clientId: clients[0]?.id || "" };
             onUpdateNest(newNest); setTempMarker(null); setSelectedMarker(newNest);
         } else {
             setSelectedMarker(marker);
@@ -840,7 +777,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
 
                 <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} routePath={routePath} onMapClick={async (ll) => {
                     if(!isAdding) return;
-                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
+                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present", eggs: 0, clientId: clients[0]?.id || "" };
                     await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
                 }}/>
                 
@@ -876,7 +813,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
           <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">TABLEAU DE BORD</h2>
       </div>
       
-      {/* 1. KPIs GLOBAUX - Plus compacts */}
+      {/* 1. KPIs GLOBAUX */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4 bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg border-0 text-center relative overflow-hidden flex flex-col justify-center">
             <div className="relative z-10 flex items-center justify-center gap-3">
@@ -914,10 +851,8 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
         </Card>
       </div>
 
-      {/* 2. LAYOUT OPTIMISÉ : 2/3 Clients, 1/3 Agenda */}
+      {/* 2. LAYOUT : 2/3 Clients, 1/3 Agenda */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* COLONNE GAUCHE : État des sites (Tableau compact) */}
           <div className="lg:col-span-2">
               <Card className="p-0 border-0 shadow-lg rounded-3xl overflow-hidden bg-white flex flex-col h-full">
                   <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
@@ -938,7 +873,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
                                   const cNests = markers.filter(m => m.clientId === client.id);
                                   if (cNests.length === 0) return null;
                                   
-                                  const cReported = cNests.filter(m => m.status === "reported_by_client" || m.status === "present_high").length;
+                                  const cReported = cNests.filter(m => m.status === "reported_by_client" || m.status === "present_high" || m.status === "present").length;
                                   const cDone = cNests.filter(m => m.status === "sterilized_2").length;
                                   
                                   return (
@@ -967,7 +902,6 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
               </Card>
           </div>
           
-          {/* COLONNE DROITE : Agenda compact */}
           <div className="lg:col-span-1">
                <Card className="p-0 border-0 shadow-lg rounded-3xl overflow-hidden bg-white flex flex-col h-full max-h-[460px]">
                   <div className="p-5 bg-sky-600 text-white flex justify-between items-center">
@@ -1003,6 +937,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
   const [selectedNest, setSelectedNest] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
 
+  // LOGIQUE EXPORT XLSX
   const handleExport = async () => {
     setIsExporting(true);
     const XLSX = await loadSheetJS();
@@ -1014,24 +949,17 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       "adresse precis": m.address,
       "observation": m.comments || "",
       "Latitude": m.lat,
-      "Longitude": m.lng,
-      "Lieux": m.lieux || "",
-      "Date de la visite": m.dateVisite || "",
-      "N° point": m.numPoint || "",
-      "Gps": m.gpsOriginal || "",
-      "Nb adulte": m.nbAdultes || "",
-      "Nd de Poussins (P=Poussin + S= semaine de développement)": m.nbPoussins || "",
-      "Comportement (Guetteur, Couve, Défend, Autres)": m.comportement || "",
-      "Remarques": m.remarques || "",
-      "info": m.info || ""
+      "Longitude": m.lng
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
+    worksheet["!cols"] = [{ wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 40 }, { wch: 40 }, { wch: 15 }, { wch: 15 }];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Gestion Nids");
     XLSX.writeFile(workbook, `Aerothau_Nids_${new Date().toISOString().split('T')[0]}.xlsx`);
     setIsExporting(false);
   };
 
+  // LOGIQUE IMPORT XLSX
   const handleImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1046,55 +974,27 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
             
             let lat = MAP_CENTER_DEFAULT.lat;
             let lng = MAP_CENTER_DEFAULT.lng;
-            if (row["Gps"]) {
-                const parts = row["Gps"].toString().split(",");
-                if (parts.length === 2) {
-                    const pLat = parseFloat(parts[0].trim());
-                    const pLng = parseFloat(parts[1].trim());
-                    if(!isNaN(pLat) && !isNaN(pLng)) {
-                        lat = pLat;
-                        lng = pLng;
-                    }
-                }
-            } else if (row["Latitude"] && row["Longitude"]) {
+            
+            if (row["Latitude"] && row["Longitude"]) {
                 lat = parseFloat(row["Latitude"]) || lat;
                 lng = parseFloat(row["Longitude"]) || lng;
             }
 
-            const rawLocation = (row["Noms Client"] || row["Lieux"] || "").toString().toLowerCase();
+            const rawLocation = (row["Noms Client"] || "").toString().toLowerCase();
             let matchedClient = clients.find(c => c.name.toLowerCase() === rawLocation);
-            
-            if (!matchedClient) {
-                if (rawLocation.includes("narbonne")) matchedClient = clients.find(c => c.name.toLowerCase().includes("narbonne"));
-                else if (rawLocation.includes("meze") || rawLocation.includes("mèze")) matchedClient = clients.find(c => c.name.toLowerCase().includes("meze") || c.name.toLowerCase().includes("mèze"));
-                else if (rawLocation.includes("sete") || rawLocation.includes("sète")) matchedClient = clients.find(c => c.name.toLowerCase().includes("sete") || c.name.toLowerCase().includes("sète"));
-                
-                if(!matchedClient && rawLocation.length > 3) {
-                     matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
-                }
-            }
-            
+            if (!matchedClient && rawLocation.length > 3) matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
             const client = matchedClient || clients[0];
             
             const newNest = {
-                id: row["ID"] || (row["N° point"] ? parseInt(row["N° point"]) + Date.now() : Date.now() + count),
+                id: row["ID"] || Date.now() + count,
                 clientId: client ? client.id : "",
-                status: row["Etat du nids"] || "present_high",
+                status: row["Etat du nids"] || "present",
                 eggs: parseInt(row["nbr d'œuf"]) || 0,
-                address: row["Adresse"] || row["adresse precis"] || "Adresse importée",
+                address: row["adresse precis"] || "Adresse importée",
                 lat: lat,
                 lng: lng,
-                title: `N°${row["N° point"] || count} - ${row["Lieux"] || "Nid importé"}`,
-                comments: row["observation"] || "Import depuis fichier Excel.",
-                lieux: row["Lieux"] || "",
-                dateVisite: row["Date de la visite"] || "",
-                info: row["info"] || "",
-                numPoint: row["N° point"] || "",
-                gpsOriginal: row["Gps"] || "",
-                nbAdultes: row["Nb adulte"] || "",
-                nbPoussins: row["Nd de Poussins (P=Poussin + S= semaine de développement)"] || "",
-                comportement: row["Comportement (Guetteur, Couve, Défend, Autres)"] || "",
-                remarques: row["Remarques"] || ""
+                title: `Nid #${row["ID"] || count}`,
+                comments: row["observation"] || ""
             };
             await onUpdateNest(newNest);
             count++;
@@ -1110,7 +1010,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
         <div className="flex gap-3 flex-wrap">
-            <Button variant="danger" onClick={onDeleteAllNests}><Trash2 size={18}/> Supprimer TOUS les nids</Button>
+            <Button variant="danger" onClick={onDeleteAllNests}><Trash2 size={18}/> Tout purger</Button>
             <Button variant="secondary" onClick={handleExport} disabled={isExporting}><Download size={18}/> Exporter Excel</Button>
             <div className="relative">
                 <input type="file" accept=".xlsx, .csv" onChange={handleImport} className="hidden" id="import-excel-file" />
@@ -1263,7 +1163,7 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
             </div>
         </div>
     );
-};
+}
 
 const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIntervention }) => {
     const [isCreating, setIsCreating] = useState(false);
@@ -1411,7 +1311,6 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
                                     <td className="p-6 text-xs font-bold text-slate-500">{r.date}</td>
                                     <td className="p-6"><Badge status={r.type === 'Fiche Nid' ? 'reported_by_client' : (r.type === 'Rapport Complet' ? 'sterilized_2' : 'Planifié')}/></td>
                                     <td className="p-6 flex justify-end gap-3">
-                                        {/* Bouton Télécharger / Imprimer (Feature 1 & 2) */}
                                         <button 
                                             onClick={() => generatePDF(r.type === 'Fiche Nid' ? 'nest_detail' : (r.type === 'Rapport Complet' ? 'complete_report' : 'file'), r.type === 'Fiche Nid' ? markers.find(m => m.id === r.nestId) : r, { client: clients.find(c => c.id === r.clientId), markers: markers.filter(m => m.clientId === r.clientId), interventions: interventions.filter(i => i.clientId === r.clientId) })} 
                                             className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all shadow-sm" 
@@ -1736,6 +1635,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             </div>
                         </Card>
                         
+                        {/* Modal Upload Client */}
                         {isUploading && (
                              <div className="fixed inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
                                 <Card className="p-10 w-full max-w-md shadow-2xl border-0 rounded-[32px] bg-white text-slate-800">
@@ -1877,7 +1777,7 @@ export default function AerothauApp() {
                     { id: "reports", label: "Rapports & Docs", icon: FileText },
                 ].map(item => (
                   <button key={item.id} onClick={() => { setView(item.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-black uppercase text-[10px] tracking-widest ${view === item.id || (item.id === "clients" && view === "client-detail") ? "bg-sky-500 text-white shadow-xl shadow-sky-900/50 translate-x-1" : "text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-1"}`}>
-                    <item.icon size={20} className={view === item.id ? "text-white" : "text-slate-500 group-hover:text-white"} /> <span>{item.label}</span>
+                    <item.icon size={20} className={view === item.id ? "text-white" : "text-slate-600 group-hover:text-white"} /> <span>{item.label}</span>
                   </button>
                 ))}
             </div>
