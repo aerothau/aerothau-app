@@ -57,7 +57,10 @@ import {
   FileCheck
 } from "lucide-react";
 
-// --- CONFIGURATION FIREBASE ---
+// ============================================================================
+// 1. CONFIGURATION & CONSTANTES
+// ============================================================================
+
 const firebaseConfig = {
   apiKey: "AIzaSyBsSKSniPQ_2tfDsM1_lQPcEcsmMzACA8E",
   authDomain: "aerothau-goelands.firebaseapp.com",
@@ -76,13 +79,28 @@ const MAIN_WEBSITE_URL = "https://www.aerothau.fr";
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; // Sète
 
-// --- CONSTANTES ---
 const INITIAL_USERS = [
   { username: "admin", password: "aerothau2024", role: "admin", name: "Aerothau Admin", id: 0 },
 ];
 
 const MOCK_CLIENTS = [
   { id: 1, name: "Mairie de Sète", type: "Collectivité", address: "12 Rue de l'Hôtel de Ville, 34200 Sète", contact: "Jean Dupont", phone: "04 67 00 00 00", email: "contact@sete.fr", username: "mairie", password: "123" },
+  { id: 2, name: "Mairie de Narbonne", type: "Collectivité", address: "Place de l'Hôtel de Ville, 11100 Narbonne", contact: "Contacts Multiples", phone: "Voir contacts", email: "", username: "narbonne", password: "123",
+    extendedContacts: [
+        "Maison C. TRENET : Mme Manuelle NOYES (06.33.82.55.74) - Dir. Patrimoine",
+        "La Calandreta / La Jaquetona : Mme Sophie VAISSIERES (06.19.02.26.20) - Directrice",
+        "Cantine Resto Sud : M. Jean-Claude PELISSOU (06.26.70.19.45) - Dir. Enfance/Éducation",
+        "Ecoles Pasteur, Lamartine, Lakanal, Buisson : M. Louis AYMERIC (06.84.69.40.35) - Dir. Bâtiments"
+    ]
+  },
+  { id: 3, name: "Domitia Habitat (Narbonne)", type: "Syndic", address: "11100 Narbonne", contact: "Responsables Secteurs", phone: "Voir contacts", email: "", username: "domitia", password: "123",
+    extendedContacts: [
+        "Centre-Ville, le pastouret : Mme BAUDEMONT (06.07.42.28.31) - c.baudemont@domitia-habitat.fr",
+        "Razimbaud, les Arènes : Mme ABAD (07.64.18.49.37) - s.abad@domitia-habitat.fr",
+        "St Jean St Pierre : M. ALBERT (07.86.09.47.11) - j.albert@domitia-habitat.fr",
+        "Berre Cesse, Anatole France... : M. MARCOU (06.07.37.81.81) - c.marcou@domitia-habitat.fr"
+    ]
+  }
 ];
 
 // --- UTILITAIRES ---
@@ -132,31 +150,28 @@ const generatePDF = (type, data, extraData = {}) => {
         doc.setFontSize(22);
         doc.text("AEROTHAU", 20, 25);
         doc.setFontSize(10);
-        doc.text(`Document généré le : ${today}`, 190, 25, { align: 'right' });
+        doc.text(`Généré le : ${today}`, 190, 25, { align: 'right' });
 
         if (type === 'nest_detail') {
             const nest = data;
             const clientName = extraData.clientName || "Inconnu";
-            doc.text("FICHE D'IDENTIFICATION NID", 20, 50);
+            doc.text("FICHE NID", 20, 50);
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(12);
-            
             let y = 65;
-            doc.text(`Titre : ${nest.title || "Nid #" + nest.id}`, 20, y); y += 7;
-            doc.text(`Client : ${clientName}`, 20, y); y += 7;
-            doc.text(`Adresse : ${nest.address}`, 20, y); y += 7;
-            doc.text(`Coordonnées GPS : ${nest.lat?.toFixed(6)}, ${nest.lng?.toFixed(6)}`, 20, y); y += 7;
-            doc.text(`Statut : ${nest.status}`, 20, y); y += 7;
-            doc.text(`Œufs : ${nest.eggs}`, 20, y); y += 7;
+            doc.text(`Référence : ${nest.title || "Nid #" + nest.id}`, 20, y); y += 8;
+            doc.text(`Client : ${clientName}`, 20, y); y += 8;
+            doc.text(`Adresse : ${nest.address}`, 20, y); y += 8;
+            doc.text(`GPS : ${nest.lat?.toFixed(6)}, ${nest.lng?.toFixed(6)}`, 20, y); y += 8;
+            doc.text(`Statut : ${nest.status}`, 20, y); y += 8;
+            doc.text(`Contenu : ${nest.eggs} œuf(s)`, 20, y); y += 8;
             
-            if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 7; }
-            if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 7; }
-            if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 7; }
-            if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 7; }
+            if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 8; }
+            if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 8; }
             
-            const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune"}`, 170);
+            const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
-            y += (notesLines.length * 7);
+            y += (notesLines.length * 8);
 
             if (nest.photo) { try { doc.addImage(nest.photo, 'JPEG', 20, y + 5, 100, 75); } catch(e) {} }
             doc.save(`Fiche_Nid_${nest.id}.pdf`);
@@ -164,26 +179,31 @@ const generatePDF = (type, data, extraData = {}) => {
             const client = extraData.client || { name: "Client Inconnu" };
             const markers = extraData.markers || [];
             const interventions = extraData.interventions || [];
-            doc.text("RAPPORT D'ACTIVITÉ COMPLET", 20, 50);
+            doc.text("RAPPORT D'ACTIVITÉ", 20, 50);
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(16);
             doc.text(`Client : ${client.name}`, 20, 65);
             doc.setFontSize(10);
             doc.text(client.address || "", 20, 72);
+            
             const totalEggs = markers.reduce((acc, curr) => acc + (curr.eggs || 0), 0);
             const treated = markers.filter(m => m.status && m.status.includes('sterilized')).length;
+            
             doc.setFillColor(240, 240, 240);
             doc.rect(20, 80, 170, 20, 'F');
             doc.text(`Total Nids : ${markers.length}`, 30, 92);
             doc.text(`Traités : ${treated}`, 80, 92);
             doc.text(`Œufs stérilisés : ${totalEggs}`, 130, 92);
+            
             const nestRows = markers.map(m => [m.title || "Nid", m.address, m.status, m.eggs]);
-            doc.autoTable({ startY: 120, head: [['Référence', 'Localisation', 'Statut', 'Oeufs']], body: nestRows, theme: 'grid', headStyles: { fillColor: [14, 165, 233] }, });
+            doc.autoTable({ startY: 110, head: [['Référence', 'Localisation', 'Statut', 'Oeufs']], body: nestRows, theme: 'grid', headStyles: { fillColor: [14, 165, 233] }, });
+            
             const finalY = doc.lastAutoTable.finalY + 15;
             doc.text("Historique Interventions", 20, finalY);
             const intRows = interventions.map(i => [i.date, i.status, i.technician || "-", i.notes || ""]);
             doc.autoTable({ startY: finalY + 5, head: [['Date', 'Statut', 'Agent', 'Notes']], body: intRows, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, });
-            doc.save(`Rapport_Complet_${client.name.replace(/\s+/g, '_')}.pdf`);
+            
+            doc.save(`Rapport_${client.name.replace(/\s+/g, '_')}.pdf`);
         } else {
             const report = data;
             doc.text("DOCUMENT", 20, 50);
@@ -194,7 +214,9 @@ const generatePDF = (type, data, extraData = {}) => {
     }).catch(e => console.error("PDF Error", e));
 };
 
-// --- COMPOSANTS UI DE BASE ---
+// ============================================================================
+// 3. COMPOSANTS UI PARTAGÉS
+// ============================================================================
 
 const Button = ({ children, variant = "primary", className = "", ...props }) => {
   const baseStyle = "px-4 py-2 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
@@ -211,7 +233,7 @@ const Button = ({ children, variant = "primary", className = "", ...props }) => 
 };
 
 const Card = ({ children, className = "", onClick }) => (
-  <div onClick={onClick} className={`bg-white rounded-2xl shadow-sm border border-slate-100 ${className}`}>{children}</div>
+  <div onClick={onClick} className={`bg-white rounded-3xl shadow-sm border border-slate-100 ${className}`}>{children}</div>
 );
 
 const Badge = ({ status }) => {
@@ -228,14 +250,14 @@ const Badge = ({ status }) => {
     sterilized_1: "bg-lime-100 text-lime-700 border border-lime-200",
     sterilized_2: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
-    temp: "bg-slate-500 text-white animate-pulse border-2 border-dashed border-white",
+    temp: "bg-slate-800 text-white animate-pulse border border-slate-900",
   };
   
   const labels = {
-    present: "Présent (Actif)",
-    present_high: "Priorité Haute",
-    present_medium: "Priorité Moyenne",
-    present_low: "Priorité Faible",
+    present: "Présent",
+    present_high: "Prio Haute",
+    present_medium: "Prio Moyenne",
+    present_low: "Prio Faible",
     non_present: "Non présent",
     sterilized_1: "1er Passage",
     sterilized_2: "2ème Passage",
@@ -250,10 +272,12 @@ const Toast = ({ message, type, onClose }) => {
     useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
     const bg = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
     const icon = type === 'success' ? <CheckCircle size={18}/> : <AlertTriangle size={18}/>;
-    return <div className={`fixed bottom-4 right-4 ${bg} text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-10 z-[2000]`}>{icon} <span className="font-bold">{message}</span></div>;
+    return <div className={`fixed bottom-4 right-4 ${bg} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-10 z-[2000]`}>{icon} <span className="font-bold">{message}</span></div>;
 };
 
-// --- FORMULAIRES ---
+// ============================================================================
+// 4. FORMULAIRES & MODALES
+// ============================================================================
 
 const LoginForm = ({ onLogin, users, logoUrl }) => {
   const [username, setUsername] = useState("");
@@ -263,17 +287,16 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const userFound = users.find(u => u.username === username && u.password === password);
-    if (userFound) onLogin(userFound);
-    else setError("Identifiants invalides.");
+    if (userFound) onLogin(userFound); else setError("Identifiants invalides.");
   };
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <Card className="p-10 w-full max-w-md shadow-2xl border-0 ring-1 ring-slate-100">
-        <div className="flex justify-center mb-8"><img src={logoUrl} alt="Logo" className="h-20 w-auto" /></div>
-        <h1 className="text-3xl font-black text-center text-slate-900 mb-2 uppercase tracking-tighter">Aerothau</h1>
+      <Card className="p-10 w-full max-w-md shadow-2xl border-0">
+        <div className="flex justify-center mb-8"><img src={logoUrl} alt="Logo" className="h-16 w-auto" /></div>
+        <h1 className="text-3xl font-black text-center text-slate-900 mb-2 uppercase tracking-tighter">Aerothau<span className="text-sky-500">.</span></h1>
         <p className="text-center text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Espace Sécurisé</p>
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-sky-500 text-sm font-medium transition-all" placeholder="Identifiant" />
@@ -282,8 +305,8 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
             <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-sky-500 text-sm font-medium transition-all" placeholder="Mot de passe" />
           </div>
-          {error && <p className="text-xs text-red-500 font-bold bg-red-50 p-2 rounded-lg text-center">{error}</p>}
-          <Button type="submit" variant="sky" className="w-full py-4 uppercase tracking-widest text-xs">Connexion</Button>
+          {error && <p className="text-xs text-red-500 font-bold bg-red-50 p-3 rounded-xl text-center">{error}</p>}
+          <Button type="submit" variant="sky" className="w-full py-4 uppercase tracking-widest text-xs mt-2">Connexion</Button>
         </form>
       </Card>
     </div>
@@ -291,67 +314,72 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 };
 
 const ClientReportForm = ({ nest, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({ title: "", ...nest, ownerContact: "", description: "", status: "reported_by_client" });
+  const [formData, setFormData] = useState({ title: "", description: "", ownerContact: "", status: "reported_by_client", ...nest });
   return (
-    <div className="space-y-4">
-      <div className="p-4 bg-purple-50 border border-purple-100 rounded-xl text-purple-800 text-sm flex gap-3 items-center">
-        <div className="p-2 bg-white rounded-full shadow-sm"><Info size={16} className="text-purple-600"/></div>
-        <div>
-            <p className="font-bold">Signalement en cours</p>
-            <p className="text-xs opacity-80">Merci de préciser la localisation pour nos équipes.</p>
-        </div>
+    <div className="space-y-4 text-slate-800">
+      <div className="p-4 bg-sky-50 rounded-xl text-sky-800 text-sm flex gap-3 items-center">
+        <Info size={20} className="text-sky-600 shrink-0"/>
+        <div><p className="font-bold">Signalement</p><p className="text-xs opacity-80">Précisez les détails pour l'équipe technique.</p></div>
       </div>
-      <div>
-        <label className="text-[10px] font-bold text-slate-400 uppercase">Titre du signalement</label>
-        <input type="text" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500" value={formData.title || ""} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Toiture Garage..." />
-      </div>
-      <div>
-        <label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label>
-        <div className="bg-white border border-slate-100 p-3 mt-1 rounded-xl text-sm text-slate-600 flex items-center gap-2">
-          <MapPin size={16} className="text-purple-500" /> {formData.address}
-        </div>
-      </div>
-      <div>
-        <label className="text-[10px] font-bold text-slate-400 uppercase">Contact sur place</label>
-        <input type="text" placeholder="Nom ou téléphone..." className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500" value={formData.ownerContact} onChange={(e) => setFormData({ ...formData, ownerContact: e.target.value })} />
-      </div>
-      <div>
-        <label className="text-[10px] font-bold text-slate-400 uppercase">Détails supplémentaires</label>
-        <textarea placeholder="Accès, digicode, particularités..." className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm resize-none outline-none focus:ring-2 focus:ring-purple-500" rows="3" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
-      </div>
-      <div className="flex gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel} className="flex-1 justify-center">Annuler</Button>
-        <Button variant="sky" className="bg-purple-600 hover:bg-purple-700 flex-1 justify-center" onClick={() => onSave(formData)}><Send size={16} /> Envoyer</Button>
-      </div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre</label><input type="text" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Toiture Bâtiment A" /></div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><div className="bg-white border border-slate-200 p-3 mt-1 rounded-xl text-sm text-slate-600 flex items-center gap-2"><MapPin size={16} className="text-sky-500" /> {formData.address}</div></div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Contact sur place</label><input type="text" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.ownerContact} onChange={(e) => setFormData({ ...formData, ownerContact: e.target.value })} placeholder="Nom ou téléphone..." /></div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Détails supplémentaires</label><textarea className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm resize-none focus:ring-2 focus:ring-sky-500 outline-none h-20" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Accès, particularités..." /></div>
+      <div className="flex gap-2 pt-2"><Button variant="outline" onClick={onCancel} className="flex-1 py-3">Annuler</Button><Button variant="sky" onClick={() => onSave(formData)} className="flex-1 py-3"><Send size={16}/> Envoyer</Button></div>
     </div>
   );
 };
 
 const ClientEditForm = ({ client, onSave, onCancel }) => {
-    const [formData, setFormData] = useState({ ...client });
+    // Transformer le tableau en texte pour l'édition facile
+    const initialExtendedContactsText = client.extendedContacts ? client.extendedContacts.join('\n') : "";
+    const [formData, setFormData] = useState({ name: "", type: "Privé", address: "", phone: "", username: "", password: "", extendedContactsText: initialExtendedContactsText, ...client });
+    
+    const handleSave = () => {
+        // Transformer le texte en tableau avant la sauvegarde, en ignorant les lignes vides
+        const contactsArray = formData.extendedContactsText
+            .split('\n')
+            .map(c => c.trim())
+            .filter(c => c.length > 0);
+            
+        const dataToSave = {
+            ...formData,
+            extendedContacts: contactsArray.length > 0 ? contactsArray : null
+        };
+        // Ne pas sauvegarder le champ texte temporaire
+        delete dataToSave.extendedContactsText;
+        
+        onSave(dataToSave);
+    }
+
     return (
       <div className="space-y-4 text-slate-800">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
         <div className="grid grid-cols-2 gap-4">
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
-              <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
-                  <option value="Privé">Privé</option><option value="Collectivité">Collectivité</option><option value="Syndic">Syndic</option>
-              </select>
-          </div>
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label><select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}><option value="Privé">Privé</option><option value="Collectivité">Collectivité</option><option value="Syndic">Syndic</option></select></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone principal</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
         </div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
-        <div className="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-3 text-center">Accès Espace Client</h4>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
+        
+        <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-1">Contacts étendus (Sites, Survol...)</label>
+            <p className="text-[9px] text-slate-400 mb-1 italic">Un contact par ligne. Exemple : Mairie annexe : 04.xx.xx.xx</p>
+            <textarea 
+                className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm h-24 resize-none focus:ring-2 focus:ring-sky-500 outline-none" 
+                value={formData.extendedContactsText} 
+                onChange={(e) => setFormData({ ...formData, extendedContactsText: e.target.value })} 
+                placeholder="Ecole Pasteur : M. Dupont (06...)"
+            />
+        </div>
+
+        <div className="bg-slate-100 p-4 rounded-xl">
+          <h4 className="text-[10px] font-black text-slate-500 uppercase mb-3">Identifiants Espace Client</h4>
           <div className="grid grid-cols-2 gap-4">
-              <input type="text" placeholder="Identifiant" className="p-2 border rounded-lg bg-white text-xs" value={formData.username || ""} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
-              <input type="text" placeholder="Pass" className="p-2 border rounded-lg bg-white text-xs" value={formData.password || ""} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+              <input type="text" placeholder="Identifiant" className="p-3 border-0 rounded-lg bg-white text-sm focus:ring-2 focus:ring-sky-500 outline-none w-full" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
+              <input type="text" placeholder="Mot de passe" className="p-3 border-0 rounded-lg bg-white text-sm focus:ring-2 focus:ring-sky-500 outline-none w-full" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
           </div>
         </div>
-        <div className="flex gap-2 pt-4">
-          <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
-          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Enregistrer</Button>
-        </div>
+        <div className="flex gap-2 pt-2"><Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button><Button variant="success" className="flex-1 py-3" onClick={handleSave}>Enregistrer</Button></div>
       </div>
     );
 };
@@ -360,25 +388,17 @@ const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCance
     const [formData, setFormData] = useState({ clientId: clients[0]?.id || "", status: "Planifié", technician: "", notes: "", date: new Date().toISOString().split("T")[0], ...intervention });
     return (
       <div className="space-y-4 text-slate-800">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label>
-          <select className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-sky-500 text-sm" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label><select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
         <div className="grid grid-cols-2 gap-4">
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Agent</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.technician} onChange={(e) => setFormData({ ...formData, technician: e.target.value })} /></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label><select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="Planifié">Planifié</option><option value="En attente">En attente</option><option value="Terminé">Terminé</option><option value="Annulé">Annulé</option></select></div>
         </div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label>
-          <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-            <option value="Planifié">Planifié</option><option value="En attente">En attente</option><option value="Terminé">Terminé</option><option value="Annulé">Annulé</option>
-          </select>
-        </div>
-        <textarea placeholder="Observations..." className="w-full p-3 border rounded-lg h-24 text-sm" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Agent / Télépilote</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.technician} onChange={(e) => setFormData({ ...formData, technician: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Observations</label><textarea className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm h-20 resize-none outline-none focus:ring-2 focus:ring-sky-500" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} /></div>
         <div className="flex gap-2 pt-2">
-          {onDelete && formData.id && <Button variant="danger" onClick={() => onDelete(formData)}><Trash2 size={16}/></Button>}
-          <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
-          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>Sauver</Button>
+          {onDelete && formData.id && <button onClick={() => onDelete(formData)} className="p-3 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 size={20}/></button>}
+          <Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button>
+          <Button variant="success" className="flex-1 py-3" onClick={() => onSave(formData)}>Sauver</Button>
         </div>
       </div>
     );
@@ -400,37 +420,33 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
       <div className="space-y-4 text-slate-800">
         {userRole === 'admin' && (
             <div className="grid grid-cols-3 gap-2 mb-2">
-                <button className={`p-2 rounded text-xs font-bold border ${formData.type === 'Fichier' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`} onClick={() => setFormData({...formData, type: 'Fichier', title: ""})}>Upload</button>
-                <button className={`p-2 rounded text-xs font-bold border ${formData.type === 'Rapport Complet' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`} onClick={() => setFormData({...formData, type: 'Rapport Complet', title: "Rapport Complet - " + (clients.find(c => c.id === formData.clientId)?.name || "")})}>Rapport</button>
-                <button className={`p-2 rounded text-xs font-bold border ${formData.type === 'Fiche Nid' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200'}`} onClick={() => setFormData({...formData, type: 'Fiche Nid', title: "Fiche Nid"})}>Fiche Nid</button>
+                <button className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${formData.type === 'Fichier' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-500 border-slate-200'}`} onClick={() => setFormData({...formData, type: 'Fichier', title: ""})}>Fichier</button>
+                <button className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${formData.type === 'Rapport Complet' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-500 border-slate-200'}`} onClick={() => { const clientName = clients.find(c => c.id === formData.clientId)?.name || ""; setFormData({...formData, type: 'Rapport Complet', title: "Rapport - " + clientName}); }}>Bilan Client</button>
+                <button className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${formData.type === 'Fiche Nid' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-500 border-slate-200'}`} onClick={() => setFormData({...formData, type: 'Fiche Nid', title: "Fiche Nid"})}>Fiche Nid</button>
             </div>
         )}
 
         {formData.type === 'Fichier' && (
-            <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Fichier</label>
-                <div className="relative mt-1">
-                    <input type="file" className="hidden" id="doc-upload" onChange={handleFileUpload}/>
-                    <label htmlFor="doc-upload" className="w-full p-4 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 text-slate-500 transition-colors"><Upload size={24}/> <span className="text-xs font-bold uppercase">{formData.title ? "Fichier: " + formData.title : "Cliquez pour déposer"}</span></label>
-                </div>
+            <div className="relative mt-2">
+                <input type="file" className="hidden" id="doc-upload" onChange={handleFileUpload}/>
+                <label htmlFor="doc-upload" className="w-full p-6 border-2 border-dashed border-sky-300 bg-sky-50 rounded-2xl flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-sky-100 text-sky-600 transition-colors">
+                    <Upload size={32}/> <span className="text-xs font-black uppercase tracking-widest">{formData.title ? formData.title : "Sélectionner un fichier"}</span>
+                </label>
             </div>
         )}
 
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">{userRole === 'admin' ? "Destinataire" : "Concerne"}</label>
-          <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.clientId} onChange={(e) => {
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client concerné</label>
+          <select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.clientId} onChange={(e) => {
               const cid = parseInt(e.target.value);
-              const clientName = clients.find(c => c.id === cid)?.name || "";
               let newTitle = formData.title;
-              if (formData.type === 'Rapport Complet') newTitle = "Rapport Complet - " + clientName;
+              if (formData.type === 'Rapport Complet') newTitle = "Rapport - " + (clients.find(c => c.id === cid)?.name || "");
               setFormData({ ...formData, clientId: cid, title: newTitle });
-          }}>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          }}>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         </div>
 
         {formData.type === 'Fiche Nid' && (
-             <div><label className="text-[10px] font-bold text-slate-400 uppercase">Sélectionner le Nid</label>
-                <select className="w-full p-2 border rounded-lg bg-white text-sm" value={formData.nestId || ""} onChange={(e) => {
+             <div><label className="text-[10px] font-bold text-slate-400 uppercase">Lier à un Nid</label>
+                <select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.nestId} onChange={(e) => {
                      const nid = parseInt(e.target.value);
                      const nestTitle = markers.find(m => m.id === nid)?.title || ("Nid #" + nid);
                      setFormData({ ...formData, nestId: nid, title: "Fiche - " + nestTitle });
@@ -441,17 +457,15 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
             </div>
         )}
 
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom du document</label><input type="text" className="w-full p-2 border rounded-lg text-sm" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom du document</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
         
         {userRole === 'admin' && (
-            <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-2 border rounded-lg text-sm" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-            </div>
+             <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
         )}
 
         <div className="flex gap-2 pt-4">
-          <Button variant="outline" className="flex-1" onClick={onCancel}>Annuler</Button>
-          <Button variant="success" className="flex-1" onClick={() => onSave(formData)}>{userRole === 'admin' ? "Enregistrer" : "Transmettre"}</Button>
+          <Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button>
+          <Button variant="success" className="flex-1 py-3" onClick={() => onSave(formData)}>{userRole === 'admin' ? "Valider" : "Envoyer"}</Button>
         </div>
       </div>
     );
@@ -472,50 +486,52 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
           {nest.photo && (
-              <div className="rounded-2xl overflow-hidden shadow-md border border-slate-100 h-48">
+              <div className="rounded-3xl overflow-hidden shadow-md border border-slate-100 h-48 relative">
                   <img src={nest.photo} alt="Nid" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
               </div>
           )}
           <div className="flex justify-between items-start">
              <div>
-                <h4 className="font-black text-xl text-slate-900">{nest.title || "Nid sans nom"}</h4>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wide mt-1"><MapIcon size={12} className="inline mr-1"/>{nest.address}</p>
+                <h4 className="font-black text-2xl text-slate-900 tracking-tighter">{nest.title || "Nid sans nom"}</h4>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1 flex items-center gap-1"><MapPin size={12}/>{nest.address}</p>
              </div>
              <Badge status={nest.status} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contenu</p>
-                  <p className="text-2xl font-black text-slate-800">{nest.eggs} <span className="text-sm font-normal text-slate-500">œufs</span></p>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center flex flex-col justify-center">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contenu observé</p>
+                  <p className="text-3xl font-black text-slate-800">{nest.eggs} <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">œufs</span></p>
               </div>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-center flex flex-col justify-center items-center">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Coordonnées</p>
-                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded border border-slate-200">{nest.lat?.toFixed(5)}</p>
-                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded border border-slate-200 mt-1">{nest.lng?.toFixed(5)}</p>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center flex flex-col justify-center items-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={openRoute} title="Ouvrir itinéraire">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><Locate size={10}/> Coordonnées GPS</p>
+                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded shadow-sm w-full">{nest.lat?.toFixed(5)}</p>
+                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded shadow-sm w-full mt-1">{nest.lng?.toFixed(5)}</p>
               </div>
           </div>
           
           {hasExtraData && (
-             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm space-y-2">
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Layers size={14}/> Données Complémentaires</p>
-                 {nest.lieux && <p><strong className="text-slate-600">Lieux:</strong> {nest.lieux}</p>}
-                 {nest.dateVisite && <p><strong className="text-slate-600">Date visite:</strong> {nest.dateVisite}</p>}
-                 {nest.nbAdultes && <p><strong className="text-slate-600">Adultes:</strong> {nest.nbAdultes}</p>}
-                 {nest.nbPoussins && <p><strong className="text-slate-600">Poussins:</strong> {nest.nbPoussins}</p>}
-                 {nest.comportement && <p><strong className="text-slate-600">Comportement:</strong> {nest.comportement}</p>}
-                 {nest.remarques && <p><strong className="text-slate-600">Remarques:</strong> {nest.remarques}</p>}
-                 {nest.info && <p><strong className="text-slate-600">Info:</strong> {nest.info}</p>}
+             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-sm space-y-3">
+                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Layers size={14}/> Données Fichier</p>
+                 <div className="grid grid-cols-2 gap-2 text-xs">
+                     {nest.lieux && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Lieux</span><span className="font-medium text-slate-700">{nest.lieux}</span></div>}
+                     {nest.dateVisite && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Date visite</span><span className="font-medium text-slate-700">{nest.dateVisite}</span></div>}
+                     {nest.nbAdultes && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Adultes</span><span className="font-medium text-slate-700">{nest.nbAdultes}</span></div>}
+                     {nest.nbPoussins && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Poussins</span><span className="font-medium text-slate-700">{nest.nbPoussins}</span></div>}
+                 </div>
+                 {nest.comportement && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Comportement</span><span className="font-medium text-slate-700 text-xs">{nest.comportement}</span></div>}
+                 {nest.remarques && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Remarques</span><span className="font-medium text-slate-700 text-xs italic">{nest.remarques}</span></div>}
              </div>
           )}
 
           {nest.comments && (
-              <div className="bg-sky-50 p-4 rounded-xl border border-sky-100">
-                <p className="text-[10px] font-black text-sky-600 uppercase mb-1 flex items-center gap-2"><Info size={12}/> Observations</p>
-                <p className="text-sm text-sky-900 italic leading-relaxed">"{nest.comments}"</p>
+              <div className="bg-sky-50 p-5 rounded-2xl border border-sky-100">
+                <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Info size={14}/> Observations Équipe</p>
+                <p className="text-sm text-sky-900 font-medium leading-relaxed">{nest.comments}</p>
               </div>
           )}
-          <Button variant="sky" className="w-full py-3" onClick={onCancel}>Fermer la fiche</Button>
+          <Button variant="sky" className="w-full py-4 uppercase tracking-widest text-xs" onClick={onCancel}>Fermer la fiche</Button>
       </div>
   );
   
@@ -525,121 +541,99 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
             <div className="space-y-4">
                  <div className="relative group">
                     {formData.photo ? (
-                        <div className="relative h-40 rounded-2xl overflow-hidden shadow-md">
+                        <div className="relative h-48 rounded-3xl overflow-hidden shadow-md">
                             <img src={formData.photo} className="w-full h-full object-cover" alt="Nid"/>
-                            <button onClick={() => setFormData({...formData, photo: null})} className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 transition-colors"><Trash2 size={14}/></button>
+                            <button onClick={() => setFormData({...formData, photo: null})} className="absolute top-3 right-3 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors"><Trash2 size={16}/></button>
                         </div>
                     ) : (
-                        <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 h-40 rounded-2xl cursor-pointer hover:bg-slate-50 transition-all group-hover:border-sky-400">
-                            <Camera size={32} className="text-slate-300 group-hover:text-sky-400 mb-2"/>
-                            <span className="text-xs font-black uppercase text-slate-400 group-hover:text-sky-500">Ajouter Photo</span>
+                        <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 bg-slate-50 h-48 rounded-3xl cursor-pointer hover:bg-sky-50 hover:border-sky-300 transition-colors group">
+                            <Camera size={40} className="text-slate-300 group-hover:text-sky-400 mb-3 transition-colors"/>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-sky-600 transition-colors">Prendre / Ajouter Photo</span>
                             <input type="file" className="hidden" onChange={handlePhotoUpload}/>
                         </label>
                     )}
                  </div>
                  
                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">État du nid</label>
-                    <select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">État du nid</label>
+                    <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
                         <option value="reported_by_client">🟣 Signalement Client</option>
                         <option value="present_high">🔴 Priorité Haute (Rouge)</option>
                         <option value="present_medium">🟠 Priorité Moyenne (Orange)</option>
                         <option value="present_low">🟡 Priorité Faible (Jaune)</option>
-                        <option value="present" className="text-slate-400">🔴 Présent (Ancien statut)</option>
+                        <option value="present">🔴 Présent (Classique)</option>
                         <option value="sterilized_1">🟢 1er Passage (Traité)</option>
                         <option value="sterilized_2">🟢 2ème Passage (Confirmé)</option>
                         <option value="non_present">⚪ Non présent / Inactif</option>
                     </select>
-                    {formData.status === 'present_high' && <p className="text-[9px] mt-1.5 text-red-600 leading-tight font-medium bg-red-50 p-2 rounded-lg">Notoirement installé, poussins présents, public à proximité / conflits d’usage.</p>}
-                    {formData.status === 'present_medium' && <p className="text-[9px] mt-1.5 text-orange-600 leading-tight font-medium bg-orange-50 p-2 rounded-lg">Installé (avec ou sans poussin), signalements de nuisance, risques modérés.</p>}
-                    {formData.status === 'present_low' && <p className="text-[9px] mt-1.5 text-yellow-600 leading-tight font-medium bg-yellow-50 p-2 rounded-lg">Observé, sans risque imminent de conflit avec la population.</p>}
                  </div>
             </div>
 
             <div className="space-y-4">
                 <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Identification</label>
-                    <input className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Identification</label>
+                    <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
                 </div>
                 <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Client</label>
-                    <select className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>
-                        <option value="">-- Sélectionner --</option>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Client Associé</label>
+                    <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>
+                        <option value="">-- Indépendant --</option>
                         {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
                  <div className="flex gap-4">
                     <div className="flex-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Œufs</label>
-                        <input type="number" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-center focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Œufs</label>
+                        <input type="number" className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-xl font-black text-center text-sky-600 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
                     </div>
                      <div className="flex-1 flex items-end">
-                         <button type="button" onClick={openRoute} className="w-full p-3 bg-sky-50 text-sky-600 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-sky-100 transition-colors flex items-center justify-center gap-2"><Locate size={14}/> GPS</button>
+                         <button type="button" onClick={openRoute} className="w-full h-[58px] bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-md"><Locate size={16}/> Voir GPS</button>
                      </div>
                 </div>
             </div>
         </div>
         
         <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Adresse précise</label>
-            <textarea className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none resize-none" rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})}/>
-            <div className="flex justify-end mt-1"><span className="text-[9px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">GPS: {formData.lat?.toFixed(6)}, {formData.lng?.toFixed(6)}</span></div>
+            <div className="flex justify-between items-end mb-1 pl-1 pr-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Adresse complète</label>
+                <span className="text-[9px] font-mono font-bold text-sky-500 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">GPS: {formData.lat?.toFixed(5)}, {formData.lng?.toFixed(5)}</span>
+            </div>
+            <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} placeholder="Numéro, Rue, Bâtiment..."/>
         </div>
 
         <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Observations Techniques</label>
-            <textarea className="w-full p-3 border border-slate-200 rounded-xl text-sm h-16 focus:ring-2 focus:ring-sky-500 outline-none resize-none" placeholder="Accès difficile, hauteur, matériel nécessaire..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Observations Techniques</label>
+            <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm h-24 focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" placeholder="Accès difficile, type de toiture, nacelle nécessaire..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/>
         </div>
 
-        {/* SECTION DONNÉES COMPLÉMENTAIRES (IMPORT XSLX) */}
-        <div className="pt-4 mt-4 border-t border-slate-100">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Layers size={14}/> Données Complémentaires (Importées)</label>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Lieux</label>
-                    <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.lieux || ""} onChange={e=>setFormData({...formData, lieux: e.target.value})} />
+        {/* SECTION IMPORTÉE MASQUABLE */}
+        {hasExtraData && (
+            <div className="pt-4 border-t border-slate-100">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 pl-1"><Layers size={14}/> Champs Import Excel</label>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Lieux" value={formData.lieux || ""} onChange={e=>setFormData({...formData, lieux: e.target.value})} />
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Date visite" value={formData.dateVisite || ""} onChange={e=>setFormData({...formData, dateVisite: e.target.value})} />
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Adultes" value={formData.nbAdultes || ""} onChange={e=>setFormData({...formData, nbAdultes: e.target.value})} />
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Poussins" value={formData.nbPoussins || ""} onChange={e=>setFormData({...formData, nbPoussins: e.target.value})} />
                 </div>
-                <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Date visite</label>
-                    <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.dateVisite || ""} onChange={e=>setFormData({...formData, dateVisite: e.target.value})} />
-                </div>
-                <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Nb Adultes</label>
-                    <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.nbAdultes || ""} onChange={e=>setFormData({...formData, nbAdultes: e.target.value})} />
-                </div>
-                <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Nb Poussins</label>
-                    <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.nbPoussins || ""} onChange={e=>setFormData({...formData, nbPoussins: e.target.value})} />
-                </div>
+                <input className="w-full p-3 bg-slate-50 border-0 rounded-xl text-xs mb-3" placeholder="Comportement" value={formData.comportement || ""} onChange={e=>setFormData({...formData, comportement: e.target.value})} />
             </div>
-            <div className="mb-4">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Comportement</label>
-                <input className="w-full p-2 border border-slate-200 rounded-lg text-sm" value={formData.comportement || ""} onChange={e=>setFormData({...formData, comportement: e.target.value})} />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Remarques (Fichier)</label>
-                    <textarea className="w-full p-2 border border-slate-200 rounded-lg text-sm h-16 resize-none" value={formData.remarques || ""} onChange={e=>setFormData({...formData, remarques: e.target.value})} />
-                </div>
-                <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Infos Diverses</label>
-                    <textarea className="w-full p-2 border border-slate-200 rounded-lg text-sm h-16 resize-none" value={formData.info || ""} onChange={e=>setFormData({...formData, info: e.target.value})} />
-                </div>
-            </div>
-        </div>
+        )}
         
-        {onGeneratePDF && <Button variant="secondary" className="w-full border-slate-200 text-slate-600 hover:bg-slate-50" onClick={()=>onGeneratePDF(nest)}><Download size={16}/> Télécharger la fiche PDF</Button>}
+        {onGeneratePDF && <Button variant="secondary" className="w-full py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={()=>onGeneratePDF(nest)}><Printer size={16}/> Générer Fiche PDF</Button>}
         
-        <div className="flex gap-3 pt-2 border-t border-slate-100">
-             {onDelete && <button onClick={() => onDelete(formData)} className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"><Trash2 size={20}/></button>}
-             <Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button>
-             <Button variant="success" className="flex-1 py-3" onClick={()=>onSave(formData)}>Enregistrer</Button>
+        <div className="flex gap-3 pt-4 border-t border-slate-100">
+             {onDelete && <button onClick={() => onDelete(formData)} className="p-4 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-2xl transition-colors"><Trash2 size={20}/></button>}
+             <Button variant="outline" className="flex-1 py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={onCancel}>Annuler</Button>
+             <Button variant="success" className="flex-1 py-4 rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-emerald-200" onClick={()=>onSave(formData)}>Enregistrer</Button>
         </div>
     </div>
   );
 };
 
-// --- CARTE (LEAFLET) ---
+// ============================================================================
+// 5. CARTE LEAFLET SÉCURISÉE
+// ============================================================================
 
 const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, routePath }) => {
   const mapContainerRef = useRef(null);
@@ -661,20 +655,27 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
 
   useEffect(() => {
     if (mapInstanceRef.current) return;
+
     const initMap = () => {
         if (!mapContainerRef.current) return;
         try {
             const L = window.L;
             if (!L || typeof L.map !== 'function') return;
+
             const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
             mapInstanceRef.current = map;
+
             L.control.zoom({ position: 'bottomright' }).addTo(map);
             tileLayerRef.current = L.tileLayer(tileUrls['satellite'], { attribution: 'Esri' }).addTo(map);
             markersLayerRef.current = L.layerGroup().addTo(map);
             routeLayerRef.current = L.layerGroup().addTo(map);
-            map.on('click', (e) => { if(onMapClickRef.current) onMapClickRef.current(e.latlng); });
-            setTimeout(() => map.invalidateSize(), 100);
-        } catch (e) { console.error("Map Error", e); }
+
+            map.on('click', (e) => {
+                if(onMapClickRef.current) onMapClickRef.current(e.latlng);
+            });
+            
+            setTimeout(() => map.invalidateSize(), 200);
+        } catch (e) { console.error("Erreur Map:", e); }
     };
 
     if (!window.L) {
@@ -693,7 +694,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
 
   useEffect(() => {
      if (mapInstanceRef.current) {
-         setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 200);
+         setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 300);
      }
   }, [isAddingMode]);
 
@@ -701,17 +702,21 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       if (!mapInstanceRef.current || !window.L || !markersLayerRef.current) return;
       const L = window.L;
       markersLayerRef.current.clearLayers();
+      
       markers.forEach(m => {
           let color = "#64748b"; 
-          if (m.status === "present" || m.status === "present_high") color = "#ef4444"; 
-          else if (m.status === "present_medium") color = "#f97316"; 
-          else if (m.status === "present_low") color = "#eab308"; 
+          if (m.status.startsWith("present")) color = "#ef4444"; 
           else if (m.status === "temp") color = "#94a3b8"; 
           else if (m.status === "sterilized_1") color = "#84cc16"; 
           else if (m.status === "sterilized_2") color = "#22c55e"; 
           else if (m.status === "reported_by_client") color = "#a855f7"; 
 
-          const icon = L.divIcon({ className: "custom-icon", html: `<div style="background-color: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid white;"></div>` });
+          const icon = L.divIcon({ 
+              className: "custom-icon", 
+              html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); ${m.status === 'temp' ? 'animation: pulse 1.5s infinite;' : ''}"></div>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12]
+          });
           const marker = L.marker([m.lat, m.lng], { icon });
           marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClickRef.current) onMarkerClickRef.current(m); });
           marker.addTo(markersLayerRef.current);
@@ -723,7 +728,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       routeLayerRef.current.clearLayers();
       if (routePath && routePath.length > 1) {
           const pointList = routePath.map(m => [m.lat, m.lng]);
-          const polyline = window.L.polyline(pointList, { color: '#3b82f6', weight: 4, dashArray: '10, 10' }).addTo(routeLayerRef.current);
+          const polyline = window.L.polyline(pointList, { color: '#0ea5e9', weight: 4, dashArray: '10, 10' }).addTo(routeLayerRef.current);
           mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
       }
   }, [routePath]);
@@ -738,16 +743,18 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
 
   return (
       <div className="relative w-full h-full">
-          <div ref={mapContainerRef} className="w-full h-full bg-slate-200 rounded-2xl overflow-hidden" style={{ minHeight: '100%', zIndex: 0 }} />
-          <div className="absolute top-4 right-4 z-[400] bg-white p-1 rounded-lg shadow-md flex gap-1">
-              <button onClick={(e) => { e.stopPropagation(); setMapType('satellite'); }} className={`px-3 py-1.5 text-xs font-bold rounded-md ${mapType === 'satellite' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>Sat</button>
-              <button onClick={(e) => { e.stopPropagation(); setMapType('plan'); }} className={`px-3 py-1.5 text-xs font-bold rounded-md ${mapType === 'plan' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>Plan</button>
+          <div ref={mapContainerRef} className="w-full h-full bg-slate-100 z-0" style={{minHeight:'100%'}}/>
+          <div className="absolute top-4 right-4 z-[400] bg-white/90 backdrop-blur-sm p-1 rounded-xl shadow-lg flex gap-1">
+              <button onClick={(e) => { e.stopPropagation(); setMapType('satellite'); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${mapType === 'satellite' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Satellite</button>
+              <button onClick={(e) => { e.stopPropagation(); setMapType('plan'); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${mapType === 'plan' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Plan</button>
           </div>
       </div>
   );
 };
 
-// --- COMPOSANT MAP INTERFACE ---
+// ============================================================================
+// 6. VUES PRINCIPALES (ADMIN)
+// ============================================================================
 
 const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     const [selectedMarker, setSelectedMarker] = useState(null);
@@ -762,7 +769,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
             let lat, lng, addr;
             const coords = searchQuery.replace(/,/g, " ").split(/\s+/).filter(Boolean).map(parseFloat);
             if (coords.length === 2 && !coords.some(isNaN) && Math.abs(coords[0]) <= 90) {
-                lat = coords[0]; lng = coords[1]; addr = `GPS: ${lat}, ${lng}`;
+                lat = coords[0]; lng = coords[1]; addr = `Point GPS`;
             } else {
                 try {
                     const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=fr`);
@@ -788,7 +795,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     };
 
     const optimizeRoute = () => {
-        if (markers.length < 2) return alert("Il faut au moins 2 nids pour créer un trajet.");
+        if (markers.length < 2) return alert("Il faut au moins 2 nids pour tracer un itinéraire.");
         let unvisited = [...markers], current = unvisited.shift(), path = [current];
         while (unvisited.length > 0) {
             let nearest = null, minDetails = Infinity, nearestIndex = -1;
@@ -804,29 +811,32 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     const displayMarkers = useMemo(() => tempMarker ? [...markers, tempMarker] : markers, [markers, tempMarker]);
 
     return (
-        <div className="h-[calc(100vh-140px)] flex flex-col gap-6 text-slate-800">
-            <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
+        <div className="h-[calc(100vh-140px)] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-300">
+            <Card className="p-3 flex flex-col md:flex-row gap-4 items-center z-20 shadow-lg border-0 rounded-3xl bg-white">
                 <div className="relative flex-1 w-full group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20}/>
-                    <input type="text" placeholder="Recherche GPS ou adresse..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-0 rounded-2xl text-sm" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={20}/>
+                    <input type="text" placeholder="Rechercher une adresse ou des coordonnées (Lat, Lng)..." className="w-full pl-14 pr-6 py-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" className="h-12" onClick={optimizeRoute}><Activity size={16}/> Trajet</Button>
-                    <Button variant={isAdding ? "danger" : "sky"} className="h-12" onClick={() => setIsAdding(!isAdding)}>
-                        {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer</>}
+                <div className="flex gap-2 shrink-0 pr-2">
+                    <Button variant="outline" className="h-14 px-6 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={optimizeRoute}><Activity size={16}/> Itinéraire</Button>
+                    <Button variant={isAdding ? "danger" : "sky"} className={`h-14 px-6 rounded-2xl text-xs uppercase tracking-widest ${isAdding ? '' : 'shadow-xl shadow-sky-200'}`} onClick={() => setIsAdding(!isAdding)}>
+                        {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
                     </Button>
                 </div>
             </Card>
             
-            <div className={`flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white transition-all duration-300 ${isAdding ? 'border-[6px] border-sky-500' : 'border-[6px] border-white'}`}>
+            <div className={`flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white transition-all duration-300 ${isAdding ? 'ring-4 ring-sky-500 ring-offset-2' : ''}`}>
                 {isAdding && (
-                    <div className="absolute inset-x-0 top-4 z-[1000] flex justify-center pointer-events-none">
-                        <div className="bg-sky-600 text-white px-6 py-2 rounded-full font-bold shadow-2xl animate-bounce">📍 Cliquez sur la carte pour placer le nid</div>
+                    <div className="absolute inset-x-0 top-6 z-[1000] flex justify-center pointer-events-none animate-in slide-in-from-top-4">
+                        <div className="bg-slate-900 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest text-xs shadow-2xl shadow-slate-900/50 flex items-center gap-3">
+                            <span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span></span>
+                            Cliquez sur la carte pour placer le nid
+                        </div>
                     </div>
                 )}
                 
-                {tempMarker && !isAdding && (<div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-800 text-white px-4 py-2 rounded-full text-xs font-bold animate-bounce pointer-events-none">📍 Cliquez sur le point gris pour valider</div>)}
-                {routePath && (<div className="absolute top-4 left-4 z-[500] bg-white text-slate-800 px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2"><Activity size={14}/> Trajet affiché <button onClick={() => setRoutePath(null)}><X size={14}/></button></div>)}
+                {tempMarker && !isAdding && (<div className="absolute top-6 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest animate-bounce pointer-events-none shadow-2xl">📍 Cliquez sur le point gris pour valider</div>)}
+                {routePath && (<div className="absolute bottom-6 left-6 z-[500] bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-3 shadow-2xl"><Activity size={16} className="text-sky-400"/> Itinéraire actif <button onClick={() => setRoutePath(null)} className="p-1 hover:bg-white/20 rounded-full transition-colors"><X size={16}/></button></div>)}
 
                 <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} routePath={routePath} onMapClick={async (ll) => {
                     if(!isAdding) return;
@@ -835,14 +845,14 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 }}/>
                 
                 {selectedMarker && selectedMarker.id !== "temp" && (
-                    <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-left-6">
-                        <Card className="border-0 flex flex-col overflow-hidden bg-white">
-                            <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
-                                <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><Crosshair size={16}/> Fiche Nid</span>
-                                <button onClick={() => setSelectedMarker(null)} className="hover:bg-white/20 p-1.5 rounded-full"><X size={18}/></button>
+                    <div className="absolute top-6 left-6 z-[500] w-80 md:w-96 max-h-[90%] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-left-6 rounded-[32px]">
+                        <Card className="border-0 flex flex-col overflow-hidden bg-white shadow-none rounded-none h-full">
+                            <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+                                <span className="font-black text-sm uppercase tracking-widest flex items-center gap-3"><Crosshair size={18} className="text-sky-400"/> Fiche Nid</span>
+                                <button onClick={() => setSelectedMarker(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20}/></button>
                             </div>
                             <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
-                                <NestEditForm nest={selectedMarker} clients={clients} onSave={async(u) => { await onUpdateNest(u); setSelectedMarker(null); }} onCancel={() => setSelectedMarker(null)} onDelete={async(u) => { if(window.confirm("Supprimer ?")) { await onDeleteNest(u); setSelectedMarker(null); } }} onGeneratePDF={(n, cb) => generatePDF('nest_detail', n, { clientName: clients.find(c => c.id === n.clientId)?.name }, () => {}, cb)} />
+                                <NestEditForm nest={selectedMarker} clients={clients} onSave={async(u) => { await onUpdateNest(u); setSelectedMarker(null); }} onCancel={() => setSelectedMarker(null)} onDelete={async(u) => { if(window.confirm("Supprimer définitivement ce nid ?")) { await onDeleteNest(u); setSelectedMarker(null); } }} onGeneratePDF={(n, cb) => generatePDF('nest_detail', n, { clientName: clients.find(c => c.id === n.clientId)?.name }, () => {}, cb)} />
                             </div>
                         </Card>
                     </div>
@@ -851,8 +861,6 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
         </div>
     );
 };
-
-// --- VUES ADMIN ---
 
 const AdminDashboard = ({ interventions, clients, markers }) => {
   const stats = useMemo(() => ({
@@ -1140,8 +1148,8 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                                       <td className="p-4"><Badge status={m.status}/></td>
                                       <td className="p-4 text-center font-black text-slate-700">{m.eggs} <span className="font-normal opacity-50">œuf(s)</span></td>
                                       <td className="p-4 flex justify-end gap-2 pr-8">
-                                          <button onClick={() => setSelectedNest(m)} className="p-2 text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100"><Edit size={16}/></button>
-                                          <button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><Trash2 size={16} /></button>
+                                          <button onClick={() => setSelectedNest(m)} className="p-2.5 text-sky-600 bg-sky-50 rounded-xl hover:bg-sky-100 transition-colors"><Edit size={16}/></button>
+                                          <button onClick={() => { if (window.confirm("Supprimer ce nid ?")) onDeleteNest(m); }} className="p-2.5 text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors"><Trash2 size={16} /></button>
                                       </td>
                                   </tr>
                               ))}
@@ -1172,8 +1180,20 @@ const ClientManagement = ({ clients, setSelectedClient, setView, onCreateClient,
   return (
     <div className="space-y-8 text-slate-800">
       <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter">CLIENTS</h2><Button variant="sky" className="rounded-2xl px-6 py-3 uppercase tracking-widest text-xs h-12" onClick={() => setIsCreating(true)}><Plus size={18} /> Nouveau Client</Button></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-slate-800">{clients.map((c) => (<Card key={c.id} className="p-8 cursor-pointer hover:shadow-2xl transition-all group border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl bg-white" onClick={() => { setSelectedClient(c); setView("client-detail"); }}><div className="flex justify-between items-start mb-6"><div className="p-3 bg-sky-50 text-sky-600 rounded-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors duration-500 shadow-sm"><Users size={24} /></div><span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{c.type}</span></div><h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter mb-2">{c.name}</h3><p className="text-xs text-slate-500 font-bold uppercase tracking-wide truncate mt-4"><MapPin size={12} className="inline mr-2 text-sky-500" /> {c.address}</p></Card>))}</div>
-      {isCreating && (<div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in"><Card className="p-8 w-full max-w-lg shadow-2xl border-0 rounded-3xl text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Créer une fiche</h3><ClientEditForm client={{ id: Date.now(), name: "", type: "Privé", address: "", contact: "", phone: "", email: "" }} onSave={(d) => { onCreateClient(d); setIsCreating(false); }} onCancel={() => setIsCreating(false)} /></Card></div>)}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-slate-800">
+        {clients.map((c) => (
+          <Card key={c.id} className="p-8 cursor-pointer hover:shadow-2xl transition-all group border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl bg-white" onClick={() => { setSelectedClient(c); setView("client-detail"); }}>
+            <div className="flex justify-between items-start mb-6"><div className="p-3 bg-sky-50 text-sky-600 rounded-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors duration-500 shadow-sm"><Users size={24} /></div><span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{c.type}</span></div>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter mb-2">{c.name}</h3>
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wide truncate mt-4"><MapPin size={12} className="inline mr-2 text-sky-500" /> {c.address}</p>
+          </Card>
+        ))}
+      </div>
+      {isCreating && (
+        <div className="fixed inset-0 z-[1000] bg-slate-900/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
+          <Card className="p-8 w-full max-w-lg shadow-2xl border-0 rounded-3xl text-slate-800"><h3 className="font-black text-2xl mb-6 uppercase tracking-tighter text-slate-900">Créer une fiche</h3><ClientEditForm client={{ id: Date.now(), name: "", type: "Privé", address: "", contact: "", phone: "", email: "" }} onSave={(d) => { onCreateClient(d); setIsCreating(false); }} onCancel={() => setIsCreating(false)} /></Card>
+        </div>
+      )}
     </div>
   );
 };
@@ -1195,7 +1215,22 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
                                 <div className="space-y-6 text-sm font-bold text-slate-600 uppercase">
                                     <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><MapPin size={20} className="text-sky-500 shrink-0"/><p className="leading-tight text-xs">{selectedClient.address}</p></div>
                                     <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"><Phone size={20} className="text-sky-500 shrink-0"/><p className="text-xs">{selectedClient.phone}</p></div>
-                                    <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-lg">
+                                    
+                                    {selectedClient.extendedContacts && selectedClient.extendedContacts.length > 0 && (
+                                        <div className="bg-sky-50 p-5 rounded-2xl border border-sky-100 mt-4 shadow-inner">
+                                            <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-3 flex items-center gap-2"><Users size={14}/> Contacts de Survol</p>
+                                            <div className="space-y-2">
+                                                {selectedClient.extendedContacts.map((contact, idx) => (
+                                                    <div key={idx} className="bg-white p-3 rounded-xl shadow-sm text-[10px] font-bold text-slate-700 flex items-start gap-3 border border-sky-50 leading-relaxed normal-case">
+                                                        <span className="text-sky-500 mt-0.5 shrink-0">•</span>
+                                                        <span>{contact}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="bg-slate-900 p-6 rounded-2xl text-white shadow-lg mt-8">
                                         <p className="text-[10px] font-black opacity-50 tracking-widest text-center mb-4">ACCÈS ESPACE CLIENT</p>
                                         <p className="text-xs tracking-widest mb-2"><span className="opacity-50">ID:</span> {selectedClient.username}</p>
                                         <p className="text-xs tracking-widest"><span className="opacity-50">PASS:</span> {selectedClient.password}</p>
@@ -1333,14 +1368,12 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
 const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport, onDeleteReport }) => {
     const [isCreating, setIsCreating] = useState(false);
     const [editingRep, setEditingRep] = useState(null);
-
-    // Fonction de filtrage pour n'afficher que les documents de l'admin ou du client
-    const [filter, setFilter] = useState('all'); // 'all', 'admin', 'client'
-
-    const filteredReports = useMemo(() => {
-        if (filter === 'admin') return reports.filter(r => r.author === 'admin');
-        if (filter === 'client') return reports.filter(r => r.author === 'client');
-        return reports;
+    const [filter, setFilter] = useState('all'); 
+    
+    const filteredReports = useMemo(() => { 
+        if (filter === 'admin') return reports.filter(r => r.author === 'admin'); 
+        if (filter === 'client') return reports.filter(r => r.author === 'client'); 
+        return reports; 
     }, [reports, filter]);
 
     return (
@@ -1378,6 +1411,7 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
                                     <td className="p-6 text-xs font-bold text-slate-500">{r.date}</td>
                                     <td className="p-6"><Badge status={r.type === 'Fiche Nid' ? 'reported_by_client' : (r.type === 'Rapport Complet' ? 'sterilized_2' : 'Planifié')}/></td>
                                     <td className="p-6 flex justify-end gap-3">
+                                        {/* Bouton Télécharger / Imprimer (Feature 1 & 2) */}
                                         <button 
                                             onClick={() => generatePDF(r.type === 'Fiche Nid' ? 'nest_detail' : (r.type === 'Rapport Complet' ? 'complete_report' : 'file'), r.type === 'Fiche Nid' ? markers.find(m => m.id === r.nestId) : r, { client: clients.find(c => c.id === r.clientId), markers: markers.filter(m => m.clientId === r.clientId), interventions: interventions.filter(i => i.clientId === r.clientId) })} 
                                             className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all shadow-sm" 
@@ -1407,18 +1441,28 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
     );
 };
 
-// --- COMPOSANT ESPACE CLIENT ---
+// ============================================================================
+// 7. ESPACE CLIENT (FRONT-END CLIENT)
+// ============================================================================
 
 const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateNest, onUpdateReport }) => {
     const myMarkers = useMemo(() => markers.filter(m => m.clientId === user.clientId), [markers, user.clientId]);
     const myReports = useMemo(() => reports.filter(r => r.clientId === user.clientId), [reports, user.clientId]);
     const neut = useMemo(() => myMarkers.filter(m => m.status && m.status.includes("sterilized")).length, [myMarkers]);
     
+    const clientStats = useMemo(() => ({
+        reported: myMarkers.filter(m => m.status === "reported_by_client").length,
+        active: myMarkers.filter(m => m.status.startsWith("present")).length,
+        passage1: myMarkers.filter(m => m.status === "sterilized_1").length,
+        passage2: myMarkers.filter(m => m.status === "sterilized_2").length,
+        nonPresent: myMarkers.filter(m => m.status === "non_present").length,
+    }), [myMarkers]);
+
     const [pendingReport, setPendingReport] = useState(null);
     const [isAddingMode, setIsAddingMode] = useState(false);
     const [selectedNestDetail, setSelectedNestDetail] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
-    const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'map', 'list', 'documents'
+    const [activeTab, setActiveTab] = useState('dashboard');
 
     const requestIntervention = async () => {
         if(window.confirm("Confirmer la demande d'intervention urgente ?")) {
@@ -1431,82 +1475,105 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
             case 'dashboard':
                 return (
                     <div className="space-y-8 animate-in fade-in duration-500">
-                        {/* WIDGET METEO & STATS - Alignés et compacts */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-slate-900">
-                            <Card className="p-6 border-0 shadow-lg rounded-3xl flex flex-col justify-between bg-gradient-to-br from-sky-400 to-blue-600 text-white relative overflow-hidden">
+                            <Card className="p-6 border-0 shadow-xl rounded-[32px] flex flex-col justify-between bg-gradient-to-br from-sky-400 to-blue-600 text-white relative overflow-hidden">
                                 <div className="relative z-10">
                                     <div className="flex justify-between items-center mb-2">
-                                        <span className="font-bold uppercase tracking-widest text-[10px] opacity-80">Météo de vol</span>
-                                        <Cloud size={20} />
+                                        <span className="font-black uppercase tracking-widest text-[10px] opacity-80">Météo Site</span>
+                                        <Cloud size={24} />
                                     </div>
-                                    <div className="flex items-end gap-2 mb-2">
-                                        <span className="text-3xl font-black leading-none">18°C</span>
-                                        <span className="text-xs font-bold opacity-90 mb-1">Vent: 12 km/h</span>
+                                    <div className="flex items-end gap-2 mb-3">
+                                        <span className="text-4xl font-black leading-none">18°C</span>
+                                        <span className="text-xs font-bold opacity-90 mb-1">Vent: 12km/h</span>
                                     </div>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest bg-white/20 px-2 py-1 rounded-md inline-block">✅ Conditions optimales</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-lg inline-block backdrop-blur-sm">✅ Conditions optimales</p>
                                 </div>
-                                <Wind className="absolute -right-4 -bottom-4 w-24 h-24 text-white/10" />
+                                <Wind className="absolute -right-6 -bottom-6 w-32 h-32 text-white/10" />
                             </Card>
 
-                            <Card className="p-6 border-0 shadow-lg rounded-3xl flex items-center justify-between bg-white relative overflow-hidden group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setActiveTab('map')}>
+                            <Card className="p-8 border-0 shadow-xl rounded-[32px] flex flex-col justify-center bg-white relative overflow-hidden group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setActiveTab('map')}>
                                 <div className="relative z-10">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids surveillés</p>
-                                    <p className="text-4xl font-black text-slate-800 tracking-tighter">{myMarkers.length}</p>
-                                    <p className="text-[10px] font-bold text-sky-600 uppercase mt-2 flex items-center gap-1 group-hover:underline">Voir la carte <ChevronRight size={12}/></p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><MapPin size={14} className="text-sky-500"/> Surveillance Globale</p>
+                                    <p className="text-5xl font-black text-slate-800 tracking-tighter">{myMarkers.length} <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Nids</span></p>
                                 </div>
-                                <Bird size={64} className="text-slate-50 absolute -right-2 -bottom-2 transform -scale-x-100 group-hover:text-slate-100 transition-colors" />
+                                <Bird size={100} className="text-slate-50 absolute -right-4 -bottom-4 transform -scale-x-100 group-hover:text-slate-100 transition-colors" />
                             </Card>
 
-                            <Card className="p-6 border-0 shadow-lg rounded-3xl flex items-center justify-between bg-white relative overflow-hidden">
+                            <Card className="p-8 border-0 shadow-xl rounded-[32px] flex flex-col justify-center bg-white relative overflow-hidden">
                                 <div className="relative z-10">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Stérilisations</p>
-                                    <p className="text-4xl font-black text-emerald-600 tracking-tighter">{neut}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Passage 2 confirmé</p>
+                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2 flex items-center gap-2"><CheckCircle size={14}/> Impact Sanitaire</p>
+                                    <p className="text-5xl font-black text-emerald-600 tracking-tighter">{clientStats.passage2} <span className="text-sm font-bold text-emerald-400 uppercase tracking-widest">Stérilisés</span></p>
                                 </div>
-                                <CheckCircle size={64} className="text-emerald-50 absolute -right-2 -bottom-2" />
+                                <CheckCircle size={100} className="text-emerald-50 absolute -right-4 -bottom-4" />
                             </Card>
                         </div>
 
-                        {/* ACTIONS RAPIDES & DOCS RECENTS */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            
-                            {/* DEMANDE INTERVENTION (1/3) */}
-                            <Card className="p-6 border-0 shadow-xl rounded-3xl bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden lg:col-span-1">
+                        <div>
+                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-4 pl-2">Analyse de la population</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
+                                    <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest mb-2">Signalements</span>
+                                    <span className="text-3xl font-black text-slate-800">{clientStats.reported}</span>
+                                </Card>
+                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
+                                    <span className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-2">Actifs & Sensibles</span>
+                                    <span className="text-3xl font-black text-slate-800">{clientStats.active}</span>
+                                </Card>
+                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
+                                    <span className="text-[10px] font-black uppercase text-lime-600 tracking-widest mb-2">1er Passage</span>
+                                    <span className="text-3xl font-black text-slate-800">{clientStats.passage1}</span>
+                                </Card>
+                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
+                                    <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-2">2ème Passage</span>
+                                    <span className="text-3xl font-black text-slate-800">{clientStats.passage2}</span>
+                                </Card>
+                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
+                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Inactifs</span>
+                                    <span className="text-3xl font-black text-slate-800">{clientStats.nonPresent}</span>
+                                </Card>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
+                            <Card className="p-8 border-0 shadow-2xl rounded-[32px] bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden lg:col-span-1">
                                 <div className="relative z-10 w-full">
-                                    <AlertTriangle size={32} className="text-orange-400 mb-4 mx-auto animate-pulse"/>
-                                    <h3 className="font-black text-lg uppercase tracking-tighter mb-2">Un problème ?</h3>
-                                    <p className="text-xs text-slate-400 mb-6 leading-relaxed">Nid agressif ou nouvelle installation suspecte ?</p>
-                                    <Button variant="sky" className="w-full rounded-xl text-[10px] uppercase font-black tracking-widest py-3" onClick={() => {setIsAddingMode(true); setActiveTab('map');}}>
-                                        Signaler un nid
+                                    <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <AlertTriangle size={32} className="text-red-400 animate-pulse"/>
+                                    </div>
+                                    <h3 className="font-black text-2xl uppercase tracking-tighter mb-3">Nid Problématique ?</h3>
+                                    <p className="text-xs text-slate-400 mb-8 leading-relaxed font-medium px-4">Signalez-nous immédiatement toute nuisance ou comportement agressif.</p>
+                                    <Button variant="sky" className="w-full rounded-2xl text-xs uppercase font-black tracking-widest py-4 shadow-xl shadow-sky-900" onClick={() => {setIsAddingMode(true); setActiveTab('map');}}>
+                                        <Crosshair size={18}/> Pointer sur la carte
                                     </Button>
-                                    <button onClick={requestIntervention} className="w-full mt-3 text-[10px] uppercase font-bold text-slate-400 hover:text-white tracking-widest transition-colors">Demande de passage</button>
+                                    <button onClick={requestIntervention} className="w-full mt-4 text-[10px] uppercase font-bold text-slate-500 hover:text-white tracking-widest transition-colors">Demander un passage technique</button>
                                 </div>
                             </Card>
 
-                            {/* DOCUMENTS RECENTS (2/3) */}
-                            <Card className="p-0 border-0 shadow-xl rounded-3xl bg-white flex flex-col h-full lg:col-span-2 overflow-hidden">
-                                <div className="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
-                                    <h3 className="font-black text-sm text-slate-800 uppercase tracking-widest flex items-center gap-2"><FileText size={16} className="text-sky-500"/> Documents Récents</h3>
-                                    <button onClick={() => setActiveTab('documents')} className="text-[10px] font-bold text-sky-600 uppercase hover:underline">Voir tout</button>
+                            <Card className="p-0 border-0 shadow-xl rounded-[32px] bg-white flex flex-col h-full lg:col-span-2 overflow-hidden">
+                                <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+                                    <h3 className="font-black text-sm text-slate-800 uppercase tracking-widest flex items-center gap-3"><FileText size={18} className="text-sky-500"/> Rapports d'intervention</h3>
+                                    <button onClick={() => setActiveTab('documents')} className="text-[10px] font-black bg-white px-4 py-2 rounded-xl text-sky-600 uppercase hover:bg-sky-50 transition-colors shadow-sm">Tout voir</button>
                                 </div>
-                                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-3">
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
                                      {myReports && myReports.length > 0 ? myReports.slice(0, 4).map(r => (
-                                         <div key={r.id} className="p-3 border border-slate-100 rounded-xl flex justify-between items-center group hover:border-sky-200 hover:shadow-sm transition-all cursor-pointer" onClick={() => generatePDF('file', r)}>
-                                             <div className="flex items-center gap-3">
-                                                 <div className={`p-2 rounded-lg ${r.author === 'client' ? 'bg-purple-50 text-purple-600' : 'bg-sky-50 text-sky-600'}`}>
-                                                    {r.author === 'client' ? <Upload size={14}/> : <Download size={14}/>}
+                                         <div key={r.id} className="p-4 border border-slate-100 rounded-2xl flex justify-between items-center group hover:border-sky-300 hover:shadow-md transition-all cursor-pointer bg-white" onClick={() => generatePDF('file', r)}>
+                                             <div className="flex items-center gap-4">
+                                                 <div className={`p-3 rounded-xl ${r.author === 'client' ? 'bg-purple-50 text-purple-600' : 'bg-sky-50 text-sky-600'}`}>
+                                                    {r.author === 'client' ? <Upload size={20}/> : <Download size={20}/>}
                                                  </div>
                                                  <div>
-                                                     <p className="font-bold text-xs text-slate-800 leading-tight">{r.title}</p>
-                                                     <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{r.date} • {r.author === 'client' ? 'Envoyé' : 'Reçu'}</p>
+                                                     <p className="font-black text-sm text-slate-800 leading-tight mb-1">{r.title}</p>
+                                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{r.date} • {r.author === 'client' ? 'Soumis' : 'Reçu'}</p>
                                                  </div>
                                              </div>
-                                             <span className="text-slate-300 group-hover:text-sky-600 transition-colors"><Printer size={14}/></span>
+                                             <div className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 group-hover:bg-sky-500 group-hover:text-white text-slate-400 transition-colors">
+                                                 <Printer size={16}/>
+                                             </div>
                                          </div>
                                      )) : (
-                                         <div className="h-full flex flex-col items-center justify-center text-slate-400 py-8">
-                                             <File size={32} className="mb-2 opacity-20"/>
-                                             <p className="text-xs italic">Aucun document récent.</p>
+                                         <div className="h-full flex flex-col items-center justify-center text-slate-400 py-12">
+                                             <File size={48} className="mb-4 opacity-10"/>
+                                             <p className="text-xs font-bold uppercase tracking-widest">Aucun rapport récent.</p>
                                          </div>
                                      )}
                                 </div>
@@ -1516,53 +1583,46 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                 );
             case 'map':
                 return (
-                    <div className="h-[600px] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-500">
-                        <Card className="p-4 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-2xl bg-white">
-                            <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-500">Cartographie</div>
-                            <Button variant={isAddingMode ? "danger" : "sky"} className="py-3 px-6 rounded-2xl uppercase tracking-widest text-xs h-12" onClick={() => setIsAddingMode(!isAddingMode)}>
-                                {isAddingMode ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Signaler un nid</>}
+                    <div className="h-[700px] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-500">
+                        <Card className="p-5 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-3xl bg-white">
+                            <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-800 flex items-center gap-3"><MapIcon className="text-sky-500"/> Cartographie du Site</div>
+                            <Button variant={isAddingMode ? "danger" : "sky"} className="py-4 px-8 rounded-2xl uppercase font-black tracking-widest text-xs shadow-lg" onClick={() => setIsAddingMode(!isAddingMode)}>
+                                {isAddingMode ? <><X size={18}/> Mode Navigation</> : <><Plus size={18}/> Signaler un nouveau nid</>}
                             </Button>
                         </Card>
-                        <div className={`flex-1 relative shadow-2xl rounded-3xl overflow-hidden bg-white transition-all duration-300 ${isAddingMode ? 'border-8 border-sky-500' : 'border-8 border-white'}`}>
+                        <div className={`flex-1 relative shadow-2xl rounded-[32px] overflow-hidden bg-white transition-all duration-300 ${isAddingMode ? 'border-[8px] border-sky-500' : 'border-0'}`}>
                             {isAddingMode && (
-                                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-4 py-2 rounded-full shadow-lg text-xs font-bold animate-bounce pointer-events-none">
-                                    📍 Cliquez sur la carte pour signaler un nid
+                                <div className="absolute inset-x-0 top-6 z-[1000] flex justify-center pointer-events-none animate-in slide-in-from-top-4">
+                                    <div className="bg-slate-900 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest text-xs shadow-2xl shadow-slate-900/50 flex items-center gap-3">
+                                        <span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span></span>
+                                        Cliquez sur la toiture pour placer le nid
+                                    </div>
                                 </div>
                             )}
                             <LeafletMap 
                                 markers={myMarkers} 
                                 isAddingMode={isAddingMode} 
-                                onMarkerClick={(m) => {
-                                    if(!isAddingMode) setSelectedNestDetail(m);
-                                }}
+                                onMarkerClick={(m) => { if(!isAddingMode) setSelectedNestDetail(m); }}
                                 onMapClick={(ll) => {
                                     if(isAddingMode) {
-                                        setPendingReport({
-                                            id: Date.now(),
-                                            clientId: user.clientId,
-                                            lat: ll.lat,
-                                            lng: ll.lng,
-                                            address: "Nouveau signalement",
-                                            status: "reported_by_client",
-                                            title: "Signalement Client",
-                                        });
+                                        setPendingReport({ id: Date.now(), clientId: user.clientId, lat: ll.lat, lng: ll.lng, address: "Signalement en attente", status: "reported_by_client", title: "Nouveau Signalement" });
                                         setIsAddingMode(false);
                                     }
                                 }}
                             />
                             
                             {pendingReport && (
-                                <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
-                                    <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
-                                        <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
-                                            <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><Crosshair size={16} className="text-sky-400"/> Signalement</span>
-                                            <button onClick={() => setPendingReport(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
+                                <div className="absolute top-6 left-6 z-[500] w-80 md:w-96 max-h-[90%] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-left-6 rounded-[32px]">
+                                    <Card className="border-0 flex flex-col overflow-hidden bg-white shadow-none rounded-none h-full">
+                                        <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+                                            <span className="font-black text-sm uppercase tracking-widest flex items-center gap-3"><Crosshair size={18} className="text-sky-400"/> Finaliser Signalement</span>
+                                            <button onClick={() => setPendingReport(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20}/></button>
                                         </div>
                                         <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
                                             <ClientReportForm nest={pendingReport} onSave={async (d) => {
                                                 await onUpdateNest(d);
                                                 setPendingReport(null);
-                                                alert("Signalement enregistré !");
+                                                alert("Votre signalement a été transmis à l'équipe technique avec succès !");
                                             }} onCancel={() => setPendingReport(null)} />
                                         </div>
                                     </Card>
@@ -1570,11 +1630,11 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             )}
 
                             {selectedNestDetail && (
-                                <div className="absolute top-6 left-6 z-[500] w-72 md:w-80 max-h-[90%] overflow-hidden flex flex-col animate-in slide-in-from-left-6 fade-in duration-300 shadow-2xl">
-                                    <Card className="border-0 flex flex-col overflow-hidden rounded-3xl bg-white">
-                                        <div className="bg-slate-900 p-4 text-white flex justify-between items-center shrink-0">
-                                            <span className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><MapIcon size={16} className="text-sky-400"/> Détails du Nid</span>
-                                            <button onClick={() => setSelectedNestDetail(null)} className="hover:bg-white/20 p-1.5 rounded-full transition-colors"><X size={18}/></button>
+                                <div className="absolute top-6 left-6 z-[500] w-80 md:w-96 max-h-[90%] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-left-6 rounded-[32px]">
+                                    <Card className="border-0 flex flex-col overflow-hidden bg-white shadow-none rounded-none h-full">
+                                        <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
+                                            <span className="font-black text-sm uppercase tracking-widest flex items-center gap-3"><MapIcon size={18} className="text-sky-400"/> Détails du Nid</span>
+                                            <button onClick={() => setSelectedNestDetail(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20}/></button>
                                         </div>
                                         <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
                                             <NestEditForm nest={selectedNestDetail} readOnly={true} onCancel={() => setSelectedNestDetail(null)} />
@@ -1587,40 +1647,38 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                 );
             case 'list':
                 return (
-                     <Card className="p-0 border-0 shadow-xl rounded-3xl bg-white flex flex-col flex-1 overflow-hidden h-[600px] animate-in fade-in duration-500">
-                        <div className="p-6 border-b border-slate-50 flex justify-between items-center mb-0 shrink-0">
-                            <h3 className="font-black text-lg text-slate-800 uppercase tracking-tighter">État des Nids</h3>
-                            <div className="p-2 bg-slate-100 rounded-full"><Bird size={18} className="text-slate-400"/></div>
+                     <Card className="p-0 border-0 shadow-2xl rounded-[32px] bg-white flex flex-col flex-1 overflow-hidden h-[700px] animate-in fade-in duration-500">
+                        <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+                            <div>
+                                <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter mb-1">Inventaire du site</h3>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Liste détaillée de tous les nids</p>
+                            </div>
+                            <div className="p-4 bg-white rounded-2xl shadow-sm"><Bird size={24} className="text-sky-500"/></div>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                              {myMarkers.length > 0 ? (
-                                 <table className="w-full text-left text-xs">
-                                     <thead className="bg-slate-50 text-slate-400 font-bold uppercase sticky top-0 z-10">
-                                         <tr>
-                                             <th className="p-3 pl-6">Ref</th>
-                                             <th className="p-3">Statut</th>
-                                             <th className="p-3 text-center">Œufs</th>
-                                             <th className="p-3 pr-6">Obs.</th>
-                                         </tr>
+                                 <table className="w-full text-left text-sm">
+                                     <thead className="bg-white text-slate-400 font-bold uppercase text-[10px] tracking-widest sticky top-0 z-10 shadow-sm">
+                                         <tr><th className="p-5 pl-8">Référence / Localisation</th><th className="p-5">État d'avancement</th><th className="p-5 text-center">Contenu</th><th className="p-5 pr-8">Notes équipe</th></tr>
                                      </thead>
                                      <tbody className="divide-y divide-slate-50">
                                          {myMarkers.map(m => (
-                                             <tr key={m.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => { setSelectedNestDetail(m); setActiveTab('map'); }}>
-                                                 <td className="p-3 pl-6">
-                                                     <div className="font-bold text-slate-700">{m.title || "Nid #" + m.id.toString().slice(-4)}</div>
-                                                     <div className="text-[10px] text-slate-400 truncate max-w-[100px]">{m.address}</div>
+                                             <tr key={m.id} className="hover:bg-slate-50/80 transition-colors cursor-pointer group" onClick={() => { setSelectedNestDetail(m); setActiveTab('map'); }}>
+                                                 <td className="p-5 pl-8">
+                                                     <div className="font-black text-slate-800 text-base mb-1 group-hover:text-sky-600 transition-colors">{m.title || "Nid #" + m.id.toString().slice(-4)}</div>
+                                                     <div className="text-xs text-slate-400 truncate max-w-[250px] font-medium flex items-center gap-1"><MapPin size={10}/>{m.address}</div>
                                                  </td>
-                                                 <td className="p-3"><Badge status={m.status}/></td>
-                                                 <td className="p-3 text-center font-bold text-slate-600">{m.eggs}</td>
-                                                 <td className="p-3 pr-6 text-slate-500 italic truncate max-w-[100px]" title={m.comments}>{m.comments || "-"}</td>
+                                                 <td className="p-5"><Badge status={m.status}/></td>
+                                                 <td className="p-5 text-center font-black text-slate-700 text-lg">{m.eggs} <span className="text-[10px] uppercase text-slate-400">œuf(s)</span></td>
+                                                 <td className="p-5 pr-8 text-xs font-medium text-slate-500 italic max-w-[200px] truncate" title={m.comments}>{m.comments || "-"}</td>
                                              </tr>
                                          ))}
                                      </tbody>
                                  </table>
                              ) : (
-                                 <div className="h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center">
-                                     <Bird size={32} className="mb-2 opacity-50"/>
-                                     <p>Aucun nid recensé pour le moment.</p>
+                                 <div className="h-full flex flex-col items-center justify-center text-slate-400 p-12 text-center">
+                                     <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6"><Bird size={48} className="opacity-20"/></div>
+                                     <p className="text-sm font-bold uppercase tracking-widest">Aucun nid recensé sur votre site pour le moment.</p>
                                  </div>
                              )}
                         </div>
@@ -1628,51 +1686,64 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                 );
             case 'documents':
                 return (
-                    <div className="h-[600px] flex flex-col gap-6 animate-in fade-in duration-500">
-                         <Card className="p-0 border-0 shadow-xl rounded-3xl bg-white flex flex-col flex-1 overflow-hidden relative">
-                             <div className="p-6 border-b border-slate-50 flex justify-between items-center mb-0 shrink-0">
-                                <h3 className="font-black text-lg text-slate-800 uppercase tracking-tighter">Documents</h3>
-                                <button onClick={() => setIsUploading(true)} className="p-2 bg-sky-50 text-sky-600 rounded-full hover:bg-sky-600 hover:text-white transition-colors"><Upload size={18}/></button>
+                    <div className="h-[700px] flex flex-col gap-6 animate-in fade-in duration-500">
+                         <Card className="p-0 border-0 shadow-2xl rounded-[32px] bg-white flex flex-col flex-1 overflow-hidden relative">
+                             <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+                                <div>
+                                    <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter mb-1">Espace Documentaire</h3>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Rapports, devis et attestations</p>
+                                </div>
+                                <Button variant="sky" className="px-6 py-3 rounded-2xl uppercase font-black text-xs tracking-widest shadow-xl shadow-sky-200" onClick={() => setIsUploading(true)}><Upload size={16}/> Transmettre un fichier</Button>
                             </div>
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
+                                 {myReports.length === 0 && <p className="text-center text-slate-400 font-bold uppercase text-xs tracking-widest py-12">Dossier vide</p>}
+                                 
+                                 {/* Documents Aerothau */}
                                  {myReports.filter(r => r.author === 'admin').map(r => (
-                                     <div key={r.id} className="p-3 bg-slate-50 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-slate-100">
-                                         <div className="flex items-center gap-3">
-                                             <div className="p-2 bg-white rounded-lg text-slate-400"><FileText size={16}/></div>
+                                     <div key={r.id} className="p-5 border border-slate-100 rounded-2xl flex justify-between items-center group hover:border-sky-300 hover:shadow-md transition-all cursor-pointer bg-white" onClick={() => generatePDF('file', r)}>
+                                         <div className="flex items-center gap-5">
+                                             <div className="p-4 bg-sky-50 text-sky-600 rounded-2xl group-hover:scale-110 transition-transform"><FileText size={24}/></div>
                                              <div>
-                                                 <p className="font-bold text-xs text-slate-700">{r.title}</p>
-                                                 <p className="text-[9px] font-bold text-slate-400 uppercase">Reçu le {r.date}</p>
+                                                 <p className="font-black text-base text-slate-800 leading-tight mb-1">{r.title}</p>
+                                                 <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] font-bold text-white bg-slate-900 px-2 py-0.5 rounded uppercase tracking-widest">Document Officiel</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{r.date}</span>
+                                                 </div>
                                              </div>
                                          </div>
-                                         <Download size={14} className="text-slate-300 group-hover:text-sky-600" onClick={() => generatePDF('file', r)}/>
+                                         <div className="w-12 h-12 rounded-full flex items-center justify-center bg-slate-50 text-slate-400 group-hover:bg-sky-500 group-hover:text-white transition-colors shadow-sm">
+                                             <Download size={20}/>
+                                         </div>
                                      </div>
                                  ))}
+
+                                 {/* Documents Client */}
                                  {myReports.filter(r => r.author === 'client').map(r => (
-                                     <div key={r.id} className="p-3 bg-purple-50 rounded-xl flex justify-between items-center group">
-                                         <div className="flex items-center gap-3">
-                                             <div className="p-2 bg-white rounded-lg text-purple-400"><Send size={16}/></div>
+                                     <div key={r.id} className="p-5 border border-slate-100 rounded-2xl flex justify-between items-center bg-slate-50">
+                                         <div className="flex items-center gap-5">
+                                             <div className="p-4 bg-white text-purple-500 rounded-2xl shadow-sm"><Send size={24}/></div>
                                              <div>
-                                                 <p className="font-bold text-xs text-purple-700">{r.title}</p>
-                                                 <p className="text-[9px] font-bold text-purple-400 uppercase">Envoyé le {r.date}</p>
+                                                 <p className="font-black text-base text-slate-800 leading-tight mb-1">{r.title}</p>
+                                                 <div className="flex items-center gap-3">
+                                                    <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded uppercase tracking-widest">Envoyé par vous</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{r.date}</span>
+                                                 </div>
                                              </div>
                                          </div>
-                                         <CheckCircle size={14} className="text-purple-300"/>
+                                         <CheckCircle size={24} className="text-emerald-500"/>
                                      </div>
                                  ))}
                             </div>
                         </Card>
                         
                         {isUploading && (
-                             <div className="absolute inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-                                <Card className="p-6 w-full shadow-2xl border-0 rounded-3xl bg-white text-slate-800">
-                                    <div className="flex justify-between items-center mb-6"><h3 className="font-black text-lg uppercase tracking-tighter">Transmettre un document</h3><button onClick={() => setIsUploading(false)}><X size={20} className="text-slate-400"/></button></div>
-                                    <ReportEditForm 
-                                        report={{id: Date.now(), clientId: user.clientId}} 
-                                        clients={clients} 
-                                        userRole="client"
-                                        onSave={async (d) => { await onUpdateReport(d); setIsUploading(false); }} 
-                                        onCancel={() => setIsUploading(false)} 
-                                    />
+                             <div className="fixed inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                                <Card className="p-10 w-full max-w-md shadow-2xl border-0 rounded-[32px] bg-white text-slate-800">
+                                    <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-4">
+                                        <h3 className="font-black text-2xl uppercase tracking-tighter flex items-center gap-3"><Upload size={24} className="text-sky-500"/> Transmettre</h3>
+                                        <button onClick={() => setIsUploading(false)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-400"/></button>
+                                    </div>
+                                    <ReportEditForm report={{id: Date.now(), clientId: user.clientId}} clients={clients} userRole="client" onSave={async (d) => { await onUpdateReport(d); setIsUploading(false); }} onCancel={() => setIsUploading(false)} />
                                 </Card>
                             </div>
                         )}
@@ -1684,25 +1755,26 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     };
 
     return (
-        <div className="space-y-6 text-slate-800 pb-20 md:pb-0">
-             <Card className="p-8 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0 mb-8">
-                <div className="relative z-10 flex justify-between items-start">
+        <div className="space-y-8 text-slate-800 pb-24 lg:pb-0">
+             <Card className="p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0">
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                         <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">Bonjour, {user.name}</h2>
-                         <p className="text-slate-400 font-bold max-w-lg text-xs tracking-widest uppercase">Espace Client Aerothau</p>
+                         <p className="text-sky-400 font-black uppercase tracking-widest text-xs mb-2">Espace Client Sécurisé</p>
+                         <h2 className="text-4xl font-black uppercase tracking-tighter leading-none mb-2">{user.name}</h2>
+                         <p className="text-slate-400 font-medium text-sm">Gestion et suivi des interventions avifaunes.</p>
                     </div>
-                    <button onClick={() => { if(window.confirm("Se déconnecter ?")) window.location.reload(); }} className="bg-red-500/20 hover:bg-red-500 text-white p-2 rounded-xl transition-colors">
-                        <LogOut size={20} />
+                    <button onClick={() => { if(window.confirm("Voulez-vous vous déconnecter ?")) window.location.reload(); }} className="bg-white/10 hover:bg-red-500 text-white px-6 py-3 rounded-2xl transition-colors flex items-center gap-3 font-bold text-sm uppercase tracking-widest w-fit">
+                        <LogOut size={18} /> Quitter
                     </button>
                 </div>
-                <Plane className="absolute -right-10 -bottom-10 h-48 w-48 text-white/5 rotate-12" />
+                <Plane className="absolute -right-12 -bottom-24 h-64 w-64 text-white/5 rotate-12 pointer-events-none" />
             </Card>
 
-            <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar">
-                <button onClick={() => setActiveTab('dashboard')} className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'dashboard' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>Tableau de bord</button>
-                <button onClick={() => setActiveTab('map')} className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'map' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>Carte Interactive</button>
-                <button onClick={() => setActiveTab('list')} className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'list' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>Liste des Nids</button>
-                <button onClick={() => setActiveTab('documents')} className={`px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeTab === 'documents' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>Documents</button>
+            <div className="flex overflow-x-auto gap-3 pb-4 custom-scrollbar">
+                <button onClick={() => setActiveTab('dashboard')} className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'dashboard' ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}><Activity size={16}/> Vue d'ensemble</button>
+                <button onClick={() => setActiveTab('map')} className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'map' ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}><MapIcon size={16}/> Cartographie</button>
+                <button onClick={() => setActiveTab('list')} className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'list' ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}><ListIcon size={16}/> Inventaire</button>
+                <button onClick={() => setActiveTab('documents')} className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'documents' ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}><FileText size={16}/> Documents</button>
             </div>
 
             {renderContent()}
@@ -1710,7 +1782,9 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     );
 };
 
-// --- COMPOSANT APP PRINCIPAL ---
+// ============================================================================
+// 8. APP PRINCIPALE & ROUTING
+// ============================================================================
 
 export default function AerothauApp() {
   const [user, setUser] = useState(null);
@@ -1724,7 +1798,7 @@ export default function AerothauApp() {
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const showToast = (message, type = 'success') => { setToast({ message, type }); };
+  const showToast = useCallback((message, type = 'success') => { setToast({ message, type }); }, []);
 
   useEffect(() => {
     const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) { console.error("Auth error", e); } };
@@ -1762,7 +1836,7 @@ export default function AerothauApp() {
       if (!isFirebaseReady) return;
       try {
           await setDoc(doc(db, "artifacts", appId, "public", "data", collectionName, data.id.toString()), data);
-          showToast("Enregistrement réussi !", "success");
+          showToast("Données sauvegardées", "success");
       } catch (error) { showToast("Erreur d'enregistrement", "error"); }
   };
   
@@ -1770,59 +1844,73 @@ export default function AerothauApp() {
       if (!isFirebaseReady) return;
       try {
           await deleteDoc(doc(db, "artifacts", appId, "public", "data", collectionName, id.toString()));
-          showToast("Suppression réussie", "success");
+          showToast("Suppression confirmée", "success");
       } catch (error) { showToast("Erreur de suppression", "error"); }
   };
 
   if (!user) return <LoginForm onLogin={setUser} users={availableUsers} logoUrl={LOGO_URL} />;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex text-slate-900 font-sans selection:bg-sky-100 selection:text-sky-900">
+    <div className="min-h-screen bg-[#f8fafc] flex text-slate-900 font-sans selection:bg-sky-200 selection:text-sky-900">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
+      {/* SIDEBAR ADMIN */}
       {user.role === 'admin' && (
-      <aside className={`fixed lg:static inset-y-0 left-0 z-[1000] w-72 bg-slate-900 text-white transform transition-transform duration-500 ease-in-out shadow-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-        <div className="p-8 h-full flex flex-col">
-          <div className="flex items-center gap-4 mb-12"><div className="p-2 bg-white rounded-xl shadow-lg shadow-white/5"><img src={LOGO_URL} alt="Logo" className="h-10 w-auto" /></div><span className="text-xl font-black uppercase tracking-tighter">Aerothau</span></div>
-          <nav className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar pr-2">
-            {[
-                { id: "dashboard", label: "Dashboard", icon: Home, roles: ["admin"] },
-                { id: "map", label: "Carte Interactive", icon: MapIcon, roles: ["admin", "client"] },
-                { id: "nests", label: "Gestion des Nids", icon: Bird, roles: ["admin"] },
-                { id: "clients", label: "Fiches Clients", icon: Users, roles: ["admin"] },
-                { id: "schedule", label: "Planning", icon: Calendar, roles: ["admin"] },
-                { id: "reports", label: "Documents", icon: FileText, roles: ["admin", "client"] },
-            ].filter(i => i.roles.includes(user.role)).map(item => (
-              <button key={item.id} onClick={() => { setView(item.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-black uppercase text-[10px] tracking-widest ${view === item.id || (item.id === "clients" && view === "client-detail") ? "bg-sky-600 text-white shadow-xl shadow-sky-900/50 scale-[1.02]" : "text-slate-500 hover:bg-slate-800 hover:text-white"}`}>
-                <item.icon size={20} className={view === item.id ? "text-white" : "text-slate-600 group-hover:text-white"} /> <span className="opacity-90">{item.label}</span>
-              </button>
-            ))}
-          </nav>
-          <div className="mt-auto pt-8 border-t border-slate-800 space-y-6">
-              <div className="flex items-center gap-3 px-4">
-                  <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center font-black text-sky-400 border border-slate-700 shadow-inner uppercase">{user.name.charAt(0)}</div>
-                  <div className="overflow-hidden"><p className="text-xs font-black uppercase tracking-tighter truncate text-white">{user.name}</p><p className="text-[10px] font-bold uppercase text-slate-500 tracking-widest">{user.role}</p></div>
-              </div>
-              <button onClick={() => setUser(null)} className="w-full flex items-center gap-4 text-red-500 hover:bg-red-500 hover:text-white p-4 rounded-2xl transition-all font-black uppercase text-[10px] tracking-widest group shadow-sm"><LogOut size={18}/> Déconnexion</button>
-          </div>
-        </div>
-      </aside>
+      <>
+          {/* Overlay Mobile */}
+          {isSidebarOpen && <div className="fixed inset-0 bg-slate-900/50 z-[990] lg:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>}
+          
+          <aside className={`fixed lg:static inset-y-0 left-0 z-[1000] w-72 bg-slate-900 text-white transform transition-transform duration-500 ease-in-out shadow-2xl flex flex-col ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+            <div className="p-8 pb-4 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-4"><div className="p-2 bg-white rounded-xl shadow-lg"><img src={LOGO_URL} alt="Logo" className="h-8 w-auto" /></div><span className="text-xl font-black uppercase tracking-tighter">Aerothau</span></div>
+                <button className="lg:hidden p-2 text-slate-400 hover:text-white" onClick={() => setIsSidebarOpen(false)}><X size={20}/></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-2">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-4 ml-2">Menu Principal</p>
+                {[
+                    { id: "dashboard", label: "Vue Générale", icon: Home },
+                    { id: "map", label: "Cartographie Globale", icon: MapIcon },
+                    { id: "nests", label: "Base de données Nids", icon: Bird },
+                    { id: "clients", label: "Portefeuille Clients", icon: Users },
+                    { id: "schedule", label: "Planning Interventions", icon: Calendar },
+                    { id: "reports", label: "Rapports & Docs", icon: FileText },
+                ].map(item => (
+                  <button key={item.id} onClick={() => { setView(item.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all font-black uppercase text-[10px] tracking-widest ${view === item.id || (item.id === "clients" && view === "client-detail") ? "bg-sky-500 text-white shadow-xl shadow-sky-900/50 translate-x-1" : "text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-1"}`}>
+                    <item.icon size={20} className={view === item.id ? "text-white" : "text-slate-500 group-hover:text-white"} /> <span>{item.label}</span>
+                  </button>
+                ))}
+            </div>
+            
+            <div className="p-6 mt-auto bg-slate-950/50 shrink-0">
+                  <div className="flex items-center gap-4 mb-6">
+                      <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center font-black text-sky-400 border-2 border-slate-700 shadow-inner uppercase text-xl">{user.name.charAt(0)}</div>
+                      <div className="overflow-hidden flex-1"><p className="text-sm font-black uppercase tracking-tighter truncate text-white">{user.name}</p><p className="text-[10px] font-bold uppercase text-sky-500 tracking-widest">Administrateur</p></div>
+                  </div>
+                  <button onClick={() => setUser(null)} className="w-full flex items-center justify-center gap-3 text-red-400 hover:bg-red-500 hover:text-white py-4 rounded-2xl transition-all font-black uppercase text-xs tracking-widest group shadow-sm bg-red-500/10 border border-red-500/20"><LogOut size={16} className="group-hover:-translate-x-1 transition-transform"/> Déconnexion</button>
+            </div>
+          </aside>
+      </>
       )}
 
-      <main className="flex-1 flex flex-col min-h-screen overflow-hidden">
-        <header className="bg-white/80 backdrop-blur-md border-b p-4 flex lg:hidden items-center justify-between sticky top-0 z-[110] shadow-sm text-slate-900">
-            {user.role === 'admin' && <button onClick={() => setIsSidebarOpen(true)} className="p-2"><Menu size={24} /></button>}
-            <span className="font-black uppercase tracking-tighter">Aerothau</span>
-            {user.role !== 'admin' && <button onClick={() => setUser(null)} className="text-red-500 flex items-center gap-2 text-xs font-bold uppercase tracking-widest bg-red-50 px-4 py-2 rounded-xl"><LogOut size={16}/> Déconnexion</button>}
-        </header>
-        <div className="flex-1 p-6 lg:p-12 overflow-auto custom-scrollbar">
-          <div className="max-w-6xl mx-auto">
+      {/* CONTENU PRINCIPAL */}
+      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
+        {user.role === 'admin' && (
+            <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200 p-4 flex lg:hidden items-center justify-between sticky top-0 z-[900] shadow-sm">
+                <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"><Menu size={24} /></button>
+                <span className="font-black uppercase tracking-tighter text-slate-900">Aerothau Admin</span>
+                <div className="w-10"></div>
+            </header>
+        )}
+
+        <div className="flex-1 overflow-auto custom-scrollbar relative" id="main-scroll-container">
+          <div className="max-w-[1400px] mx-auto p-4 md:p-8 lg:p-10">
             {user.role === "admin" ? (
               <>
                 {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} />}
                 {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} />}
                 {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} onDeleteAllNests={async () => {
-                    if (window.confirm("⚠️ Êtes-vous sûr de vouloir supprimer TOUS les nids ?")) {
+                    if (window.confirm("⚠️ ACTION IRRÉVERSIBLE : Supprimer absolument TOUS les nids de la base ?")) {
                         for (const m of markers) { await deleteFromFirebase("markers", m.id); }
                         showToast("Tous les nids ont été supprimés.", "success");
                     }
@@ -1838,11 +1926,13 @@ export default function AerothauApp() {
           </div>
         </div>
       </main>
+
+      {/* CSS GLOBAL POUR SCROLLBAR ET ICONES */}
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px;}
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; border: 2px solid transparent; background-clip: padding-box; }
         .custom-icon { display: flex; align-items: center; justify-content: center; }
       `}</style>
     </div>
