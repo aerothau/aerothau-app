@@ -982,7 +982,20 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
   const [selectedNest, setSelectedNest] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  // LOGIQUE EXPORT XLSX
+  const cleanGhosts = async () => {
+      const ghosts = markers.filter(m => m.lat === MAP_CENTER_DEFAULT.lat && m.lng === MAP_CENTER_DEFAULT.lng);
+      if (ghosts.length === 0) {
+          alert("Aucun nid fantôme trouvé.");
+          return;
+      }
+      if(window.confirm(`Voulez-vous supprimer les ${ghosts.length} nids fantômes empilés à Sète ?`)) {
+          for (const ghost of ghosts) {
+              await onDeleteNest(ghost);
+          }
+          alert("Nettoyage des fantômes terminé !");
+      }
+  };
+
   const handleExport = async () => {
     setIsExporting(true);
     const XLSX = await loadSheetJS();
@@ -1012,7 +1025,6 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
     setIsExporting(false);
   };
 
-  // LOGIQUE IMPORT XLSX
   const handleImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1032,7 +1044,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
             
             let lat = MAP_CENTER_DEFAULT.lat;
             let lng = MAP_CENTER_DEFAULT.lng;
-            let hasGps = false; // On vérifie si on a vraiment trouvé un GPS
+            let hasGps = false;
 
             if (row["Gps"]) {
                 const parts = row["Gps"].toString().split(",");
@@ -1073,7 +1085,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
             const newNest = {
                 id: row["ID"] || (row["N° point"] ? parseInt(row["N° point"]) + Date.now() : Date.now() + count),
                 clientId: client ? client.id : "",
-                status: hasGps ? (row["Etat du nids"] || "present_high") : "temp", // Si pas de GPS on le met "à valider"
+                status: hasGps ? (row["Etat du nids"] || "present_high") : "temp",
                 eggs: parseInt(row["nbr d'œuf"]) || 0,
                 address: row["Adresse"] || row["adresse precis"] || (hasGps ? "Adresse importée" : "⚠️ À REPLACER (Pas de GPS)"),
                 lat: lat,
@@ -1104,12 +1116,13 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
         <div className="flex gap-3 flex-wrap">
-            <Button variant="danger" onClick={onDeleteAllNests}><Trash2 size={18}/> Tout purger</Button>
-            <Button variant="secondary" onClick={handleExport} disabled={isExporting}><Download size={18}/> Exporter Excel</Button>
+            <Button variant="outline" className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6 border-2 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={cleanGhosts}><Trash2 size={16}/> Purger Fantômes</Button>
+            <Button variant="danger" onClick={onDeleteAllNests} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6"><Trash2 size={16}/> Tout purger</Button>
+            <Button variant="secondary" onClick={handleExport} disabled={isExporting} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6"><Download size={16}/> Exporter Excel</Button>
             <div className="relative">
                 <input type="file" accept=".xlsx, .csv" onChange={handleImport} className="hidden" id="import-excel-file" />
-                <label htmlFor="import-excel-file" className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase cursor-pointer hover:bg-sky-700 shadow-lg h-full">
-                    <Upload size={18}/> Importer Fichier
+                <label htmlFor="import-excel-file" className="flex items-center gap-2 bg-sky-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase cursor-pointer hover:bg-sky-700 shadow-xl shadow-sky-200 h-12 transition-all">
+                    <Upload size={16}/> Importer Fichier
                 </label>
             </div>
         </div>
@@ -1430,348 +1443,6 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
                     </Card>
                 </div>
             )}
-        </div>
-    );
-};
-
-// ============================================================================
-// 7. ESPACE CLIENT (FRONT-END CLIENT)
-// ============================================================================
-
-const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateNest, onUpdateReport }) => {
-    const myMarkers = useMemo(() => markers.filter(m => m.clientId === user.clientId), [markers, user.clientId]);
-    const myReports = useMemo(() => reports.filter(r => r.clientId === user.clientId), [reports, user.clientId]);
-    const neut = useMemo(() => myMarkers.filter(m => m.status && m.status.includes("sterilized")).length, [myMarkers]);
-    
-    const clientStats = useMemo(() => ({
-        reported: myMarkers.filter(m => m.status === "reported_by_client").length,
-        active: myMarkers.filter(m => m.status.startsWith("present")).length,
-        passage1: myMarkers.filter(m => m.status === "sterilized_1").length,
-        passage2: myMarkers.filter(m => m.status === "sterilized_2").length,
-        nonPresent: myMarkers.filter(m => m.status === "non_present").length,
-    }), [myMarkers]);
-
-    const [pendingReport, setPendingReport] = useState(null);
-    const [isAddingMode, setIsAddingMode] = useState(false);
-    const [selectedNestDetail, setSelectedNestDetail] = useState(null);
-    const [isUploading, setIsUploading] = useState(false);
-    const [activeTab, setActiveTab] = useState('dashboard');
-
-    const requestIntervention = async () => {
-        if(window.confirm("Confirmer la demande d'intervention urgente ?")) {
-            alert("Votre demande a été transmise à nos équipes. Nous vous contacterons sous 24h.");
-        }
-    };
-
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'dashboard':
-                return (
-                    <div className="space-y-8 animate-in fade-in duration-500">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-slate-900">
-                            <Card className="p-6 border-0 shadow-xl rounded-[32px] flex flex-col justify-between bg-gradient-to-br from-sky-400 to-blue-600 text-white relative overflow-hidden">
-                                <div className="relative z-10">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="font-black uppercase tracking-widest text-[10px] opacity-80">Météo Site</span>
-                                        <Cloud size={24} />
-                                    </div>
-                                    <div className="flex items-end gap-2 mb-3">
-                                        <span className="text-4xl font-black leading-none">18°C</span>
-                                        <span className="text-xs font-bold opacity-90 mb-1">Vent: 12km/h</span>
-                                    </div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-lg inline-block backdrop-blur-sm">✅ Conditions optimales</p>
-                                </div>
-                                <Wind className="absolute -right-6 -bottom-6 w-32 h-32 text-white/10" />
-                            </Card>
-
-                            <Card className="p-8 border-0 shadow-xl rounded-[32px] flex flex-col justify-center bg-white relative overflow-hidden group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setActiveTab('map')}>
-                                <div className="relative z-10">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><MapPin size={14} className="text-sky-500"/> Surveillance Globale</p>
-                                    <p className="text-5xl font-black text-slate-800 tracking-tighter">{myMarkers.length} <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Nids</span></p>
-                                </div>
-                                <Bird size={100} className="text-slate-50 absolute -right-4 -bottom-4 transform -scale-x-100 group-hover:text-slate-100 transition-colors" />
-                            </Card>
-
-                            <Card className="p-8 border-0 shadow-xl rounded-[32px] flex flex-col justify-center bg-white relative overflow-hidden">
-                                <div className="relative z-10">
-                                    <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2 flex items-center gap-2"><CheckCircle size={14}/> Impact Sanitaire</p>
-                                    <p className="text-5xl font-black text-emerald-600 tracking-tighter">{clientStats.passage2} <span className="text-sm font-bold text-emerald-400 uppercase tracking-widest">Stérilisés</span></p>
-                                </div>
-                                <CheckCircle size={100} className="text-emerald-50 absolute -right-4 -bottom-4" />
-                            </Card>
-                        </div>
-
-                        <div>
-                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-4 pl-2">Analyse de la population</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
-                                    <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest mb-2">Signalements</span>
-                                    <span className="text-3xl font-black text-slate-800">{clientStats.reported}</span>
-                                </Card>
-                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
-                                    <span className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-2">Actifs & Sensibles</span>
-                                    <span className="text-3xl font-black text-slate-800">{clientStats.active}</span>
-                                </Card>
-                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
-                                    <span className="text-[10px] font-black uppercase text-lime-600 tracking-widest mb-2">1er Passage</span>
-                                    <span className="text-3xl font-black text-slate-800">{clientStats.passage1}</span>
-                                </Card>
-                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
-                                    <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-2">2ème Passage</span>
-                                    <span className="text-3xl font-black text-slate-800">{clientStats.passage2}</span>
-                                </Card>
-                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
-                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Inactifs</span>
-                                    <span className="text-3xl font-black text-slate-800">{clientStats.nonPresent}</span>
-                                </Card>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
-                            <Card className="p-8 border-0 shadow-2xl rounded-[32px] bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden lg:col-span-1">
-                                <div className="relative z-10 w-full">
-                                    <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                                        <AlertTriangle size={32} className="text-red-400 animate-pulse"/>
-                                    </div>
-                                    <h3 className="font-black text-2xl uppercase tracking-tighter mb-3">Nid Problématique ?</h3>
-                                    <p className="text-xs text-slate-400 mb-8 leading-relaxed font-medium px-4">Signalez-nous immédiatement toute nuisance ou comportement agressif.</p>
-                                    <Button variant="sky" className="w-full rounded-2xl text-xs uppercase font-black tracking-widest py-4 shadow-xl shadow-sky-900" onClick={() => {setIsAddingMode(true); setActiveTab('map');}}>
-                                        <Crosshair size={18}/> Pointer sur la carte
-                                    </Button>
-                                    <button onClick={requestIntervention} className="w-full mt-4 text-[10px] uppercase font-bold text-slate-500 hover:text-white tracking-widest transition-colors">Demander un passage technique</button>
-                                </div>
-                            </Card>
-
-                            <Card className="p-0 border-0 shadow-xl rounded-[32px] bg-white flex flex-col h-full lg:col-span-2 overflow-hidden">
-                                <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
-                                    <h3 className="font-black text-sm text-slate-800 uppercase tracking-widest flex items-center gap-3"><FileText size={18} className="text-sky-500"/> Rapports d'intervention</h3>
-                                    <button onClick={() => setActiveTab('documents')} className="text-[10px] font-black bg-white px-4 py-2 rounded-xl text-sky-600 uppercase hover:bg-sky-50 transition-colors shadow-sm">Tout voir</button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
-                                     {myReports && myReports.length > 0 ? myReports.slice(0, 4).map(r => (
-                                         <div key={r.id} className="p-4 border border-slate-100 rounded-2xl flex justify-between items-center group hover:border-sky-300 hover:shadow-md transition-all cursor-pointer bg-white" onClick={() => generatePDF('file', r)}>
-                                             <div className="flex items-center gap-4">
-                                                 <div className={`p-3 rounded-xl ${r.author === 'client' ? 'bg-purple-50 text-purple-600' : 'bg-sky-50 text-sky-600'}`}>
-                                                    {r.author === 'client' ? <Upload size={20}/> : <Download size={20}/>}
-                                                 </div>
-                                                 <div>
-                                                     <p className="font-black text-sm text-slate-800 leading-tight mb-1">{r.title}</p>
-                                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{r.date} • {r.author === 'client' ? 'Soumis' : 'Reçu'}</p>
-                                                 </div>
-                                             </div>
-                                             <div className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 group-hover:bg-sky-500 group-hover:text-white text-slate-400 transition-colors">
-                                                 <Printer size={16}/>
-                                             </div>
-                                         </div>
-                                     )) : (
-                                         <div className="h-full flex flex-col items-center justify-center text-slate-400 py-12">
-                                             <File size={48} className="mb-4 opacity-10"/>
-                                             <p className="text-xs font-bold uppercase tracking-widest">Aucun rapport récent.</p>
-                                         </div>
-                                     )}
-                                </div>
-                            </Card>
-                        </div>
-                    </div>
-                );
-            case 'map':
-                return (
-                    <div className="h-[700px] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-500">
-                        <Card className="p-5 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-3xl bg-white">
-                            <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-800 flex items-center gap-3"><MapIcon className="text-sky-500"/> Cartographie du Site</div>
-                            <Button variant={isAddingMode ? "danger" : "sky"} className="py-4 px-8 rounded-2xl uppercase font-black tracking-widest text-xs shadow-lg" onClick={() => setIsAddingMode(!isAddingMode)}>
-                                {isAddingMode ? <><X size={18}/> Mode Navigation</> : <><Plus size={18}/> Signaler un nouveau nid</>}
-                            </Button>
-                        </Card>
-                        <div className={`flex-1 relative shadow-2xl rounded-[32px] overflow-hidden bg-white transition-all duration-300 ${isAddingMode ? 'border-[8px] border-sky-500' : 'border-0'}`}>
-                            {isAddingMode && (
-                                <div className="absolute inset-x-0 top-6 z-[1000] flex justify-center pointer-events-none animate-in slide-in-from-top-4">
-                                    <div className="bg-slate-900 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest text-xs shadow-2xl shadow-slate-900/50 flex items-center gap-3">
-                                        <span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span></span>
-                                        Cliquez sur la toiture pour placer le nid
-                                    </div>
-                                </div>
-                            )}
-                            <LeafletMap 
-                                markers={myMarkers} 
-                                isAddingMode={isAddingMode} 
-                                onMarkerClick={(m) => { if(!isAddingMode) setSelectedNestDetail(m); }}
-                                onMapClick={(ll) => {
-                                    if(isAddingMode) {
-                                        setPendingReport({ id: Date.now(), clientId: user.clientId, lat: ll.lat, lng: ll.lng, address: "Signalement en attente", status: "reported_by_client", title: "Nouveau Signalement" });
-                                        setIsAddingMode(false);
-                                    }
-                                }}
-                            />
-                            
-                            {pendingReport && (
-                                <div className="absolute top-6 left-6 z-[500] w-80 md:w-96 max-h-[90%] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-left-6 rounded-[32px]">
-                                    <Card className="border-0 flex flex-col overflow-hidden bg-white shadow-none rounded-none h-full">
-                                        <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
-                                            <span className="font-black text-sm uppercase tracking-widest flex items-center gap-3"><Crosshair size={18} className="text-sky-400"/> Finaliser Signalement</span>
-                                            <button onClick={() => setPendingReport(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20}/></button>
-                                        </div>
-                                        <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
-                                            <ClientReportForm nest={pendingReport} onSave={async (d) => {
-                                                await onUpdateNest(d);
-                                                setPendingReport(null);
-                                                alert("Votre signalement a été transmis à l'équipe technique avec succès !");
-                                            }} onCancel={() => setPendingReport(null)} />
-                                        </div>
-                                    </Card>
-                                </div>
-                            )}
-
-                            {selectedNestDetail && (
-                                <div className="absolute top-6 left-6 z-[500] w-80 md:w-96 max-h-[90%] overflow-hidden flex flex-col shadow-2xl animate-in slide-in-from-left-6 rounded-[32px]">
-                                    <Card className="border-0 flex flex-col overflow-hidden bg-white shadow-none rounded-none h-full">
-                                        <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
-                                            <span className="font-black text-sm uppercase tracking-widest flex items-center gap-3"><MapIcon size={18} className="text-sky-400"/> Détails du Nid</span>
-                                            <button onClick={() => setSelectedNestDetail(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20}/></button>
-                                        </div>
-                                        <div className="p-6 overflow-y-auto shrink custom-scrollbar bg-white">
-                                            <NestEditForm nest={selectedNestDetail} readOnly={true} onCancel={() => setSelectedNestDetail(null)} />
-                                        </div>
-                                    </Card>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            case 'list':
-                return (
-                     <Card className="p-0 border-0 shadow-2xl rounded-[32px] bg-white flex flex-col flex-1 overflow-hidden h-[700px] animate-in fade-in duration-500">
-                        <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
-                            <div>
-                                <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter mb-1">Inventaire du site</h3>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Liste détaillée de tous les nids</p>
-                            </div>
-                            <div className="p-4 bg-white rounded-2xl shadow-sm"><Bird size={24} className="text-sky-500"/></div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar">
-                             {myMarkers.length > 0 ? (
-                                 <table className="w-full text-left text-sm">
-                                     <thead className="bg-white text-slate-400 font-bold uppercase text-[10px] tracking-widest sticky top-0 z-10 shadow-sm">
-                                         <tr><th className="p-5 pl-8">Référence / Localisation</th><th className="p-5">État d'avancement</th><th className="p-5 text-center">Contenu</th><th className="p-5 pr-8">Notes équipe</th></tr>
-                                     </thead>
-                                     <tbody className="divide-y divide-slate-50">
-                                         {myMarkers.map(m => (
-                                             <tr key={m.id} className="hover:bg-slate-50/80 transition-colors cursor-pointer group" onClick={() => { setSelectedNestDetail(m); setActiveTab('map'); }}>
-                                                 <td className="p-5 pl-8">
-                                                     <div className="font-black text-slate-800 text-base mb-1 group-hover:text-sky-600 transition-colors">{m.title || "Nid #" + m.id.toString().slice(-4)}</div>
-                                                     <div className="text-xs text-slate-400 truncate max-w-[250px] font-medium flex items-center gap-1"><MapPin size={10}/>{m.address}</div>
-                                                 </td>
-                                                 <td className="p-5"><Badge status={m.status}/></td>
-                                                 <td className="p-5 text-center font-black text-slate-700 text-lg">{m.eggs} <span className="text-[10px] uppercase text-slate-400">œuf(s)</span></td>
-                                                 <td className="p-5 pr-8 text-xs font-medium text-slate-500 italic max-w-[200px] truncate" title={m.comments}>{m.comments || "-"}</td>
-                                             </tr>
-                                         ))}
-                                     </tbody>
-                                 </table>
-                             ) : (
-                                 <div className="h-full flex flex-col items-center justify-center text-slate-400 p-12 text-center">
-                                     <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6"><Bird size={48} className="opacity-20"/></div>
-                                     <p className="text-sm font-bold uppercase tracking-widest">Aucun nid recensé sur votre site pour le moment.</p>
-                                 </div>
-                             )}
-                        </div>
-                    </Card>
-                );
-            case 'documents':
-                return (
-                    <div className="h-[700px] flex flex-col gap-6 animate-in fade-in duration-500">
-                         <Card className="p-0 border-0 shadow-2xl rounded-[32px] bg-white flex flex-col flex-1 overflow-hidden relative">
-                             <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
-                                <div>
-                                    <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter mb-1">Espace Documentaire</h3>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Rapports, devis et attestations</p>
-                                </div>
-                                <Button variant="sky" className="px-6 py-3 rounded-2xl uppercase font-black text-xs tracking-widest shadow-xl shadow-sky-200" onClick={() => setIsUploading(true)}><Upload size={16}/> Transmettre un fichier</Button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
-                                 {myReports.length === 0 && <p className="text-center text-slate-400 font-bold uppercase text-xs tracking-widest py-12">Dossier vide</p>}
-                                 
-                                 {/* Documents Aerothau */}
-                                 {myReports.filter(r => r.author === 'admin').map(r => (
-                                     <div key={r.id} className="p-5 border border-slate-100 rounded-2xl flex justify-between items-center group hover:border-sky-300 hover:shadow-md transition-all cursor-pointer bg-white" onClick={() => generatePDF('file', r)}>
-                                         <div className="flex items-center gap-5">
-                                             <div className="p-4 bg-sky-50 text-sky-600 rounded-2xl group-hover:scale-110 transition-transform"><FileText size={24}/></div>
-                                             <div>
-                                                 <p className="font-black text-base text-slate-800 leading-tight mb-1">{r.title}</p>
-                                                 <div className="flex items-center gap-3">
-                                                    <span className="text-[10px] font-bold text-white bg-slate-900 px-2 py-0.5 rounded uppercase tracking-widest">Document Officiel</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{r.date}</span>
-                                                 </div>
-                                             </div>
-                                         </div>
-                                         <div className="w-12 h-12 rounded-full flex items-center justify-center bg-slate-50 text-slate-400 group-hover:bg-sky-500 group-hover:text-white transition-colors shadow-sm">
-                                             <Download size={20}/>
-                                         </div>
-                                     </div>
-                                 ))}
-
-                                 {/* Documents Client */}
-                                 {myReports.filter(r => r.author === 'client').map(r => (
-                                     <div key={r.id} className="p-5 border border-slate-100 rounded-2xl flex justify-between items-center bg-slate-50">
-                                         <div className="flex items-center gap-5">
-                                             <div className="p-4 bg-white text-purple-500 rounded-2xl shadow-sm"><Send size={24}/></div>
-                                             <div>
-                                                 <p className="font-black text-base text-slate-800 leading-tight mb-1">{r.title}</p>
-                                                 <div className="flex items-center gap-3">
-                                                    <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded uppercase tracking-widest">Envoyé par vous</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{r.date}</span>
-                                                 </div>
-                                             </div>
-                                         </div>
-                                         <CheckCircle size={24} className="text-emerald-500"/>
-                                     </div>
-                                 ))}
-                            </div>
-                        </Card>
-                        
-                        {/* Modal Upload Client */}
-                        {isUploading && (
-                             <div className="fixed inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
-                                <Card className="p-10 w-full max-w-md shadow-2xl border-0 rounded-[32px] bg-white text-slate-800">
-                                    <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-4">
-                                        <h3 className="font-black text-2xl uppercase tracking-tighter flex items-center gap-3"><Upload size={24} className="text-sky-500"/> Transmettre</h3>
-                                        <button onClick={() => setIsUploading(false)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-400"/></button>
-                                    </div>
-                                    <ReportEditForm report={{id: Date.now(), clientId: user.clientId}} clients={clients} userRole="client" onSave={async (d) => { await onUpdateReport(d); setIsUploading(false); }} onCancel={() => setIsUploading(false)} />
-                                </Card>
-                            </div>
-                        )}
-                    </div>
-                );
-            default:
-                return null;
-        }
-    };
-
-    return (
-        <div className="space-y-8 text-slate-800 pb-24 lg:pb-0">
-             <Card className="p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl rounded-[32px] border-0">
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div>
-                         <p className="text-sky-400 font-black uppercase tracking-widest text-xs mb-2">Espace Client Sécurisé</p>
-                         <h2 className="text-4xl font-black uppercase tracking-tighter leading-none mb-2">{user.name}</h2>
-                         <p className="text-slate-400 font-medium text-sm">Gestion et suivi des interventions avifaunes.</p>
-                    </div>
-                    <button onClick={() => { if(window.confirm("Voulez-vous vous déconnecter ?")) window.location.reload(); }} className="bg-white/10 hover:bg-red-500 text-white px-6 py-3 rounded-2xl transition-colors flex items-center gap-3 font-bold text-sm uppercase tracking-widest w-fit">
-                        <LogOut size={18} /> Quitter
-                    </button>
-                </div>
-                <Plane className="absolute -right-12 -bottom-24 h-64 w-64 text-white/5 rotate-12 pointer-events-none" />
-            </Card>
-
-            <div className="flex overflow-x-auto gap-3 pb-4 custom-scrollbar">
-                <button onClick={() => setActiveTab('dashboard')} className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'dashboard' ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}><Activity size={16}/> Vue d'ensemble</button>
-                <button onClick={() => setActiveTab('map')} className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'map' ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}><MapIcon size={16}/> Cartographie</button>
-                <button onClick={() => setActiveTab('list')} className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'list' ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}><ListIcon size={16}/> Inventaire</button>
-                <button onClick={() => setActiveTab('documents')} className={`px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all flex items-center gap-2 ${activeTab === 'documents' ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'}`}><FileText size={16}/> Documents</button>
-            </div>
-
-            {renderContent()}
         </div>
     );
 };
