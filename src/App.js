@@ -44,7 +44,8 @@ import {
   FileCheck,
   Activity,
   Cloud,
-  Wind
+  Wind,
+  List as ListIcon
 } from "lucide-react";
 
 // ============================================================================
@@ -515,7 +516,10 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">État du nid</label>
                     <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
                         <option value="reported_by_client">🟣 Signalement Client</option>
-                        <option value="present">🔴 Présent (Actif)</option>
+                        <option value="present_high">🔴 Priorité Haute (Rouge)</option>
+                        <option value="present_medium">🟠 Priorité Moyenne (Orange)</option>
+                        <option value="present_low">🟡 Priorité Faible (Jaune)</option>
+                        <option value="present">🔴 Présent (Classique)</option>
                         <option value="sterilized_1">🟢 1er Passage (Traité)</option>
                         <option value="sterilized_2">🟢 2ème Passage (Confirmé)</option>
                         <option value="non_present">⚪ Non présent / Inactif</option>
@@ -529,9 +533,9 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                     <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
                 </div>
                 <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Client</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Client Associé</label>
                     <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.clientId} onChange={e=>setFormData({...formData, clientId: parseInt(e.target.value)})}>
-                        <option value="">-- Sélectionner --</option>
+                        <option value="">-- Indépendant --</option>
                         {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
@@ -541,7 +545,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                         <input type="number" className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-xl font-black text-center text-sky-600 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
                     </div>
                      <div className="flex-1 flex items-end">
-                         <button type="button" onClick={openRoute} className="w-full h-[58px] bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-md"><Locate size={16}/> GPS</button>
+                         <button type="button" onClick={openRoute} className="w-full h-[58px] bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-md"><Locate size={16}/> Voir GPS</button>
                      </div>
                 </div>
             </div>
@@ -549,8 +553,8 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
         
         <div>
             <div className="flex justify-between items-end mb-1 pl-1 pr-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Adresse / Localisation</label>
-                <span className="text-[9px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md">GPS: {formData.lat?.toFixed(5)}, {formData.lng?.toFixed(5)}</span>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Adresse complète</label>
+                <span className="text-[9px] font-mono font-bold text-sky-500 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">GPS: {formData.lat?.toFixed(5)}, {formData.lng?.toFixed(5)}</span>
             </div>
             <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} placeholder="Numéro, Rue, Bâtiment..."/>
         </div>
@@ -559,6 +563,22 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Observations Techniques</label>
             <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm h-24 focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" placeholder="Accès difficile, type de toiture, nacelle nécessaire..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/>
         </div>
+
+        {/* SECTION IMPORTÉE MASQUABLE */}
+        {(formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info) && (
+            <div className="pt-4 border-t border-slate-100">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 pl-1"><Layers size={14}/> Champs Import Excel</label>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Lieux" value={formData.lieux || ""} onChange={e=>setFormData({...formData, lieux: e.target.value})} />
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Date visite" value={formData.dateVisite || ""} onChange={e=>setFormData({...formData, dateVisite: e.target.value})} />
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Adultes" value={formData.nbAdultes || ""} onChange={e=>setFormData({...formData, nbAdultes: e.target.value})} />
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Poussins" value={formData.nbPoussins || ""} onChange={e=>setFormData({...formData, nbPoussins: e.target.value})} />
+                </div>
+                <input className="w-full p-3 bg-slate-50 border-0 rounded-xl text-xs mb-3" placeholder="Comportement" value={formData.comportement || ""} onChange={e=>setFormData({...formData, comportement: e.target.value})} />
+            </div>
+        )}
+        
+        {onGeneratePDF && <Button variant="secondary" className="w-full py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={()=>onGeneratePDF(nest)}><Printer size={16}/> Générer Fiche PDF</Button>}
         
         <div className="flex gap-3 pt-4 border-t border-slate-100">
              {onDelete && <button onClick={() => onDelete(formData)} className="p-4 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-2xl transition-colors"><Trash2 size={20}/></button>}
@@ -593,6 +613,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
 
   useEffect(() => {
     if (mapInstanceRef.current) return;
+
     const initMap = () => {
         if (!mapContainerRef.current) return;
         try {
@@ -629,6 +650,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
 
+  // Correction écran blanc : forcer le redimensionnement sans détruire la carte
   useEffect(() => {
      if (mapInstanceRef.current) {
          setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 300);
@@ -724,7 +746,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
 
     const handleMarkerClick = (marker) => {
         if (marker.id === "temp") {
-            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present", eggs: 0, clientId: clients[0]?.id || "" };
+            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
             onUpdateNest(newNest); setTempMarker(null); setSelectedMarker(newNest);
         } else {
             setSelectedMarker(marker);
@@ -777,7 +799,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
 
                 <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} routePath={routePath} onMapClick={async (ll) => {
                     if(!isAdding) return;
-                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present", eggs: 0, clientId: clients[0]?.id || "" };
+                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
                     await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
                 }}/>
                 
@@ -949,10 +971,18 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       "adresse precis": m.address,
       "observation": m.comments || "",
       "Latitude": m.lat,
-      "Longitude": m.lng
+      "Longitude": m.lng,
+      "Lieux": m.lieux || "",
+      "Date de la visite": m.dateVisite || "",
+      "N° point": m.numPoint || "",
+      "Gps": m.gpsOriginal || "",
+      "Nb adulte": m.nbAdultes || "",
+      "Nd de Poussins (P=Poussin + S= semaine de développement)": m.nbPoussins || "",
+      "Comportement (Guetteur, Couve, Défend, Autres)": m.comportement || "",
+      "Remarques": m.remarques || "",
+      "info": m.info || ""
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
-    worksheet["!cols"] = [{ wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 40 }, { wch: 40 }, { wch: 15 }, { wch: 15 }];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Gestion Nids");
     XLSX.writeFile(workbook, `Aerothau_Nids_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -974,27 +1004,55 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
             
             let lat = MAP_CENTER_DEFAULT.lat;
             let lng = MAP_CENTER_DEFAULT.lng;
-            
-            if (row["Latitude"] && row["Longitude"]) {
+            if (row["Gps"]) {
+                const parts = row["Gps"].toString().split(",");
+                if (parts.length === 2) {
+                    const pLat = parseFloat(parts[0].trim());
+                    const pLng = parseFloat(parts[1].trim());
+                    if(!isNaN(pLat) && !isNaN(pLng)) {
+                        lat = pLat;
+                        lng = pLng;
+                    }
+                }
+            } else if (row["Latitude"] && row["Longitude"]) {
                 lat = parseFloat(row["Latitude"]) || lat;
                 lng = parseFloat(row["Longitude"]) || lng;
             }
 
-            const rawLocation = (row["Noms Client"] || "").toString().toLowerCase();
+            const rawLocation = (row["Noms Client"] || row["Lieux"] || "").toString().toLowerCase();
             let matchedClient = clients.find(c => c.name.toLowerCase() === rawLocation);
-            if (!matchedClient && rawLocation.length > 3) matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
+            
+            if (!matchedClient) {
+                if (rawLocation.includes("narbonne")) matchedClient = clients.find(c => c.name.toLowerCase().includes("narbonne"));
+                else if (rawLocation.includes("meze") || rawLocation.includes("mèze")) matchedClient = clients.find(c => c.name.toLowerCase().includes("meze") || c.name.toLowerCase().includes("mèze"));
+                else if (rawLocation.includes("sete") || rawLocation.includes("sète")) matchedClient = clients.find(c => c.name.toLowerCase().includes("sete") || c.name.toLowerCase().includes("sète"));
+                
+                if(!matchedClient && rawLocation.length > 3) {
+                     matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
+                }
+            }
+            
             const client = matchedClient || clients[0];
             
             const newNest = {
-                id: row["ID"] || Date.now() + count,
+                id: row["ID"] || (row["N° point"] ? parseInt(row["N° point"]) + Date.now() : Date.now() + count),
                 clientId: client ? client.id : "",
-                status: row["Etat du nids"] || "present",
+                status: row["Etat du nids"] || "present_high",
                 eggs: parseInt(row["nbr d'œuf"]) || 0,
-                address: row["adresse precis"] || "Adresse importée",
+                address: row["Adresse"] || row["adresse precis"] || "Adresse importée",
                 lat: lat,
                 lng: lng,
-                title: `Nid #${row["ID"] || count}`,
-                comments: row["observation"] || ""
+                title: `N°${row["N° point"] || count} - ${row["Lieux"] || "Nid importé"}`,
+                comments: row["observation"] || "Import depuis fichier Excel.",
+                lieux: row["Lieux"] || "",
+                dateVisite: row["Date de la visite"] || "",
+                info: row["info"] || "",
+                numPoint: row["N° point"] || "",
+                gpsOriginal: row["Gps"] || "",
+                nbAdultes: row["Nb adulte"] || "",
+                nbPoussins: row["Nd de Poussins (P=Poussin + S= semaine de développement)"] || "",
+                comportement: row["Comportement (Guetteur, Couve, Défend, Autres)"] || "",
+                remarques: row["Remarques"] || ""
             };
             await onUpdateNest(newNest);
             count++;
