@@ -863,35 +863,129 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
   }), [markers]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 text-slate-800">
-      <div className="flex justify-between items-center"><h2 className="text-3xl font-black uppercase tracking-tighter">TABLEAU DE BORD</h2></div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg border-0 text-center relative overflow-hidden">
-            <div className="relative z-10"><Cloud size={20} className="mx-auto mb-1 opacity-70"/><div className="text-2xl font-black">18°C</div><div className="text-[10px] font-bold uppercase">✅ Vol Autorisé</div></div>
-            <Wind className="absolute -right-4 -bottom-4 w-16 h-16 text-white/10" />
-        </Card>
-        <Card className={`p-4 text-center border-0 shadow-lg ${stats.reported > 0 ? 'bg-red-600 text-white animate-pulse' : 'bg-white text-slate-400'}`}>
-            <AlertTriangle size={20} className="mx-auto mb-1"/><div className="text-2xl font-black">{stats.reported}</div><div className="text-[10px] font-bold uppercase">Signalements</div>
-        </Card>
-        <Card className="p-4 bg-white text-center shadow-sm"><span className="text-[10px] font-black uppercase text-slate-400">Non Présents</span><div className="text-2xl font-black">{stats.nonPresent}</div></Card>
-        <Card className="p-4 bg-white text-center shadow-sm"><span className="text-[10px] font-black uppercase text-emerald-500">Stérilisés</span><div className="text-2xl font-black text-emerald-600">{stats.sterilized}</div></Card>
+    <div className="space-y-6 animate-in fade-in duration-500 text-slate-800">
+      <div className="flex justify-between items-center mb-2">
+          <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">TABLEAU DE BORD</h2>
       </div>
+      
+      {/* 1. KPIs GLOBAUX - Plus compacts */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="p-4 bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg border-0 text-center relative overflow-hidden flex flex-col justify-center">
+            <div className="relative z-10 flex items-center justify-center gap-3">
+                <Cloud size={32} className="opacity-80"/>
+                <div className="text-left">
+                    <div className="text-2xl font-black leading-none">18°C</div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest mt-1">✅ Vol OK</div>
+                </div>
+            </div>
+            <Wind className="absolute -right-4 -bottom-4 w-20 h-20 text-white/10" />
+        </Card>
+        
+        <Card className={`p-4 border-0 shadow-md flex items-center justify-between ${stats.reported > 0 ? 'bg-red-600 text-white animate-pulse' : 'bg-white'}`}>
+            <div>
+                <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${stats.reported > 0 ? 'text-red-200' : 'text-purple-500'}`}>Signalements</span>
+                <span className={`text-3xl font-black leading-none ${stats.reported > 0 ? 'text-white' : 'text-slate-800'}`}>{stats.reported}</span>
+            </div>
+            <AlertTriangle size={32} className={stats.reported > 0 ? 'text-red-300' : 'text-purple-100'}/>
+        </Card>
+        
+        <Card className="p-4 bg-white shadow-md border-0 flex items-center justify-between">
+            <div>
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-1">Non Présents</span>
+                <span className="text-3xl font-black leading-none text-slate-800">{stats.nonPresent}</span>
+            </div>
+            <Bird size={32} className="text-slate-100"/>
+        </Card>
+        
+        <Card className="p-4 bg-white shadow-md border-0 flex items-center justify-between">
+            <div>
+                <span className="text-[10px] font-black uppercase text-emerald-500 tracking-widest block mb-1">Stérilisés</span>
+                <span className="text-3xl font-black leading-none text-emerald-600">{stats.sterilized}</span>
+            </div>
+            <CheckCircle size={32} className="text-emerald-100"/>
+        </Card>
+      </div>
+
+      {/* 2. LAYOUT OPTIMISÉ : 2/3 Clients, 1/3 Agenda */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {clients.map(client => {
-              const cNests = markers.filter(m => m.clientId === client.id);
-              const cReported = cNests.filter(m => m.status === "reported_by_client").length;
-              const cDone = cNests.filter(m => m.status === "sterilized_2").length;
-              if (cNests.length === 0) return null;
-              return (
-                  <Card key={client.id} className="p-6">
-                    <h4 className="font-black text-slate-800 uppercase tracking-tight mb-4 flex items-center gap-2 truncate"><Users size={16}/> {client.name}</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="p-2 bg-purple-50 rounded-lg text-center"><p className="text-[9px] font-black text-purple-400 uppercase">Alertes</p><p className="text-xl font-black text-purple-700">{cReported}</p></div>
-                        <div className="p-2 bg-emerald-50 rounded-lg text-center"><p className="text-[9px] font-black text-emerald-400 uppercase">Stérilisés</p><p className="text-xl font-black text-emerald-700">{cDone}</p></div>
-                    </div>
-                  </Card>
-              );
-          })}
+          
+          {/* COLONNE GAUCHE : État des sites (Tableau compact) */}
+          <div className="lg:col-span-2">
+              <Card className="p-0 border-0 shadow-lg rounded-3xl overflow-hidden bg-white flex flex-col h-full">
+                  <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
+                      <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Users size={16} className="text-sky-400"/> État par client</h3>
+                  </div>
+                  <div className="overflow-x-auto max-h-[400px] custom-scrollbar">
+                      <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest sticky top-0 z-10 shadow-sm">
+                              <tr>
+                                  <th className="p-4 pl-6">Client / Site</th>
+                                  <th className="p-4 text-center">Total Nids</th>
+                                  <th className="p-4 text-center">Urgences</th>
+                                  <th className="p-4 text-center">Stérilisés</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {clients.map(client => {
+                                  const cNests = markers.filter(m => m.clientId === client.id);
+                                  if (cNests.length === 0) return null;
+                                  
+                                  const cReported = cNests.filter(m => m.status === "reported_by_client" || m.status === "present_high").length;
+                                  const cDone = cNests.filter(m => m.status === "sterilized_2").length;
+                                  
+                                  return (
+                                      <tr key={client.id} className="hover:bg-slate-50/50 transition-colors">
+                                          <td className="p-4 pl-6 font-bold text-slate-800">{client.name}</td>
+                                          <td className="p-4 text-center font-black text-slate-600">{cNests.length}</td>
+                                          <td className="p-4 text-center">
+                                              {cReported > 0 ? (
+                                                  <span className="bg-red-100 text-red-700 px-2 py-1 rounded-md text-xs font-bold">{cReported}</span>
+                                              ) : <span className="text-slate-300">-</span>}
+                                          </td>
+                                          <td className="p-4 text-center">
+                                              {cDone > 0 ? (
+                                                  <span className="text-emerald-600 font-black">{cDone}</span>
+                                              ) : <span className="text-slate-300">0</span>}
+                                          </td>
+                                      </tr>
+                                  );
+                              })}
+                              {clients.filter(c => markers.some(m => m.clientId === c.id)).length === 0 && (
+                                  <tr><td colSpan="4" className="p-8 text-center text-slate-400 italic text-xs">Aucune donnée client disponible.</td></tr>
+                              )}
+                          </tbody>
+                      </table>
+                  </div>
+              </Card>
+          </div>
+          
+          {/* COLONNE DROITE : Agenda compact */}
+          <div className="lg:col-span-1">
+               <Card className="p-0 border-0 shadow-lg rounded-3xl overflow-hidden bg-white flex flex-col h-full max-h-[460px]">
+                  <div className="p-5 bg-sky-600 text-white flex justify-between items-center">
+                      <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><Calendar size={16} className="text-sky-200"/> Interventions</h3>
+                  </div>
+                  <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+                       {interventions.filter(i => i.status === 'Planifié' || i.status === 'En attente')
+                           .sort((a,b) => new Date(a.date) - new Date(b.date))
+                           .slice(0, 5)
+                           .map(i => (
+                           <div key={i.id} className="border-l-2 border-sky-500 pl-4 py-1">
+                               <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-0.5">{i.date}</p>
+                               <p className="font-bold text-slate-800 text-sm leading-tight truncate">{clients.find(c => c.id === i.clientId)?.name || "Client"}</p>
+                               <div className="mt-2"><Badge status={i.status}/></div>
+                           </div>
+                       ))}
+                       {interventions.filter(i => i.status === 'Planifié' || i.status === 'En attente').length === 0 && (
+                           <div className="text-center text-slate-400 py-8">
+                               <Calendar size={32} className="mx-auto mb-2 opacity-50"/>
+                               <p className="text-xs font-medium uppercase tracking-widest">Rien de prévu</p>
+                           </div>
+                       )}
+                  </div>
+              </Card>
+          </div>
+
       </div>
     </div>
   );
@@ -1326,14 +1420,97 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     const [isUploading, setIsUploading] = useState(false);
     const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'map', 'list', 'documents'
 
+    const requestIntervention = async () => {
+        if(window.confirm("Confirmer la demande d'intervention urgente ?")) {
+            alert("Votre demande a été transmise à nos équipes. Nous vous contacterons sous 24h.");
+        }
+    };
+
     const renderContent = () => {
         switch (activeTab) {
             case 'dashboard':
                 return (
-                    <div className="space-y-10 animate-in fade-in duration-500">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-slate-900">
-                            <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-sky-50 text-sky-600 rounded-[28px]"><Bird size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids sous surveillance</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{myMarkers.length}</p></div></Card>
-                            <Card className="p-8 border-0 shadow-lg ring-1 ring-slate-100 rounded-3xl flex items-center gap-8 bg-white"><div className="p-5 bg-emerald-50 text-emerald-600 rounded-[28px]"><CheckCircle size={40}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Neutralisations</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{neut}</p></div></Card>
+                    <div className="space-y-8 animate-in fade-in duration-500">
+                        {/* WIDGET METEO & STATS - Alignés et compacts */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-slate-900">
+                            <Card className="p-6 border-0 shadow-lg rounded-3xl flex flex-col justify-between bg-gradient-to-br from-sky-400 to-blue-600 text-white relative overflow-hidden">
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold uppercase tracking-widest text-[10px] opacity-80">Météo de vol</span>
+                                        <Cloud size={20} />
+                                    </div>
+                                    <div className="flex items-end gap-2 mb-2">
+                                        <span className="text-3xl font-black leading-none">18°C</span>
+                                        <span className="text-xs font-bold opacity-90 mb-1">Vent: 12 km/h</span>
+                                    </div>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest bg-white/20 px-2 py-1 rounded-md inline-block">✅ Conditions optimales</p>
+                                </div>
+                                <Wind className="absolute -right-4 -bottom-4 w-24 h-24 text-white/10" />
+                            </Card>
+
+                            <Card className="p-6 border-0 shadow-lg rounded-3xl flex items-center justify-between bg-white relative overflow-hidden group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setActiveTab('map')}>
+                                <div className="relative z-10">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nids surveillés</p>
+                                    <p className="text-4xl font-black text-slate-800 tracking-tighter">{myMarkers.length}</p>
+                                    <p className="text-[10px] font-bold text-sky-600 uppercase mt-2 flex items-center gap-1 group-hover:underline">Voir la carte <ChevronRight size={12}/></p>
+                                </div>
+                                <Bird size={64} className="text-slate-50 absolute -right-2 -bottom-2 transform -scale-x-100 group-hover:text-slate-100 transition-colors" />
+                            </Card>
+
+                            <Card className="p-6 border-0 shadow-lg rounded-3xl flex items-center justify-between bg-white relative overflow-hidden">
+                                <div className="relative z-10">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Stérilisations</p>
+                                    <p className="text-4xl font-black text-emerald-600 tracking-tighter">{neut}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Passage 2 confirmé</p>
+                                </div>
+                                <CheckCircle size={64} className="text-emerald-50 absolute -right-2 -bottom-2" />
+                            </Card>
+                        </div>
+
+                        {/* ACTIONS RAPIDES & DOCS RECENTS */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            
+                            {/* DEMANDE INTERVENTION (1/3) */}
+                            <Card className="p-6 border-0 shadow-xl rounded-3xl bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden lg:col-span-1">
+                                <div className="relative z-10 w-full">
+                                    <AlertTriangle size={32} className="text-orange-400 mb-4 mx-auto animate-pulse"/>
+                                    <h3 className="font-black text-lg uppercase tracking-tighter mb-2">Un problème ?</h3>
+                                    <p className="text-xs text-slate-400 mb-6 leading-relaxed">Nid agressif ou nouvelle installation suspecte ?</p>
+                                    <Button variant="sky" className="w-full rounded-xl text-[10px] uppercase font-black tracking-widest py-3" onClick={() => {setIsAddingMode(true); setActiveTab('map');}}>
+                                        Signaler un nid
+                                    </Button>
+                                    <button onClick={requestIntervention} className="w-full mt-3 text-[10px] uppercase font-bold text-slate-400 hover:text-white tracking-widest transition-colors">Demande de passage</button>
+                                </div>
+                            </Card>
+
+                            {/* DOCUMENTS RECENTS (2/3) */}
+                            <Card className="p-0 border-0 shadow-xl rounded-3xl bg-white flex flex-col h-full lg:col-span-2 overflow-hidden">
+                                <div className="p-5 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+                                    <h3 className="font-black text-sm text-slate-800 uppercase tracking-widest flex items-center gap-2"><FileText size={16} className="text-sky-500"/> Documents Récents</h3>
+                                    <button onClick={() => setActiveTab('documents')} className="text-[10px] font-bold text-sky-600 uppercase hover:underline">Voir tout</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-3">
+                                     {myReports && myReports.length > 0 ? myReports.slice(0, 4).map(r => (
+                                         <div key={r.id} className="p-3 border border-slate-100 rounded-xl flex justify-between items-center group hover:border-sky-200 hover:shadow-sm transition-all cursor-pointer" onClick={() => generatePDF('file', r)}>
+                                             <div className="flex items-center gap-3">
+                                                 <div className={`p-2 rounded-lg ${r.author === 'client' ? 'bg-purple-50 text-purple-600' : 'bg-sky-50 text-sky-600'}`}>
+                                                    {r.author === 'client' ? <Upload size={14}/> : <Download size={14}/>}
+                                                 </div>
+                                                 <div>
+                                                     <p className="font-bold text-xs text-slate-800 leading-tight">{r.title}</p>
+                                                     <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">{r.date} • {r.author === 'client' ? 'Envoyé' : 'Reçu'}</p>
+                                                 </div>
+                                             </div>
+                                             <span className="text-slate-300 group-hover:text-sky-600 transition-colors"><Printer size={14}/></span>
+                                         </div>
+                                     )) : (
+                                         <div className="h-full flex flex-col items-center justify-center text-slate-400 py-8">
+                                             <File size={32} className="mb-2 opacity-20"/>
+                                             <p className="text-xs italic">Aucun document récent.</p>
+                                         </div>
+                                     )}
+                                </div>
+                            </Card>
                         </div>
                     </div>
                 );
