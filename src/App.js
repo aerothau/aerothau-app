@@ -1025,8 +1025,15 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         let count = 0;
         for (const row of jsonData) {
             
+            // 🛡️ ANTI-FANTÔME : On ignore les lignes Excel totalement vides
+            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) {
+                continue;
+            }
+            
             let lat = MAP_CENTER_DEFAULT.lat;
             let lng = MAP_CENTER_DEFAULT.lng;
+            let hasGps = false; // On vérifie si on a vraiment trouvé un GPS
+
             if (row["Gps"]) {
                 const parts = row["Gps"].toString().split(",");
                 if (parts.length === 2) {
@@ -1035,11 +1042,17 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                     if(!isNaN(pLat) && !isNaN(pLng)) {
                         lat = pLat;
                         lng = pLng;
+                        hasGps = true;
                     }
                 }
             } else if (row["Latitude"] && row["Longitude"]) {
-                lat = parseFloat(row["Latitude"]) || lat;
-                lng = parseFloat(row["Longitude"]) || lng;
+                const pLat = parseFloat(row["Latitude"]);
+                const pLng = parseFloat(row["Longitude"]);
+                if(!isNaN(pLat) && !isNaN(pLng)) {
+                    lat = pLat;
+                    lng = pLng;
+                    hasGps = true;
+                }
             }
 
             const rawLocation = (row["Noms Client"] || row["Lieux"] || "").toString().toLowerCase();
@@ -1060,9 +1073,9 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
             const newNest = {
                 id: row["ID"] || (row["N° point"] ? parseInt(row["N° point"]) + Date.now() : Date.now() + count),
                 clientId: client ? client.id : "",
-                status: row["Etat du nids"] || "present_high",
+                status: hasGps ? (row["Etat du nids"] || "present_high") : "temp", // Si pas de GPS on le met "à valider"
                 eggs: parseInt(row["nbr d'œuf"]) || 0,
-                address: row["Adresse"] || row["adresse precis"] || "Adresse importée",
+                address: row["Adresse"] || row["adresse precis"] || (hasGps ? "Adresse importée" : "⚠️ À REPLACER (Pas de GPS)"),
                 lat: lat,
                 lng: lng,
                 title: `N°${row["N° point"] || count} - ${row["Lieux"] || "Nid importé"}`,
