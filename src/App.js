@@ -686,12 +686,14 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       markersLayerRef.current.clearLayers();
       
       markers.forEach(m => {
-          let color = "#64748b"; 
-          if (m.status.startsWith("present")) color = "#ef4444"; 
-          else if (m.status === "temp") color = "#94a3b8"; 
-          else if (m.status === "sterilized_1") color = "#84cc16"; 
-          else if (m.status === "sterilized_2") color = "#22c55e"; 
-          else if (m.status === "reported_by_client") color = "#a855f7"; 
+          let color = "#64748b"; // Gris par défaut (Non présent)
+          if (m.status === "present" || m.status === "present_high") color = "#ef4444"; // Rouge
+          else if (m.status === "present_medium") color = "#f97316"; // Orange
+          else if (m.status === "present_low") color = "#eab308"; // Jaune
+          else if (m.status === "temp") color = "#94a3b8"; // Gris clair
+          else if (m.status === "sterilized_1") color = "#84cc16"; // Vert clair
+          else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; // Vert foncé
+          else if (m.status === "reported_by_client") color = "#a855f7"; // Violet
 
           const icon = L.divIcon({ 
               className: "custom-icon", 
