@@ -46,7 +46,8 @@ import {
   Cloud,
   Wind,
   List as ListIcon,
-  Layers
+  Layers,
+  Bell
 } from "lucide-react";
 
 // ============================================================================
@@ -722,7 +723,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
 
     if (!window.L) {
         if(!document.getElementById('leaflet-script')) {
-            const link = document.createElement("link"); link.id = 'leaflet-css'; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
+            const link = document.createElement("link"); link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
             const script = document.createElement("script"); script.id = 'leaflet-script'; script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true; script.onload = initMap; document.head.appendChild(script);
         } else {
             const script = document.getElementById('leaflet-script');
@@ -1390,7 +1391,7 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
             </div>
         </div>
     );
-};
+}
 
 const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIntervention }) => {
     const [isCreating, setIsCreating] = useState(false);
@@ -1471,8 +1472,8 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
                                         <td className="p-6 text-xs font-bold text-slate-500">{i.technician || "-"}</td>
                                         <td className="p-6"><Badge status={i.status}/></td>
                                         <td className="p-6 flex justify-end gap-2 pr-8">
-                                            <button onClick={() => setEditingInt(i)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all"><Edit size={18}/></button>
-                                            <button onClick={() => {if(window.confirm("Supprimer la mission ?")) onDeleteIntervention(i);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all"><Trash2 size={18}/></button>
+                                            <button onClick={() => setEditingInt(i)} className="p-2.5 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl transition-all shadow-sm"><Edit size={18}/></button>
+                                            <button onClick={() => {if(window.confirm("Supprimer la mission ?")) onDeleteIntervention(i);}} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={18}/></button>
                                         </td>
                                     </tr>
                                 ))}
