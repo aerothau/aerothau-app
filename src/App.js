@@ -46,7 +46,8 @@ import {
   Cloud,
   Wind,
   List as ListIcon,
-  Layers
+  Layers,
+  Bell
 } from "lucide-react";
 
 // ============================================================================
@@ -153,6 +154,7 @@ const generatePDF = (type, data, extraData = {}) => {
             if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 8; }
             if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 8; }
             if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 8; }
+            if(nest.nestContacts && nest.nestContacts.length > 0) { doc.text(`Contacts sur place : ${nest.nestContacts.length}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
@@ -458,11 +460,26 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
       lieux: "", dateVisite: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
       ...nest 
   });
+  const [nestContacts, setNestContacts] = useState(nest.nestContacts || []);
   
   const handlePhotoUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({ ...formData, photo: reader.result }); reader.readAsDataURL(file); } };
   const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
   
   const hasExtraData = formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info;
+
+  const handleContactChange = (index, field, value) => {
+      const updated = [...nestContacts];
+      updated[index][field] = value;
+      setNestContacts(updated);
+  };
+
+  const addContact = () => setNestContacts([...nestContacts, { name: "", phone: "", email: "" }]);
+  const removeContact = (index) => setNestContacts(nestContacts.filter((_, i) => i !== index));
+
+  const handleSave = () => {
+      const validContacts = nestContacts.filter(c => c.name.trim() || c.phone.trim() || c.email.trim());
+      onSave({ ...formData, nestContacts: validContacts.length > 0 ? validContacts : null });
+  };
 
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
@@ -492,6 +509,30 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
               </div>
           </div>
           
+          {/* LECTURE : BLOC CONTACTS SUR PLACE */}
+          {nest.nestContacts && nest.nestContacts.length > 0 && (
+             <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 text-sm space-y-3">
+                 <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2"><User size={14}/> Contacts sur place</p>
+                 {nest.nestContacts.map((c, i) => (
+                     <div key={i} className="flex flex-col gap-2 p-3 bg-white rounded-xl shadow-sm border border-indigo-50">
+                         <span className="font-bold text-slate-800 text-xs">{c.name || "Contact sans nom"}</span>
+                         <div className="flex gap-2">
+                             {c.phone && (
+                                 <a href={`tel:${c.phone.replace(/\s/g, '')}`} className="flex-1 flex items-center justify-center gap-2 bg-emerald-50 text-emerald-600 p-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-colors">
+                                     <Phone size={14}/> Appeler
+                                 </a>
+                             )}
+                             {c.email && (
+                                 <a href={`mailto:${c.email}`} className="flex-1 flex items-center justify-center gap-2 bg-sky-50 text-sky-600 p-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-sky-100 transition-colors">
+                                     <Send size={14}/> Email
+                                 </a>
+                             )}
+                         </div>
+                     </div>
+                 ))}
+             </div>
+          )}
+
           {hasExtraData && (
              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-sm space-y-3">
                  <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Layers size={14}/> Données Fichier</p>
@@ -587,6 +628,29 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
             <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm h-24 focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" placeholder="Accès difficile, type de toiture, nacelle nécessaire..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/>
         </div>
 
+        {/* ÉDITION : SECTION CONTACTS NID */}
+        <div className="pt-4 border-t border-slate-100">
+            <div className="flex justify-between items-center mb-3 pl-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><User size={14}/> Contacts sur place</label>
+                <button type="button" onClick={addContact} className="text-[10px] font-bold text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors flex items-center gap-1"><Plus size={12}/> Ajouter</button>
+            </div>
+            <div className="space-y-3">
+                {nestContacts.map((contact, index) => (
+                    <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl relative group">
+                        <button type="button" onClick={() => removeContact(index)} className="absolute top-2 right-2 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                        <div className="grid grid-cols-1 gap-2 pr-8">
+                            <input type="text" className="w-full p-2 border-0 rounded-lg text-xs font-bold focus:ring-2 focus:ring-sky-500 outline-none" placeholder="Nom du contact (ex: Gardien, M. Durand)" value={contact.name} onChange={(e) => handleContactChange(index, 'name', e.target.value)} />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="tel" className="w-full p-2 border-0 rounded-lg text-xs focus:ring-2 focus:ring-sky-500 outline-none" placeholder="Téléphone" value={contact.phone} onChange={(e) => handleContactChange(index, 'phone', e.target.value)} />
+                                <input type="email" className="w-full p-2 border-0 rounded-lg text-xs focus:ring-2 focus:ring-sky-500 outline-none" placeholder="Email" value={contact.email} onChange={(e) => handleContactChange(index, 'email', e.target.value)} />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+                {nestContacts.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2 bg-slate-50 rounded-xl border border-dashed border-slate-200">Aucun contact enregistré pour ce nid.</p>}
+            </div>
+        </div>
+
         {/* SECTION IMPORTÉE MASQUABLE */}
         {(formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info) && (
             <div className="pt-4 border-t border-slate-100">
@@ -606,7 +670,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
         <div className="flex gap-3 pt-4 border-t border-slate-100">
              {onDelete && <button onClick={() => onDelete(formData)} className="p-4 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-2xl transition-colors"><Trash2 size={20}/></button>}
              <Button variant="outline" className="flex-1 py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={onCancel}>Annuler</Button>
-             <Button variant="success" className="flex-1 py-4 rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-emerald-200" onClick={()=>onSave(formData)}>Enregistrer</Button>
+             <Button variant="success" className="flex-1 py-4 rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-emerald-200" onClick={handleSave}>Enregistrer</Button>
         </div>
     </div>
   );
@@ -854,6 +918,8 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
     sterilized: markers.filter(m => m.status === "sterilized_2").length,
   }), [markers]);
 
+  const reportedNests = markers.filter(m => m.status === "reported_by_client");
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 text-slate-800">
       <div className="flex justify-between items-center mb-2">
@@ -897,6 +963,32 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
             <CheckCircle size={32} className="text-emerald-100"/>
         </Card>
       </div>
+
+      {/* NOUVEAU : NOTIFICATIONS DE SIGNALEMENTS */}
+      {reportedNests.length > 0 && (
+          <div className="bg-purple-600 rounded-[32px] p-1 shadow-xl shadow-purple-200 animate-in slide-in-from-top-4">
+              <div className="bg-white rounded-[28px] p-6">
+                  <h3 className="text-purple-700 font-black uppercase tracking-widest text-sm flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-purple-100 text-purple-600 rounded-full"><Bell size={18} className="animate-bounce" /></div>
+                      Nouveaux Signalements Clients ({reportedNests.length})
+                  </h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {reportedNests.map(nest => (
+                          <div key={nest.id} className="bg-purple-50 p-4 rounded-2xl border border-purple-100 flex justify-between items-center hover:bg-purple-100 transition-colors">
+                              <div className="overflow-hidden pr-4">
+                                  <p className="font-black text-slate-800 text-sm truncate">{nest.title || "Nid signalé"}</p>
+                                  <p className="text-[10px] text-purple-600 font-bold mt-1 uppercase tracking-widest">{clients.find(c => c.id === nest.clientId)?.name || "Client inconnu"}</p>
+                                  <p className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1 truncate"><MapPin size={10} className="shrink-0"/> {nest.address}</p>
+                              </div>
+                              <div className="shrink-0">
+                                  <Badge status="reported_by_client" />
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* 2. LAYOUT : 2/3 Clients, 1/3 Agenda */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1225,7 +1317,7 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
                                     <div className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl"><MapPin size={20} className="text-sky-500 shrink-0"/><p className="leading-tight text-xs mt-0.5">{selectedClient.address}</p></div>
                                     <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl"><Phone size={20} className="text-sky-500 shrink-0"/><p className="text-xs">{selectedClient.phone}</p></div>
                                     
-                                    {selectedClient.extendedContacts && (
+                                    {selectedClient.extendedContacts && selectedClient.extendedContacts.length > 0 && (
                                         <div className="bg-sky-50 p-5 rounded-2xl border border-sky-100 mt-4 shadow-inner">
                                             <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-3 flex items-center gap-2"><Users size={14}/> Contacts de Survol</p>
                                             <div className="space-y-2">
@@ -1479,8 +1571,8 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
 const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateNest, onUpdateReport }) => {
     const myMarkers = useMemo(() => markers.filter(m => m.clientId === user.clientId), [markers, user.clientId]);
     const myReports = useMemo(() => reports.filter(r => r.clientId === user.clientId), [reports, user.clientId]);
-    const neut = useMemo(() => myMarkers.filter(m => m.status && m.status.includes("sterilized")).length, [myMarkers]);
     
+    // NOUVEAU: Statistiques détaillées pour le client
     const clientStats = useMemo(() => ({
         reported: myMarkers.filter(m => m.status === "reported_by_client").length,
         active: myMarkers.filter(m => m.status.startsWith("present")).length,
@@ -1506,6 +1598,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
             case 'dashboard':
                 return (
                     <div className="space-y-8 animate-in fade-in duration-500">
+                        {/* WIDGETS PRINCIPAUX */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-slate-900">
                             <Card className="p-8 border-0 shadow-xl rounded-[32px] flex flex-col justify-center bg-white relative overflow-hidden group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setActiveTab('map')}>
                                 <div className="relative z-10">
@@ -1524,6 +1617,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             </Card>
                         </div>
 
+                        {/* REPARTITION DETAILLEE */}
                         <div>
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-4 pl-2">Analyse de la population</h3>
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -1550,6 +1644,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             </div>
                         </div>
 
+                        {/* ACTIONS RAPIDES */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
                             <Card className="p-8 border-0 shadow-2xl rounded-[32px] bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden lg:col-span-1">
                                 <div className="relative z-10 w-full">
