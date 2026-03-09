@@ -154,10 +154,14 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`Statut : ${nest.status}`, 20, y); y += 8;
             doc.text(`Contenu : ${nest.eggs} œuf(s)`, 20, y); y += 8;
             
+            if(nest.ster_1_date) { doc.text(`Date 1er passage : ${new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
+            if(nest.ster_2_date) { doc.text(`Date 2ème passage : ${new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
+
             if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 8; }
             if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 8; }
             if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 8; }
             if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 8; }
+            if(nest.nestContacts && nest.nestContacts.length > 0) { doc.text(`Contacts sur place : ${nest.nestContacts.length}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
@@ -165,6 +169,7 @@ const generatePDF = (type, data, extraData = {}) => {
 
             if (nest.photo) { try { doc.addImage(nest.photo, 'JPEG', 20, y + 5, 100, 75); } catch(e) {} }
             doc.save(`Fiche_Nid_${nest.id}.pdf`);
+
         } else if (type === 'complete_report') {
             const client = extraData.client || { name: "Client Inconnu" };
             const markers = extraData.markers || [];
@@ -185,8 +190,22 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`Traités : ${treated}`, 80, 92);
             doc.text(`Œufs stérilisés : ${totalEggs}`, 130, 92);
             
-            const nestRows = markers.map(m => [m.title || "Nid", m.address, m.status, m.eggs]);
-            doc.autoTable({ startY: 110, head: [['Référence', 'Localisation', 'Statut', 'Oeufs']], body: nestRows, theme: 'grid', headStyles: { fillColor: [14, 165, 233] }, });
+            const nestRows = markers.map(m => [
+                `${m.title || "Nid"}\n${m.address}`, 
+                m.status, 
+                m.eggs,
+                m.ster_1_date ? new Date(m.ster_1_date).toLocaleDateString('fr-FR') : "-",
+                m.ster_2_date ? new Date(m.ster_2_date).toLocaleDateString('fr-FR') : "-"
+            ]);
+
+            doc.autoTable({ 
+                startY: 110, 
+                head: [['Réf / Localisation', 'Statut', 'Oeufs', '1er Pass.', '2ème Pass.']], 
+                body: nestRows, 
+                theme: 'grid', 
+                headStyles: { fillColor: [14, 165, 233] },
+                styles: { fontSize: 9 }
+            });
             
             const finalY = doc.lastAutoTable.finalY + 15;
             doc.text("Historique Interventions", 20, finalY);
@@ -236,6 +255,7 @@ const Badge = ({ status }) => {
     present_high: "bg-red-100 text-red-700 border border-red-200",
     present_medium: "bg-orange-100 text-orange-700 border border-orange-200",
     present_low: "bg-yellow-100 text-yellow-700 border border-yellow-200",
+    non_priority: "bg-cyan-100 text-cyan-700 border border-cyan-200",
     non_present: "bg-slate-100 text-slate-500 border border-slate-200",
     sterilized_1: "bg-lime-100 text-lime-700 border border-lime-200",
     sterilized_2: "bg-emerald-100 text-emerald-700 border border-emerald-200",
@@ -248,6 +268,7 @@ const Badge = ({ status }) => {
     present_high: "Prio Haute",
     present_medium: "Prio Moyenne",
     present_low: "Prio Faible",
+    non_priority: "Non Prioritaire",
     non_present: "Non présent",
     sterilized_1: "1er Passage",
     sterilized_2: "2ème Passage",
@@ -461,6 +482,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   const [formData, setFormData] = useState({ 
       title: "", comments: "", eggs: 0, status: "present_high", clientId: "", 
       lieux: "", dateVisite: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
+      ster_1_date: "", ster_2_date: "",
       ...nest 
   });
   const [nestContacts, setNestContacts] = useState(nest.nestContacts || []);
@@ -511,6 +533,24 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                    <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded shadow-sm w-full mt-1">{nest.lng?.toFixed(5)}</p>
               </div>
           </div>
+
+          {/* LECTURE : HISTORIQUE DATES INTERVENTIONS */}
+          {(nest.ster_1_date || nest.ster_2_date) && (
+              <div className="grid grid-cols-2 gap-4">
+                  {nest.ster_1_date && (
+                      <div className="bg-lime-50 p-3 rounded-xl border border-lime-100 flex flex-col items-center">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-lime-600 mb-1">1er Passage</span>
+                          <span className="font-bold text-sm text-slate-800">{new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                  )}
+                  {nest.ster_2_date && (
+                      <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 flex flex-col items-center">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-1">2ème Passage</span>
+                          <span className="font-bold text-sm text-slate-800">{new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                  )}
+              </div>
+          )}
           
           {/* LECTURE : BLOC CONTACTS SUR PLACE */}
           {nest.nestContacts && nest.nestContacts.length > 0 && (
@@ -586,6 +626,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                         <option value="present_high">🔴 Priorité Haute (Rouge)</option>
                         <option value="present_medium">🟠 Priorité Moyenne (Orange)</option>
                         <option value="present_low">🟡 Priorité Faible (Jaune)</option>
+                        <option value="non_priority">🔵 Non Prioritaire (Bleu)</option>
                         <option value="present">🔴 Présent (Classique)</option>
                         <option value="sterilized_1">🟢 1er Passage (Traité)</option>
                         <option value="sterilized_2">🟢 2ème Passage (Confirmé)</option>
@@ -615,6 +656,18 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                          <button type="button" onClick={openRoute} className="w-full h-[58px] bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-md"><Locate size={16}/> Voir GPS</button>
                      </div>
                 </div>
+            </div>
+        </div>
+
+        {/* NOUVEAU BLOC : DATES DE STÉRILISATION */}
+        <div className="grid grid-cols-2 gap-4 mt-2 p-5 bg-emerald-50/50 rounded-3xl border border-emerald-100">
+            <div>
+                <label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 block pl-1">Date 1er Passage</label>
+                <input type="date" className="w-full p-3 bg-white border-0 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm" value={formData.ster_1_date || ""} onChange={e=>setFormData({...formData, ster_1_date: e.target.value})} />
+            </div>
+            <div>
+                <label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 block pl-1">Date 2ème Passage</label>
+                <input type="date" className="w-full p-3 bg-white border-0 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm" value={formData.ster_2_date || ""} onChange={e=>setFormData({...formData, ster_2_date: e.target.value})} />
             </div>
         </div>
         
@@ -752,6 +805,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
           if (m.status === "present" || m.status === "present_high") color = "#ef4444"; // Rouge
           else if (m.status === "present_medium") color = "#f97316"; // Orange
           else if (m.status === "present_low") color = "#eab308"; // Jaune
+          else if (m.status === "non_priority") color = "#0ea5e9"; // Bleu Cyan
           else if (m.status === "temp") color = "#94a3b8"; // Gris clair
           else if (m.status === "sterilized_1") color = "#84cc16"; // Vert clair
           else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; // Vert foncé
@@ -1011,12 +1065,15 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
                   </div>
                   <div className="overflow-x-auto max-h-[400px] custom-scrollbar">
                       <table className="w-full text-left text-sm">
-                          <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest sticky top-0 z-10 shadow-sm">
+                          <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[9px] tracking-widest sticky top-0 z-10 shadow-sm">
                               <tr>
                                   <th className="p-4 pl-6">Client / Site</th>
-                                  <th className="p-4 text-center">Total Nids</th>
-                                  <th className="p-4 text-center">Urgences</th>
-                                  <th className="p-4 text-center">Stérilisés</th>
+                                  <th className="p-4 text-center">Total</th>
+                                  <th className="p-4 text-center text-purple-500">Signalés</th>
+                                  <th className="p-4 text-center text-red-500">Actifs</th>
+                                  <th className="p-4 text-center text-lime-600">1er Pass.</th>
+                                  <th className="p-4 text-center text-emerald-500">2ème Pass.</th>
+                                  <th className="p-4 text-center text-slate-500">Absents</th>
                               </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
@@ -1024,28 +1081,37 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
                                   const cNests = markers.filter(m => m.clientId === client.id);
                                   if (cNests.length === 0) return null;
                                   
-                                  const cReported = cNests.filter(m => m.status === "reported_by_client" || m.status === "present_high" || m.status === "present").length;
-                                  const cDone = cNests.filter(m => m.status === "sterilized_2").length;
+                                  const cTotal = cNests.length;
+                                  const cReported = cNests.filter(m => m.status === "reported_by_client").length;
+                                  const cActive = cNests.filter(m => m.status.startsWith("present")).length;
+                                  const cPassage1 = cNests.filter(m => m.status === "sterilized_1").length;
+                                  const cPassage2 = cNests.filter(m => m.status === "sterilized_2" || m.status === "sterilized").length;
+                                  const cAbsent = cNests.filter(m => m.status === "non_present").length;
                                   
                                   return (
                                       <tr key={client.id} className="hover:bg-slate-50/50 transition-colors">
-                                          <td className="p-4 pl-6 font-bold text-slate-800">{client.name}</td>
-                                          <td className="p-4 text-center font-black text-slate-600">{cNests.length}</td>
+                                          <td className="p-4 pl-6 font-bold text-slate-800 text-xs">{client.name}</td>
+                                          <td className="p-4 text-center font-black text-slate-600">{cTotal}</td>
                                           <td className="p-4 text-center">
-                                              {cReported > 0 ? (
-                                                  <span className="bg-red-100 text-red-700 px-2 py-1 rounded-md text-xs font-bold">{cReported}</span>
-                                              ) : <span className="text-slate-300">-</span>}
+                                              {cReported > 0 ? <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-md text-xs font-bold">{cReported}</span> : <span className="text-slate-300">-</span>}
                                           </td>
                                           <td className="p-4 text-center">
-                                              {cDone > 0 ? (
-                                                  <span className="text-emerald-600 font-black">{cDone}</span>
-                                              ) : <span className="text-slate-300">0</span>}
+                                              {cActive > 0 ? <span className="bg-red-100 text-red-700 px-2 py-1 rounded-md text-xs font-bold">{cActive}</span> : <span className="text-slate-300">-</span>}
+                                          </td>
+                                          <td className="p-4 text-center">
+                                              {cPassage1 > 0 ? <span className="bg-lime-100 text-lime-700 px-2 py-1 rounded-md text-xs font-bold">{cPassage1}</span> : <span className="text-slate-300">-</span>}
+                                          </td>
+                                          <td className="p-4 text-center">
+                                              {cPassage2 > 0 ? <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md text-xs font-bold">{cPassage2}</span> : <span className="text-slate-300">-</span>}
+                                          </td>
+                                          <td className="p-4 text-center">
+                                              {cAbsent > 0 ? <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-md text-xs font-bold">{cAbsent}</span> : <span className="text-slate-300">-</span>}
                                           </td>
                                       </tr>
                                   );
                               })}
                               {clients.filter(c => markers.some(m => m.clientId === c.id)).length === 0 && (
-                                  <tr><td colSpan="4" className="p-8 text-center text-slate-400 italic text-xs">Aucune donnée client disponible.</td></tr>
+                                  <tr><td colSpan="7" className="p-8 text-center text-slate-400 italic text-xs">Aucune donnée client disponible.</td></tr>
                               )}
                           </tbody>
                       </table>
@@ -1114,6 +1180,8 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       "observation": m.comments || "",
       "Latitude": m.lat,
       "Longitude": m.lng,
+      "Date 1er Passage": m.ster_1_date || "",
+      "Date 2ème Passage": m.ster_2_date || "",
       "Lieux": m.lieux || "",
       "Date de la visite": m.dateVisite || "",
       "N° point": m.numPoint || "",
@@ -1198,6 +1266,8 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                 lng: lng,
                 title: `N°${row["N° point"] || count} - ${row["Lieux"] || "Nid importé"}`,
                 comments: row["observation"] || "Import depuis fichier Excel.",
+                ster_1_date: row["Date 1er Passage"] || "",
+                ster_2_date: row["Date 2ème Passage"] || "",
                 lieux: row["Lieux"] || "",
                 dateVisite: row["Date de la visite"] || "",
                 info: row["info"] || "",
@@ -1509,6 +1579,21 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
         return reports; 
     }, [reports, filter]);
 
+    const handleDownloadReport = (r) => {
+        const client = clients.find(c => c.id === r.clientId) || { name: "Inconnu" };
+        if (r.type === 'Fiche Nid') {
+            const targetNest = markers.find(m => m.id === r.nestId);
+            if (!targetNest) return alert("Impossible de générer : le nid associé à ce document a probablement été supprimé.");
+            generatePDF('nest_detail', targetNest, { clientName: client.name });
+        } else if (r.type === 'Rapport Complet') {
+            const clientMarkers = markers.filter(m => m.clientId === r.clientId);
+            const clientInts = interventions.filter(i => i.clientId === r.clientId);
+            generatePDF('complete_report', r, { client, markers: clientMarkers, interventions: clientInts });
+        } else {
+            generatePDF('file', r);
+        }
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in duration-300 text-slate-800">
             <div className="flex justify-between items-center flex-wrap gap-4">
@@ -1529,7 +1614,7 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
                             <tr><th className="p-6 pl-8">Document</th><th className="p-6">Client / Cible</th><th className="p-6">Date</th><th className="p-6">Catégorie</th><th className="p-6 text-right pr-8">Actions</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {filteredReports.length === 0 ? <tr><td colSpan="5" className="p-16 text-center text-slate-400 font-bold uppercase tracking-widest"><FileText size={40} className="mx-auto mb-4 opacity-20"/> Aucun document trouvé</td></tr> : filteredReports.map(r => (
+                            {filteredReports.length === 0 ? <tr><td colSpan="5" className="p-16 text-center text-slate-400 font-bold uppercase italic tracking-widest"><FileText size={40} className="mx-auto mb-4 opacity-20"/> Aucun document trouvé</td></tr> : filteredReports.map(r => (
                                 <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                                     <td className="p-6 pl-8 font-black flex items-center gap-4 text-slate-800 text-base">
                                         <div className={`p-3 rounded-2xl ${r.author === 'client' ? 'bg-purple-100 text-purple-600 shadow-inner' : 'bg-slate-100 text-slate-500 shadow-inner'}`}>
@@ -1545,7 +1630,7 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
                                     <td className="p-6"><Badge status={r.type === 'Fiche Nid' ? 'reported_by_client' : (r.type === 'Rapport Complet' ? 'sterilized_2' : 'Planifié')}/></td>
                                     <td className="p-6 flex justify-end gap-2 pr-8">
                                         <button 
-                                            onClick={() => generatePDF(r.type === 'Fiche Nid' ? 'nest_detail' : (r.type === 'Rapport Complet' ? 'complete_report' : 'file'), r.type === 'Fiche Nid' ? markers.find(m => m.id === r.nestId) : r, { client: clients.find(c => c.id === r.clientId), markers: markers.filter(m => m.clientId === r.clientId), interventions: interventions.filter(i => i.clientId === r.clientId) })} 
+                                            onClick={() => handleDownloadReport(r)} 
                                             className="p-3 text-slate-600 hover:text-white bg-slate-50 hover:bg-slate-900 rounded-xl transition-all shadow-sm" 
                                             title="Télécharger le PDF"
                                         >
@@ -1602,6 +1687,20 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     const requestIntervention = async () => {
         if(window.confirm("Confirmer la demande d'intervention urgente ?")) {
             alert("Votre demande a été transmise à nos équipes. Nous vous contacterons sous 24h.");
+        }
+    };
+
+    const handleDownloadReport = (r) => {
+        const client = clients.find(c => c.id === r.clientId) || { name: "Inconnu" };
+        if (r.type === 'Fiche Nid') {
+            const targetNest = myMarkers.find(m => m.id === r.nestId);
+            if (!targetNest) return alert("Le nid associé à ce document est introuvable.");
+            generatePDF('nest_detail', targetNest, { clientName: client.name });
+        } else if (r.type === 'Rapport Complet') {
+            const clientInts = interventions.filter(i => i.clientId === r.clientId);
+            generatePDF('complete_report', r, { client, markers: myMarkers, interventions: clientInts });
+        } else {
+            generatePDF('file', r);
         }
     };
 
@@ -1679,7 +1778,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                 </div>
                                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
                                      {myReports && myReports.length > 0 ? myReports.slice(0, 4).map(r => (
-                                         <div key={r.id} className="p-4 border border-slate-100 rounded-2xl flex justify-between items-center group hover:border-sky-300 hover:shadow-md transition-all cursor-pointer bg-white" onClick={() => generatePDF('file', r)}>
+                                         <div key={r.id} className="p-4 border border-slate-100 rounded-2xl flex justify-between items-center group hover:border-sky-300 hover:shadow-md transition-all cursor-pointer bg-white" onClick={() => handleDownloadReport(r)}>
                                              <div className="flex items-center gap-4">
                                                  <div className={`p-3 rounded-xl ${r.author === 'client' ? 'bg-purple-50 text-purple-600' : 'bg-sky-50 text-sky-600'}`}>
                                                     {r.author === 'client' ? <Upload size={20}/> : <Download size={20}/>}
@@ -1823,7 +1922,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                  
                                  {/* Documents Aerothau */}
                                  {myReports.filter(r => r.author === 'admin').map(r => (
-                                     <div key={r.id} className="p-5 border border-slate-100 rounded-2xl flex justify-between items-center group hover:border-sky-300 hover:shadow-md transition-all cursor-pointer bg-white" onClick={() => generatePDF('file', r)}>
+                                     <div key={r.id} className="p-5 border border-slate-100 rounded-2xl flex justify-between items-center group hover:border-sky-300 hover:shadow-md transition-all cursor-pointer bg-white" onClick={() => handleDownloadReport(r)}>
                                          <div className="flex items-center gap-5">
                                              <div className="p-4 bg-sky-50 text-sky-600 rounded-2xl group-hover:scale-110 transition-transform"><FileText size={24}/></div>
                                              <div>
