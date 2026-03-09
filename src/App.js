@@ -46,8 +46,7 @@ import {
   Cloud,
   Wind,
   List as ListIcon,
-  Layers,
-  Bell
+  Layers
 } from "lucide-react";
 
 // ============================================================================
@@ -68,9 +67,13 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "aerothau-goelands";
 
-const MAIN_WEBSITE_URL = "https://www.aerothau.fr";
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; // Sète
+
+const TILE_URLS = {
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  plan: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+};
 
 const INITIAL_USERS = [
   { username: "admin", password: "aerothau2024", role: "admin", name: "Aerothau Admin", id: 0 },
@@ -154,7 +157,6 @@ const generatePDF = (type, data, extraData = {}) => {
             if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 8; }
             if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 8; }
             if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 8; }
-            if(nest.nestContacts && nest.nestContacts.length > 0) { doc.text(`Contacts sur place : ${nest.nestContacts.length}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
@@ -693,11 +695,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
   useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
   useEffect(() => { onMarkerClickRef.current = onMarkerClick; }, [onMarkerClick]);
 
-  const tileUrls = {
-      satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      plan: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-  };
-
   useEffect(() => {
     if (mapInstanceRef.current) return;
 
@@ -711,7 +708,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
             mapInstanceRef.current = map;
 
             L.control.zoom({ position: 'bottomright' }).addTo(map);
-            tileLayerRef.current = L.tileLayer(tileUrls['satellite'], { attribution: 'Esri' }).addTo(map);
+            tileLayerRef.current = L.tileLayer(TILE_URLS['satellite'], { attribution: 'Esri' }).addTo(map);
             markersLayerRef.current = L.layerGroup().addTo(map);
             routeLayerRef.current = L.layerGroup().addTo(map);
 
@@ -782,7 +779,9 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
   }, [routePath]);
 
   useEffect(() => {
-      if (mapInstanceRef.current && tileLayerRef.current) tileLayerRef.current.setUrl(tileUrls[mapType]);
+      if (mapInstanceRef.current && tileLayerRef.current && TILE_URLS[mapType]) {
+          tileLayerRef.current.setUrl(TILE_URLS[mapType]);
+      }
   }, [mapType]);
 
   useEffect(() => {
@@ -844,14 +843,26 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
 
     const optimizeRoute = () => {
         if (markers.length < 2) return alert("Il faut au moins 2 nids pour tracer un itinéraire.");
-        let unvisited = [...markers], current = unvisited.shift(), path = [current];
+        let unvisited = [...markers];
+        let current = unvisited.shift();
+        let path = [current];
+        
         while (unvisited.length > 0) {
-            let nearest = null, minDetails = Infinity, nearestIndex = -1;
-            unvisited.forEach((m, idx) => {
+            let nearest = null;
+            let minDetails = Infinity;
+            let nearestIndex = -1;
+            
+            for (let i = 0; i < unvisited.length; i++) {
+                const m = unvisited[i];
                 const dist = Math.sqrt(Math.pow(m.lat - current.lat, 2) + Math.pow(m.lng - current.lng, 2));
-                if (dist < minDetails) { minDetails = dist; nearest = m; nearestIndex = idx; }
-            });
-            if (nearest) { path.push(nearest); current = nearest; unvisited.splice(nearestIndex, 1); }
+                if (dist < minDetails) { minDetails = dist; nearest = m; nearestIndex = i; }
+            }
+            
+            if (nearest) { 
+                path.push(nearest); 
+                current = nearest; 
+                unvisited.splice(nearestIndex, 1); 
+            }
         }
         setRoutePath(path);
     };
@@ -964,7 +975,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
         </Card>
       </div>
 
-      {/* NOUVEAU : NOTIFICATIONS DE SIGNALEMENTS */}
+      {/* NOTIFICATIONS DE SIGNALEMENTS */}
       {reportedNests.length > 0 && (
           <div className="bg-purple-600 rounded-[32px] p-1 shadow-xl shadow-purple-200 animate-in slide-in-from-top-4">
               <div className="bg-white rounded-[28px] p-6">
@@ -1131,7 +1142,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         let count = 0;
         for (const row of jsonData) {
             
-            // 🛡️ ANTI-FANTÔME : On ignore les lignes Excel totalement vides
+            // ANTI-FANTÔME
             if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) {
                 continue;
             }
@@ -1379,7 +1390,7 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
             </div>
         </div>
     );
-}
+};
 
 const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIntervention }) => {
     const [isCreating, setIsCreating] = useState(false);
