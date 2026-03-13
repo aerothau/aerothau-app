@@ -325,18 +325,72 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 };
 
 const ClientReportForm = ({ nest, onSave, onCancel }) => {
-  const [formData, setFormData] = useState({ title: "", description: "", ownerContact: "", status: "reported_by_client", ...nest });
+  const [formData, setFormData] = useState({ 
+      title: "", 
+      comments: "", 
+      contactName: "", 
+      contactPhone: "", 
+      status: "reported_by_client", 
+      photo: null,
+      ...nest 
+  });
+
+  const handlePhotoUpload = (e) => { 
+      const file = e.target.files[0]; 
+      if (file) { 
+          const reader = new FileReader(); 
+          reader.onloadend = () => setFormData({ ...formData, photo: reader.result }); 
+          reader.readAsDataURL(file); 
+      } 
+  };
+
+  const handleSave = () => {
+      // Transformation des données pour qu'elles correspondent exactement à la Fiche Nid Admin
+      const finalData = {
+          ...formData,
+          comments: formData.comments ? `[Signalement Client] : ${formData.comments}` : "",
+          nestContacts: (formData.contactName || formData.contactPhone) 
+              ? [{ name: formData.contactName, phone: formData.contactPhone, email: "" }] 
+              : []
+      };
+      delete finalData.contactName;
+      delete finalData.contactPhone;
+      onSave(finalData);
+  };
+
   return (
     <div className="space-y-4 text-slate-800">
       <div className="p-4 bg-sky-50 rounded-xl text-sky-800 text-sm flex gap-3 items-center">
         <Info size={20} className="text-sky-600 shrink-0"/>
-        <div><p className="font-bold">Signalement</p><p className="text-xs opacity-80">Précisez les détails pour l'équipe technique.</p></div>
+        <div><p className="font-bold">Nouveau Signalement</p><p className="text-xs opacity-80">Précisez les détails pour l'équipe technique.</p></div>
       </div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre</label><input type="text" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Toiture Bâtiment A" /></div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><div className="bg-white border border-slate-200 p-3 mt-1 rounded-xl text-sm text-slate-600 flex items-center gap-2"><MapPin size={16} className="text-sky-500" /> {formData.address}</div></div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Contact sur place</label><input type="text" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.ownerContact} onChange={(e) => setFormData({ ...formData, ownerContact: e.target.value })} placeholder="Nom ou téléphone..." /></div>
-      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Détails supplémentaires</label><textarea className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm resize-none focus:ring-2 focus:ring-sky-500 outline-none h-20" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Accès, particularités..." /></div>
-      <div className="flex gap-2 pt-2"><Button variant="outline" onClick={onCancel} className="flex-1 py-3">Annuler</Button><Button variant="sky" onClick={() => onSave(formData)} className="flex-1 py-3"><Send size={16}/> Envoyer</Button></div>
+      
+      <div className="relative group">
+        {formData.photo ? (
+            <div className="relative h-32 rounded-xl overflow-hidden shadow-md">
+                <img src={formData.photo} className="w-full h-full object-cover" alt="Nid"/>
+                <button onClick={() => setFormData({...formData, photo: null})} className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 transition-colors"><Trash2 size={14}/></button>
+            </div>
+        ) : (
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-sky-300 bg-sky-50 text-sky-500 h-32 rounded-xl cursor-pointer hover:bg-sky-100 transition-colors group">
+                <Camera size={32} className="mb-2 transition-colors"/>
+                <span className="text-[10px] font-black uppercase tracking-widest transition-colors">Prendre une photo</span>
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload}/>
+            </label>
+        )}
+      </div>
+
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre / Repère</label><input type="text" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Toiture Bâtiment A" /></div>
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><div className="bg-white border border-slate-200 p-3 mt-1 rounded-xl text-sm text-slate-600 flex items-center gap-2"><MapPin size={16} className="text-sky-500 shrink-0" /> <span className="truncate">{formData.address}</span></div></div>
+      
+      <div className="grid grid-cols-2 gap-3">
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Contact (Nom)</label><input type="text" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.contactName} onChange={(e) => setFormData({ ...formData, contactName: e.target.value })} placeholder="Ex: Gardien" /></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone</label><input type="tel" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.contactPhone} onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })} placeholder="06..." /></div>
+      </div>
+
+      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Détails supplémentaires</label><textarea className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm resize-none focus:ring-2 focus:ring-sky-500 outline-none h-20" value={formData.comments} onChange={(e) => setFormData({ ...formData, comments: e.target.value })} placeholder="Accès, agressivité, particularités..." /></div>
+      
+      <div className="flex gap-2 pt-2"><Button variant="outline" onClick={onCancel} className="flex-1 py-3">Annuler</Button><Button variant="sky" onClick={handleSave} className="flex-1 py-3"><Send size={16}/> Envoyer</Button></div>
     </div>
   );
 };
