@@ -1669,7 +1669,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     const myMarkers = useMemo(() => markers.filter(m => m.clientId === user.clientId), [markers, user.clientId]);
     const myReports = useMemo(() => reports.filter(r => r.clientId === user.clientId), [reports, user.clientId]);
     
-    // NOUVEAU: Statistiques détaillées pour le client
+    // Statistiques détaillées pour le client
     const clientStats = useMemo(() => ({
         reported: myMarkers.filter(m => m.status === "reported_by_client").length,
         active: myMarkers.filter(m => m.status.startsWith("present")).length,
@@ -1683,6 +1683,11 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     const [selectedNestDetail, setSelectedNestDetail] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [activeTab, setActiveTab] = useState('dashboard');
+    
+    // NOUVEAU : États pour la barre de recherche client
+    const [searchQuery, setSearchQuery] = useState("");
+    const [mapCenter, setMapCenter] = useState(null);
+    const [tempMarker, setTempMarker] = useState(null);
 
     const requestIntervention = async () => {
         if(window.confirm("Confirmer la demande d'intervention urgente ?")) {
@@ -1703,6 +1708,30 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
             generatePDF('file', r);
         }
     };
+
+    // NOUVEAU : Logique de recherche pour le client
+    const handleSearch = useCallback(async (e) => {
+        if (e.key === "Enter" && searchQuery.trim()) {
+            let lat, lng, addr;
+            const coords = searchQuery.replace(/,/g, " ").split(/\s+/).filter(Boolean).map(parseFloat);
+            if (coords.length === 2 && !coords.some(isNaN) && Math.abs(coords[0]) <= 90) {
+                lat = coords[0]; lng = coords[1]; addr = `Point GPS`;
+            } else {
+                try {
+                    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=fr`);
+                    const d = await r.json();
+                    if (d?.[0]) { lat = parseFloat(d[0].lat); lng = parseFloat(d[0].lon); addr = d[0].display_name.split(',')[0]; }
+                    else { alert("Lieu non trouvé."); return; }
+                } catch (err) { console.error(err); return; }
+            }
+            if (lat && lng) {
+                setMapCenter({ lat, lng });
+                setTempMarker({ id: "temp", lat, lng, address: addr, status: "temp", eggs: 0 });
+            }
+        }
+    }, [searchQuery]);
+
+    const displayMarkers = useMemo(() => tempMarker ? [...myMarkers, tempMarker] : myMarkers, [myMarkers, tempMarker]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -1806,12 +1835,18 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
             case 'map':
                 return (
                     <div className="h-[700px] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-500">
-                        <Card className="p-5 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-3xl bg-white">
-                            <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-800 flex items-center gap-3"><MapIcon className="text-sky-500"/> Cartographie du Site</div>
-                            <Button variant={isAddingMode ? "danger" : "sky"} className="py-4 px-8 rounded-2xl uppercase font-black tracking-widest text-xs shadow-lg" onClick={() => setIsAddingMode(!isAddingMode)}>
-                                {isAddingMode ? <><X size={18}/> Mode Navigation</> : <><Plus size={18}/> Signaler un nouveau nid</>}
-                            </Button>
+                        <Card className="p-3 flex flex-col md:flex-row gap-4 items-center z-20 shadow-lg border-0 rounded-3xl bg-white">
+                            <div className="relative flex-1 w-full group">
+                                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={20}/>
+                                <input type="text" placeholder="Rechercher une adresse ou un point GPS pour signaler un nid..." className="w-full pl-14 pr-6 py-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
+                            </div>
+                            <div className="flex gap-2 shrink-0 pr-2">
+                                <Button variant={isAddingMode ? "danger" : "sky"} className={`h-14 px-6 rounded-2xl text-xs uppercase tracking-widest ${isAddingMode ? '' : 'shadow-xl shadow-sky-200'}`} onClick={() => setIsAddingMode(!isAddingMode)}>
+                                    {isAddingMode ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
+                                </Button>
+                            </div>
                         </Card>
+                        
                         <div className={`flex-1 relative shadow-2xl rounded-[32px] overflow-hidden bg-white transition-all duration-300 ${isAddingMode ? 'border-[8px] border-sky-500' : 'border-0'}`}>
                             {isAddingMode && (
                                 <div className="absolute inset-x-0 top-6 z-[1000] flex justify-center pointer-events-none animate-in slide-in-from-top-4">
@@ -1821,10 +1856,21 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                     </div>
                                 </div>
                             )}
+                            
+                            {tempMarker && !isAddingMode && (<div className="absolute top-6 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest animate-bounce pointer-events-none shadow-2xl">📍 Cliquez sur le point gris pour valider</div>)}
+                            
                             <LeafletMap 
-                                markers={myMarkers} 
+                                markers={displayMarkers} 
                                 isAddingMode={isAddingMode} 
-                                onMarkerClick={(m) => { if(!isAddingMode) setSelectedNestDetail(m); }}
+                                center={mapCenter}
+                                onMarkerClick={(m) => { 
+                                    if (m.id === "temp") {
+                                        setPendingReport({ id: Date.now(), clientId: user.clientId, lat: m.lat, lng: m.lng, address: m.address, status: "reported_by_client", title: "Nouveau Signalement" });
+                                        setTempMarker(null);
+                                    } else if(!isAddingMode) {
+                                        setSelectedNestDetail(m); 
+                                    }
+                                }}
                                 onMapClick={(ll) => {
                                     if(isAddingMode) {
                                         setPendingReport({ id: Date.now(), clientId: user.clientId, lat: ll.lat, lng: ll.lng, address: "Signalement en attente", status: "reported_by_client", title: "Nouveau Signalement" });
