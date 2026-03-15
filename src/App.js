@@ -37,6 +37,7 @@ import {
   Printer,
   Locate,
   Camera,
+  MessageSquare,
   AlertTriangle,
   Download,
   Upload,
@@ -47,7 +48,8 @@ import {
   Wind,
   List as ListIcon,
   Layers,
-  Bell
+  Bell,
+  FileSpreadsheet
 } from "lucide-react";
 
 // ============================================================================
@@ -84,25 +86,42 @@ const MOCK_CLIENTS = [
   { id: 1, name: "Mairie de Sète", type: "Collectivité", address: "12 Rue de l'Hôtel de Ville, 34200 Sète", contact: "Jean Dupont", phone: "04 67 00 00 00", email: "contact@sete.fr", username: "mairie", password: "123" },
   { id: 2, name: "Mairie de Narbonne", type: "Collectivité", address: "Place de l'Hôtel de Ville, 11100 Narbonne", contact: "Contacts Multiples", phone: "Voir contacts", email: "", username: "narbonne", password: "123",
     extendedContacts: [
-        "La maison de Charles TRENET : Mme Manuelle NOYES (06.33.82.55.74) de la Direction Patrimoine",
-        "La Calandreta/La Jaquetona proche du Resto Sud : Mme Sophie VAISSIERES (06.19.02.26.20) Directrice",
-        "La cantine Resto Sud : M. Jean-Claude PELISSOU (06.26.70.19.45), Dir. Enfance/Jeunesse/Éducation",
-        "Ecole Pasteur, Lamartine, Lakanal, Buisson : M. Louis AYMERIC (06.84.69.40.35), Dir. des Bâtiments"
+        "La maison de Charles TRENET : Mme Manuelle NOYES (06.33.82.55.74)",
+        "La Calandreta/La Jaquetona : Mme Sophie VAISSIERES (06.19.02.26.20)",
+        "Ecole Pasteur, Lamartine, Lakanal, Buisson : M. Louis AYMERIC (06.84.69.40.35)"
     ]
   },
   { id: 3, name: "Domitia Habitat", type: "Syndic", address: "11100 Narbonne", contact: "Responsables Secteurs", phone: "Voir contacts", email: "", username: "domitia", password: "123",
     extendedContacts: [
-        "Mme BAUDEMONT pour le secteur Centre-Ville, le pastouret... : c.baudemont@domitia-habitat.fr - 06.07.42.28.31",
-        "Mme ABAD pour le secteur Razimbaud, les Arènes... : s.abad@domitia-habitat.fr - 07.64.18.49.37",
-        "Monsieur ALBERT pour le secteur Saint Jean Saint Pierre : j.albert@domitia-habitat.fr - 07.86.09.47.11",
-        "Monsieur MARCOU pour le secteur Berre Cesse, Anatole France et les villages : c.marcou@domitia-habitat.fr - 06.07.37.81.81"
+        "Mme BAUDEMONT pour le secteur Centre-Ville : 06.07.42.28.31",
+        "Mme ABAD pour le secteur Razimbaud : 07.64.18.49.37"
     ]
   }
 ];
 
 // ============================================================================
-// 2. UTILITAIRES (Excel, CSV, PDF)
+// 2. COMPRESSION D'IMAGES & UTILITAIRES
 // ============================================================================
+
+// Compresse l'image pour éviter de faire saturer la base de données Firestore
+const compressImage = (file) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 800; // Taille max pour PDF et App
+            const scaleSize = MAX_WIDTH / img.width;
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scaleSize;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.6)); // Qualité 60%
+        };
+    };
+});
 
 const loadSheetJS = () => {
   return new Promise((resolve) => {
@@ -156,18 +175,40 @@ const generatePDF = (type, data, extraData = {}) => {
             
             if(nest.ster_1_date) { doc.text(`Date 1er passage : ${new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
             if(nest.ster_2_date) { doc.text(`Date 2ème passage : ${new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
-
             if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 8; }
             if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 8; }
             if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 8; }
             if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 8; }
-            if(nest.nestContacts && nest.nestContacts.length > 0) { doc.text(`Contacts sur place : ${nest.nestContacts.length}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
-            y += (notesLines.length * 8);
+            y += (notesLines.length * 8) + 5;
 
-            if (nest.photo) { try { doc.addImage(nest.photo, 'JPEG', 20, y + 5, 100, 75); } catch(e) {} }
+            // Rétrocompatibilité ancienne photo + nouveau tableau photos
+            const photos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
+
+            if (photos.length > 0) {
+                doc.setFontSize(14);
+                doc.text("Documentation Photographique :", 20, y);
+                y += 10;
+                doc.setFontSize(10);
+
+                photos.forEach((p, idx) => {
+                    if (y > 230) { doc.addPage(); y = 20; } // Nouvelle page si on dépasse en bas
+                    
+                    const xPos = (idx % 2 === 0) ? 20 : 115; // Colonne gauche ou droite
+                    
+                    try { doc.addImage(p.data, 'JPEG', xPos, y, 80, 60); } catch(e) {}
+                    
+                    if (p.comment) {
+                        const commentLines = doc.splitTextToSize(p.comment, 80);
+                        doc.text(commentLines, xPos, y + 65);
+                    }
+                    
+                    // On descend l'axe Y seulement toutes les 2 photos
+                    if (idx % 2 === 1) y += 80; 
+                });
+            }
             doc.save(`Fiche_Nid_${nest.id}.pdf`);
 
         } else if (type === 'complete_report') {
@@ -237,6 +278,7 @@ const Button = ({ children, variant = "primary", className = "", ...props }) => 
     outline: "border border-slate-300 text-slate-600 hover:bg-slate-50",
     sky: "bg-sky-600 text-white hover:bg-sky-700 shadow-lg shadow-sky-200",
     ghost: "text-slate-500 hover:bg-slate-100",
+    purple: "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-200"
   };
   return <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>{children}</button>;
 };
@@ -287,7 +329,7 @@ const Toast = ({ message, type, onClose }) => {
 };
 
 // ============================================================================
-// 4. FORMULAIRES & MODALES
+// 4. FORMULAIRES ET MODALES
 // ============================================================================
 
 const LoginForm = ({ onLogin, users, logoUrl }) => {
@@ -325,27 +367,44 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 };
 
 const ClientReportForm = ({ nest, onSave, onCancel }) => {
+  // Adaptation vers le tableau photos (Max 4)
+  const initialPhotos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
+  
   const [formData, setFormData] = useState({ 
       title: "", 
       comments: "", 
       contactName: "", 
       contactPhone: "", 
       status: "reported_by_client", 
-      photo: null,
-      ...nest 
+      ...nest,
+      photos: initialPhotos
   });
 
-  const handlePhotoUpload = (e) => { 
-      const file = e.target.files[0]; 
-      if (file) { 
-          const reader = new FileReader(); 
-          reader.onloadend = () => setFormData({ ...formData, photo: reader.result }); 
-          reader.readAsDataURL(file); 
-      } 
+  const handlePhotoUpload = async (e) => { 
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      const remainingSlots = 4 - (formData.photos || []).length;
+      const filesToProcess = files.slice(0, remainingSlots);
+      
+      const newPhotos = await Promise.all(filesToProcess.map(async file => {
+          const compressedData = await compressImage(file);
+          return { data: compressedData, comment: "" };
+      }));
+
+      setFormData(prev => ({ ...prev, photos: [...(prev.photos || []), ...newPhotos] }));
+  };
+
+  const updatePhotoComment = (index, comment) => {
+      const updatedPhotos = [...formData.photos];
+      updatedPhotos[index].comment = comment;
+      setFormData({ ...formData, photos: updatedPhotos });
+  };
+
+  const removePhoto = (index) => {
+      setFormData({ ...formData, photos: formData.photos.filter((_, i) => i !== index) });
   };
 
   const handleSave = () => {
-      // Transformation des données pour qu'elles correspondent exactement à la Fiche Nid Admin
       const finalData = {
           ...formData,
           comments: formData.comments ? `[Signalement Client] : ${formData.comments}` : "",
@@ -355,6 +414,7 @@ const ClientReportForm = ({ nest, onSave, onCancel }) => {
       };
       delete finalData.contactName;
       delete finalData.contactPhone;
+      delete finalData.photo; 
       onSave(finalData);
   };
 
@@ -365,19 +425,38 @@ const ClientReportForm = ({ nest, onSave, onCancel }) => {
         <div><p className="font-bold">Nouveau Signalement</p><p className="text-xs opacity-80">Précisez les détails pour l'équipe technique.</p></div>
       </div>
       
-      <div className="relative group">
-        {formData.photo ? (
-            <div className="relative h-32 rounded-xl overflow-hidden shadow-md">
-                <img src={formData.photo} className="w-full h-full object-cover" alt="Nid"/>
-                <button onClick={() => setFormData({...formData, photo: null})} className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 transition-colors"><Trash2 size={14}/></button>
-            </div>
-        ) : (
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-sky-300 bg-sky-50 text-sky-500 h-32 rounded-xl cursor-pointer hover:bg-sky-100 transition-colors group">
-                <Camera size={32} className="mb-2 transition-colors"/>
-                <span className="text-[10px] font-black uppercase tracking-widest transition-colors">Prendre une photo</span>
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload}/>
-            </label>
-        )}
+      {/* PHOTOS MULTIPLES CLIENT */}
+      <div>
+          <div className="flex justify-between items-center mb-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Photos (Optionnel - Max 4)</label>
+              <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-1 rounded-md">{(formData.photos || []).length} / 4</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(formData.photos || []).map((p, index) => (
+                  <div key={index} className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex flex-col shadow-sm">
+                      <div className="h-28 relative bg-slate-200">
+                          <img src={p.data} className="w-full h-full object-cover" alt={`Photo ${index + 1}`}/>
+                          <button type="button" onClick={() => removePhoto(index)} className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 transition-colors"><Trash2 size={12}/></button>
+                      </div>
+                      <div className="p-2 bg-slate-50">
+                          <input 
+                              type="text" 
+                              className="w-full p-2 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-sky-500" 
+                              placeholder="Lieu de la photo..." 
+                              value={p.comment} 
+                              onChange={(e) => updatePhotoComment(index, e.target.value)} 
+                          />
+                      </div>
+                  </div>
+              ))}
+              {(formData.photos || []).length < 4 && (
+                  <label className="h-40 border-2 border-dashed border-sky-300 bg-sky-50/50 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-sky-100 transition-colors">
+                      <Camera size={28} className="text-sky-400 mb-2"/>
+                      <span className="text-[10px] font-black uppercase text-sky-600">Prendre photo</span>
+                      <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handlePhotoUpload}/>
+                  </label>
+              )}
+          </div>
       </div>
 
       <div><label className="text-[10px] font-bold text-slate-400 uppercase">Titre / Repère</label><input type="text" className="w-full mt-1 p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Ex: Toiture Bâtiment A" /></div>
@@ -395,153 +474,42 @@ const ClientReportForm = ({ nest, onSave, onCancel }) => {
   );
 };
 
-const ClientEditForm = ({ client, onSave, onCancel }) => {
-    const initialExtendedContactsText = client.extendedContacts ? client.extendedContacts.join('\n') : "";
-    const [formData, setFormData] = useState({ name: "", type: "Privé", address: "", phone: "", username: "", password: "", extendedContactsText: initialExtendedContactsText, ...client });
-    
-    const handleSave = () => {
-        const contactsArray = formData.extendedContactsText
-            .split('\n')
-            .map(c => c.trim())
-            .filter(c => c.length > 0);
-            
-        const dataToSave = {
-            ...formData,
-            extendedContacts: contactsArray.length > 0 ? contactsArray : null
-        };
-        delete dataToSave.extendedContactsText;
-        onSave(dataToSave);
-    }
-
-    return (
-      <div className="space-y-4 text-slate-800">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label><select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}><option value="Privé">Privé</option><option value="Collectivité">Collectivité</option><option value="Syndic">Syndic</option></select></div>
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone principal</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
-        </div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
-        
-        <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-1">Contacts étendus (Sites, Survol...)</label>
-            <p className="text-[9px] text-slate-400 mb-1 italic">Un contact par ligne. Exemple : Mairie annexe : 04.xx.xx.xx</p>
-            <textarea 
-                className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm h-24 resize-none focus:ring-2 focus:ring-sky-500 outline-none" 
-                value={formData.extendedContactsText} 
-                onChange={(e) => setFormData({ ...formData, extendedContactsText: e.target.value })} 
-                placeholder="Ecole Pasteur : M. Dupont (06...)"
-            />
-        </div>
-
-        <div className="bg-slate-100 p-4 rounded-xl">
-          <h4 className="text-[10px] font-black text-slate-500 uppercase mb-3">Identifiants Espace Client</h4>
-          <div className="grid grid-cols-2 gap-4">
-              <input type="text" placeholder="Identifiant" className="p-3 border-0 rounded-lg bg-white text-sm focus:ring-2 focus:ring-sky-500 outline-none w-full" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
-              <input type="text" placeholder="Mot de passe" className="p-3 border-0 rounded-lg bg-white text-sm focus:ring-2 focus:ring-sky-500 outline-none w-full" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
-          </div>
-        </div>
-        <div className="flex gap-2 pt-2"><Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button><Button variant="success" className="flex-1 py-3" onClick={handleSave}>Enregistrer</Button></div>
-      </div>
-    );
-};
-
-const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCancel }) => {
-    const [formData, setFormData] = useState({ clientId: clients[0]?.id || "", status: "Planifié", technician: "", notes: "", date: new Date().toISOString().split("T")[0], ...intervention });
-    return (
-      <div className="space-y-4 text-slate-800">
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label><select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label><select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="Planifié">Planifié</option><option value="En attente">En attente</option><option value="Terminé">Terminé</option><option value="Annulé">Annulé</option></select></div>
-        </div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Agent / Télépilote</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.technician} onChange={(e) => setFormData({ ...formData, technician: e.target.value })} /></div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Observations</label><textarea className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm h-20 resize-none outline-none focus:ring-2 focus:ring-sky-500" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} /></div>
-        <div className="flex gap-2 pt-2">
-          {onDelete && formData.id && <button onClick={() => onDelete(formData)} className="p-3 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 size={20}/></button>}
-          <Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button>
-          <Button variant="success" className="flex-1 py-3" onClick={() => onSave(formData)}>Sauver</Button>
-        </div>
-      </div>
-    );
-};
-
-const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCancel, userRole = "admin" }) => {
-    const [formData, setFormData] = useState({ 
-        title: "", date: new Date().toISOString().split("T")[0], type: "Fichier", status: userRole === 'admin' ? "Envoyé" : "En attente", 
-        clientId: userRole === 'admin' ? (clients.length > 0 ? clients[0].id : "") : report.clientId, 
-        author: userRole === 'admin' ? "admin" : "client", nestId: "", ...report 
-    });
-
-    const handleFileUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) setFormData({ ...formData, title: file.name, type: "Fichier", status: "Envoyé" });
-    };
-
-    return (
-      <div className="space-y-4 text-slate-800">
-        {userRole === 'admin' && (
-            <div className="grid grid-cols-3 gap-2 mb-2">
-                <button className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${formData.type === 'Fichier' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-500 border-slate-200'}`} onClick={() => setFormData({...formData, type: 'Fichier', title: ""})}>Fichier</button>
-                <button className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${formData.type === 'Rapport Complet' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-500 border-slate-200'}`} onClick={() => { const clientName = clients.find(c => c.id === formData.clientId)?.name || ""; setFormData({...formData, type: 'Rapport Complet', title: "Rapport - " + clientName}); }}>Bilan Client</button>
-                <button className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${formData.type === 'Fiche Nid' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-500 border-slate-200'}`} onClick={() => setFormData({...formData, type: 'Fiche Nid', title: "Fiche Nid"})}>Fiche Nid</button>
-            </div>
-        )}
-
-        {formData.type === 'Fichier' && (
-            <div className="relative mt-2">
-                <input type="file" className="hidden" id="doc-upload" onChange={handleFileUpload}/>
-                <label htmlFor="doc-upload" className="w-full p-6 border-2 border-dashed border-sky-300 bg-sky-50 rounded-2xl flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-sky-100 text-sky-600 transition-colors">
-                    <Upload size={32}/> <span className="text-xs font-black uppercase tracking-widest">{formData.title ? formData.title : "Sélectionner un fichier"}</span>
-                </label>
-            </div>
-        )}
-
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client concerné</label>
-          <select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.clientId} onChange={(e) => {
-              const cid = parseInt(e.target.value);
-              let newTitle = formData.title;
-              if (formData.type === 'Rapport Complet') newTitle = "Rapport - " + (clients.find(c => c.id === cid)?.name || "");
-              setFormData({ ...formData, clientId: cid, title: newTitle });
-          }}>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-        </div>
-
-        {formData.type === 'Fiche Nid' && (
-             <div><label className="text-[10px] font-bold text-slate-400 uppercase">Lier à un Nid</label>
-                <select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.nestId} onChange={(e) => {
-                     const nid = parseInt(e.target.value);
-                     const nestTitle = markers.find(m => m.id === nid)?.title || ("Nid #" + nid);
-                     setFormData({ ...formData, nestId: nid, title: "Fiche - " + nestTitle });
-                }}>
-                    <option value="">-- Choisir un nid --</option>
-                    {markers.filter(m => m.clientId === formData.clientId).map(m => <option key={m.id} value={m.id}>{m.title || m.address}</option>)}
-                </select>
-            </div>
-        )}
-
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom du document</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
-        
-        {userRole === 'admin' && (
-             <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
-        )}
-
-        <div className="flex gap-2 pt-4">
-          <Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button>
-          <Button variant="success" className="flex-1 py-3" onClick={() => onSave(formData)}>{userRole === 'admin' ? "Valider" : "Envoyer"}</Button>
-        </div>
-      </div>
-    );
-};
-
 const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly = false, onGeneratePDF }) => {
+  const initialPhotos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
+  
   const [formData, setFormData] = useState({ 
       title: "", comments: "", eggs: 0, status: "present_high", clientId: "", 
       lieux: "", dateVisite: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
       ster_1_date: "", ster_2_date: "",
-      ...nest 
+      ...nest,
+      photos: initialPhotos
   });
   const [nestContacts, setNestContacts] = useState(nest.nestContacts || []);
   
-  const handlePhotoUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => setFormData({ ...formData, photo: reader.result }); reader.readAsDataURL(file); } };
+  const handlePhotoUpload = async (e) => { 
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      const remainingSlots = 4 - (formData.photos || []).length;
+      const filesToProcess = files.slice(0, remainingSlots);
+      
+      const newPhotos = await Promise.all(filesToProcess.map(async file => {
+          const compressedData = await compressImage(file);
+          return { data: compressedData, comment: "" };
+      }));
+
+      setFormData(prev => ({ ...prev, photos: [...(prev.photos || []), ...newPhotos] }));
+  };
+
+  const updatePhotoComment = (index, comment) => {
+      const updatedPhotos = [...formData.photos];
+      updatedPhotos[index].comment = comment;
+      setFormData({ ...formData, photos: updatedPhotos });
+  };
+
+  const removePhoto = (index) => {
+      setFormData({ ...formData, photos: formData.photos.filter((_, i) => i !== index) });
+  };
+
   const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
   
   const hasExtraData = formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info;
@@ -557,17 +525,32 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
 
   const handleSave = () => {
       const validContacts = nestContacts.filter(c => c.name.trim() || c.phone.trim() || c.email.trim());
-      onSave({ ...formData, nestContacts: validContacts.length > 0 ? validContacts : null });
+      const finalData = { ...formData, nestContacts: validContacts.length > 0 ? validContacts : null };
+      delete finalData.photo; // Nettoyage de l'ancien format
+      onSave(finalData);
   };
 
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
-          {nest.photo && (
-              <div className="rounded-3xl overflow-hidden shadow-md border border-slate-100 h-48 relative">
-                  <img src={nest.photo} alt="Nid" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+          {/* LECTURE : PHOTOS MULTIPLES */}
+          {formData.photos && formData.photos.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  {formData.photos.map((p, idx) => (
+                      <div key={idx} className="rounded-2xl overflow-hidden shadow-sm border border-slate-200 bg-white flex flex-col">
+                          <div className="h-40 relative bg-slate-100">
+                              <img src={p.data} className="w-full h-full object-cover" alt={`Nid ${idx + 1}`} />
+                          </div>
+                          {p.comment && (
+                              <div className="p-3 text-xs text-slate-700 bg-slate-50 border-t border-slate-100 italic flex gap-2">
+                                  <MessageSquare size={14} className="shrink-0 text-sky-500 mt-0.5"/>
+                                  <span>{p.comment}</span>
+                              </div>
+                          )}
+                      </div>
+                  ))}
               </div>
           )}
+
           <div className="flex justify-between items-start">
              <div>
                 <h4 className="font-black text-2xl text-slate-900 tracking-tighter">{nest.title || "Nid sans nom"}</h4>
@@ -656,23 +639,43 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   
   return (
     <div className="space-y-6 text-slate-800">
+        {/* ÉDITION : PHOTOS MULTIPLES */}
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div className="flex justify-between items-center mb-3">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Photos du nid (Max 4)</label>
+                <span className="text-[10px] font-bold text-sky-600 bg-sky-100 px-2 py-1 rounded-md">{(formData.photos || []).length} / 4</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {(formData.photos || []).map((p, index) => (
+                    <div key={index} className="relative rounded-xl overflow-hidden border border-slate-200 bg-white flex flex-col shadow-sm">
+                        <div className="h-32 relative bg-slate-200">
+                            <img src={p.data} className="w-full h-full object-cover" alt={`Nid ${index + 1}`}/>
+                            <button type="button" onClick={() => removePhoto(index)} className="absolute top-2 right-2 bg-red-600 text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 transition-colors"><Trash2 size={14}/></button>
+                        </div>
+                        <div className="p-2 border-t border-slate-100">
+                            <input 
+                                type="text" 
+                                className="w-full p-2 text-xs bg-slate-50 border-0 rounded-lg outline-none focus:ring-2 focus:ring-sky-500 transition-shadow" 
+                                placeholder="Commentaire (ex: Toiture Sud...)" 
+                                value={p.comment} 
+                                onChange={(e) => updatePhotoComment(index, e.target.value)} 
+                            />
+                        </div>
+                    </div>
+                ))}
+                
+                {(formData.photos || []).length < 4 && (
+                    <label className="h-[178px] border-2 border-dashed border-sky-300 bg-sky-50/50 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-sky-100 transition-colors">
+                        <Camera size={32} className="text-sky-500 mb-2"/>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">Ajouter Photo</span>
+                        <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload}/>
+                    </label>
+                )}
+            </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-                 <div className="relative group">
-                    {formData.photo ? (
-                        <div className="relative h-48 rounded-3xl overflow-hidden shadow-md">
-                            <img src={formData.photo} className="w-full h-full object-cover" alt="Nid"/>
-                            <button onClick={() => setFormData({...formData, photo: null})} className="absolute top-3 right-3 bg-red-600 text-white p-2 rounded-full shadow-lg hover:bg-red-700 transition-colors"><Trash2 size={16}/></button>
-                        </div>
-                    ) : (
-                        <label className="flex flex-col items-center justify-center border-2 border-dashed border-sky-300 bg-sky-50 text-sky-500 h-48 rounded-3xl cursor-pointer hover:bg-sky-100 transition-colors group">
-                            <Camera size={40} className="mb-3 transition-colors"/>
-                            <span className="text-[10px] font-black uppercase tracking-widest transition-colors">Ajouter Photo</span>
-                            <input type="file" className="hidden" onChange={handlePhotoUpload}/>
-                        </label>
-                    )}
-                 </div>
-                 
                  <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">État du nid</label>
                     <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
@@ -687,6 +690,17 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                         <option value="non_present">⚪ Non présent / Inactif</option>
                     </select>
                  </div>
+                 
+                 <div className="grid grid-cols-2 gap-3 p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                    <div>
+                        <label className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-1 block pl-1">1er Passage</label>
+                        <input type="date" className="w-full p-2.5 bg-white border-0 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm" value={formData.ster_1_date || ""} onChange={e=>setFormData({...formData, ster_1_date: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-1 block pl-1">2ème Passage</label>
+                        <input type="date" className="w-full p-2.5 bg-white border-0 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm" value={formData.ster_2_date || ""} onChange={e=>setFormData({...formData, ster_2_date: e.target.value})} />
+                    </div>
+                </div>
             </div>
 
             <div className="space-y-4">
@@ -710,18 +724,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                          <button type="button" onClick={openRoute} className="w-full h-[58px] bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-md"><Locate size={16}/> Voir GPS</button>
                      </div>
                 </div>
-            </div>
-        </div>
-
-        {/* NOUVEAU BLOC : DATES DE STÉRILISATION */}
-        <div className="grid grid-cols-2 gap-4 mt-2 p-5 bg-emerald-50/50 rounded-3xl border border-emerald-100">
-            <div>
-                <label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 block pl-1">Date 1er Passage</label>
-                <input type="date" className="w-full p-3 bg-white border-0 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm" value={formData.ster_1_date || ""} onChange={e=>setFormData({...formData, ster_1_date: e.target.value})} />
-            </div>
-            <div>
-                <label className="text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-2 block pl-1">Date 2ème Passage</label>
-                <input type="date" className="w-full p-3 bg-white border-0 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm" value={formData.ster_2_date || ""} onChange={e=>setFormData({...formData, ster_2_date: e.target.value})} />
             </div>
         </div>
         
@@ -786,6 +788,150 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   );
 };
 
+const ClientEditForm = ({ client, onSave, onCancel }) => {
+    const initialExtendedContactsText = client.extendedContacts ? client.extendedContacts.join('\n') : "";
+    const [formData, setFormData] = useState({ name: "", type: "Privé", address: "", phone: "", username: "", password: "", extendedContactsText: initialExtendedContactsText, ...client });
+    
+    const handleSave = () => {
+        const contactsArray = formData.extendedContactsText
+            .split('\n')
+            .map(c => c.trim())
+            .filter(c => c.length > 0);
+            
+        const dataToSave = {
+            ...formData,
+            extendedContacts: contactsArray.length > 0 ? contactsArray : null
+        };
+        delete dataToSave.extendedContactsText;
+        onSave(dataToSave);
+    }
+
+    return (
+      <div className="space-y-4 text-slate-800">
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Type</label><select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })}><option value="Privé">Privé</option><option value="Collectivité">Collectivité</option><option value="Syndic">Syndic</option></select></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Téléphone principal</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} /></div>
+        </div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Adresse</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} /></div>
+        
+        <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-1">Contacts étendus (Sites, Survol...)</label>
+            <p className="text-[9px] text-slate-400 mb-1 italic">Un contact par ligne. Exemple : Mairie annexe : 04.xx.xx.xx</p>
+            <textarea 
+                className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm h-24 resize-none focus:ring-2 focus:ring-sky-500 outline-none" 
+                value={formData.extendedContactsText} 
+                onChange={(e) => setFormData({ ...formData, extendedContactsText: e.target.value })} 
+                placeholder="Ecole Pasteur : M. Dupont (06...)"
+            />
+        </div>
+
+        <div className="bg-slate-100 p-4 rounded-xl">
+          <h4 className="text-[10px] font-black text-slate-500 uppercase mb-3">Identifiants Espace Client</h4>
+          <div className="grid grid-cols-2 gap-4">
+              <input type="text" placeholder="Identifiant" className="p-3 border-0 rounded-lg bg-white text-sm focus:ring-2 focus:ring-sky-500 outline-none w-full" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
+              <input type="text" placeholder="Mot de passe" className="p-3 border-0 rounded-lg bg-white text-sm focus:ring-2 focus:ring-sky-500 outline-none w-full" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+          </div>
+        </div>
+        <div className="flex gap-2 pt-2"><Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button><Button variant="success" className="flex-1 py-3" onClick={handleSave}>Enregistrer</Button></div>
+      </div>
+    );
+};
+
+const InterventionEditForm = ({ intervention, clients, onSave, onDelete, onCancel }) => {
+    const [formData, setFormData] = useState({ clientId: clients[0]?.id || "", status: "Planifié", technician: "", notes: "", date: new Date().toISOString().split("T")[0], ...intervention });
+    return (
+      <div className="space-y-4 text-slate-800">
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client</label><select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: parseInt(e.target.value) })}>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
+          <div><label className="text-[10px] font-bold text-slate-400 uppercase">Statut</label><select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}><option value="Planifié">Planifié</option><option value="En attente">En attente</option><option value="Terminé">Terminé</option><option value="Annulé">Annulé</option></select></div>
+        </div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Agent / Télépilote</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500" value={formData.technician} onChange={(e) => setFormData({ ...formData, technician: e.target.value })} /></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Observations</label><textarea className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm h-20 resize-none outline-none focus:ring-2 focus:ring-sky-500" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} /></div>
+        <div className="flex gap-2 pt-2">
+          {onDelete && formData.id && <button onClick={() => onDelete(formData)} className="p-3 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 size={20}/></button>}
+          <Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button>
+          <Button variant="success" className="flex-1 py-3" onClick={() => onSave(formData)}>Sauver</Button>
+        </div>
+      </div>
+    );
+};
+
+const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCancel, userRole = "admin" }) => {
+    const [formData, setFormData] = useState({ 
+        title: "", date: new Date().toISOString().split("T")[0], type: "Fichier", status: userRole === 'admin' ? "Envoyé" : "En attente", 
+        clientId: userRole === 'admin' ? (clients.length > 0 ? clients[0].id : "") : report.clientId, 
+        author: userRole === 'admin' ? "admin" : "client", nestId: "", ...report 
+    });
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setFormData({ ...formData, title: file.name, type: "Fichier", status: "Envoyé" });
+            // Si c'est une image on la compresse avant de l'envoyer comme fichier attaché
+            if(file.type.startsWith('image/')) {
+                 const compressed = await compressImage(file);
+                 setFormData(prev => ({...prev, attachmentData: compressed }));
+            }
+        }
+    };
+
+    return (
+      <div className="space-y-4 text-slate-800">
+        {userRole === 'admin' && (
+            <div className="grid grid-cols-3 gap-2 mb-2">
+                <button className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${formData.type === 'Fichier' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-500 border-slate-200'}`} onClick={() => setFormData({...formData, type: 'Fichier', title: ""})}>Fichier</button>
+                <button className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${formData.type === 'Rapport Complet' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-500 border-slate-200'}`} onClick={() => { const clientName = clients.find(c => c.id === formData.clientId)?.name || ""; setFormData({...formData, type: 'Rapport Complet', title: "Rapport - " + clientName}); }}>Bilan Client</button>
+                <button className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border-2 transition-all ${formData.type === 'Fiche Nid' ? 'bg-slate-900 text-white border-slate-900' : 'bg-transparent text-slate-500 border-slate-200'}`} onClick={() => setFormData({...formData, type: 'Fiche Nid', title: "Fiche Nid"})}>Fiche Nid</button>
+            </div>
+        )}
+
+        {formData.type === 'Fichier' && (
+            <div className="relative mt-2">
+                <input type="file" className="hidden" id="doc-upload" onChange={handleFileUpload}/>
+                <label htmlFor="doc-upload" className="w-full p-6 border-2 border-dashed border-sky-300 bg-sky-50 rounded-2xl flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-sky-100 text-sky-600 transition-colors">
+                    <Upload size={32}/> <span className="text-xs font-black uppercase tracking-widest">{formData.title ? formData.title : "Sélectionner un fichier"}</span>
+                </label>
+            </div>
+        )}
+
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Client concerné</label>
+          <select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.clientId} onChange={(e) => {
+              const cid = parseInt(e.target.value);
+              let newTitle = formData.title;
+              if (formData.type === 'Rapport Complet') newTitle = "Rapport - " + (clients.find(c => c.id === cid)?.name || "");
+              setFormData({ ...formData, clientId: cid, title: newTitle });
+          }}>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+        </div>
+
+        {formData.type === 'Fiche Nid' && (
+             <div><label className="text-[10px] font-bold text-slate-400 uppercase">Lier à un Nid</label>
+                <select className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.nestId} onChange={(e) => {
+                     const nid = parseInt(e.target.value);
+                     const nestTitle = markers.find(m => m.id === nid)?.title || ("Nid #" + nid);
+                     setFormData({ ...formData, nestId: nid, title: "Fiche - " + nestTitle });
+                }}>
+                    <option value="">-- Choisir un nid --</option>
+                    {markers.filter(m => m.clientId === formData.clientId).map(m => <option key={m.id} value={m.id}>{m.title || m.address}</option>)}
+                </select>
+            </div>
+        )}
+
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase">Nom du document</label><input type="text" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} /></div>
+        
+        {userRole === 'admin' && (
+             <div><label className="text-[10px] font-bold text-slate-400 uppercase">Date</label><input type="date" className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-sky-500 outline-none mt-1" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} /></div>
+        )}
+
+        <div className="flex gap-2 pt-4">
+          <Button variant="outline" className="flex-1 py-3" onClick={onCancel}>Annuler</Button>
+          <Button variant="success" className="flex-1 py-3" onClick={() => onSave(formData)}>{userRole === 'admin' ? "Valider" : "Envoyer"}</Button>
+        </div>
+      </div>
+    );
+};
+
 // ============================================================================
 // 5. CARTE LEAFLET SÉCURISÉE
 // ============================================================================
@@ -830,7 +976,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
 
     if (!window.L) {
         if(!document.getElementById('leaflet-script')) {
-            const link = document.createElement("link"); link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
+            const link = document.createElement("link"); link.id = 'leaflet-css'; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
             const script = document.createElement("script"); script.id = 'leaflet-script'; script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true; script.onload = initMap; document.head.appendChild(script);
         } else {
             const script = document.getElementById('leaflet-script');
@@ -842,7 +988,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
 
-  // Correction écran blanc : forcer le redimensionnement sans détruire la carte
   useEffect(() => {
      if (mapInstanceRef.current) {
          setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 300);
@@ -1035,7 +1180,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
     total: markers.length,
     reported: markers.filter(m => m.status === "reported_by_client").length,
     nonPresent: markers.filter(m => m.status === "non_present").length,
-    sterilized: markers.filter(m => m.status === "sterilized_2").length,
+    sterilized: markers.filter(m => m.status === "sterilized_2" || m.status === "sterilized").length,
   }), [markers]);
 
   const reportedNests = markers.filter(m => m.status === "reported_by_client");
@@ -1046,7 +1191,6 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
           <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">TABLEAU DE BORD</h2>
       </div>
       
-      {/* 1. KPIs GLOBAUX */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4 bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg border-0 text-center relative overflow-hidden flex flex-col justify-center">
             <div className="relative z-10 flex items-center justify-center gap-3">
@@ -1084,7 +1228,6 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
         </Card>
       </div>
 
-      {/* NOTIFICATIONS DE SIGNALEMENTS */}
       {reportedNests.length > 0 && (
           <div className="bg-purple-600 rounded-[32px] p-1 shadow-xl shadow-purple-200 animate-in slide-in-from-top-4">
               <div className="bg-white rounded-[28px] p-6">
@@ -1110,7 +1253,6 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
           </div>
       )}
 
-      {/* 2. LAYOUT : 2/3 Clients, 1/3 Agenda */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
               <Card className="p-0 border-0 shadow-lg rounded-3xl overflow-hidden bg-white flex flex-col h-full">
@@ -1264,11 +1406,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         let count = 0;
         for (const row of jsonData) {
-            
-            // ANTI-FANTÔME
-            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) {
-                continue;
-            }
+            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) continue;
             
             let lat = MAP_CENTER_DEFAULT.lat;
             let lng = MAP_CENTER_DEFAULT.lng;
@@ -1302,10 +1440,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                 if (rawLocation.includes("narbonne")) matchedClient = clients.find(c => c.name.toLowerCase().includes("narbonne"));
                 else if (rawLocation.includes("meze") || rawLocation.includes("mèze")) matchedClient = clients.find(c => c.name.toLowerCase().includes("meze") || c.name.toLowerCase().includes("mèze"));
                 else if (rawLocation.includes("sete") || rawLocation.includes("sète")) matchedClient = clients.find(c => c.name.toLowerCase().includes("sete") || c.name.toLowerCase().includes("sète"));
-                
-                if(!matchedClient && rawLocation.length > 3) {
-                     matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
-                }
+                if(!matchedClient && rawLocation.length > 3) matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
             }
             
             const client = matchedClient || clients[0];
@@ -1366,7 +1501,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                   <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
                       <div className="flex items-center gap-4">
                           <div className="p-3 bg-white/10 rounded-2xl"><Users size={20} className="text-sky-400"/></div>
-                          <h3 className="font-black uppercase tracking-widest text-lg">{client.name}</h3>
+                          <h3 className="font-black uppercase tracking-wide text-lg">{client.name}</h3>
                       </div>
                       <span className="bg-white/20 px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-inner">{clientNests.length} Nids</span>
                   </div>
@@ -1589,7 +1724,7 @@ const ScheduleView = ({ interventions, clients, onUpdateIntervention, onDeleteIn
                                 <tr><th className="p-6 pl-8">Date</th><th className="p-6">Client / Site</th><th className="p-6">Pilote</th><th className="p-6">Statut</th><th className="p-6 text-right pr-8">Actions</th></tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {interventions.length === 0 ? <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest">Aucune intervention</td></tr> : interventions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(i => (
+                                {interventions.length === 0 ? <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest">Aucune intervention programmée</td></tr> : interventions.sort((a,b) => new Date(b.date) - new Date(a.date)).map(i => (
                                     <tr key={i.id} className="hover:bg-slate-50/80 transition-colors">
                                         <td className="p-6 pl-8 font-black text-sky-600">{i.date}</td>
                                         <td className="p-6 font-bold uppercase text-slate-800 tracking-tight">{clients.find(c => c.id === i.clientId)?.name || "Non assigné"}</td>
@@ -1637,7 +1772,7 @@ const ReportsView = ({ reports, clients, markers, interventions, onUpdateReport,
         const client = clients.find(c => c.id === r.clientId) || { name: "Inconnu" };
         if (r.type === 'Fiche Nid') {
             const targetNest = markers.find(m => m.id === r.nestId);
-            if (!targetNest) return alert("Impossible de générer : le nid associé à ce document a probablement été supprimé.");
+            if (!targetNest) return alert("Impossible de générer : le nid associé a été supprimé.");
             generatePDF('nest_detail', targetNest, { clientName: client.name });
         } else if (r.type === 'Rapport Complet') {
             const clientMarkers = markers.filter(m => m.clientId === r.clientId);
@@ -1723,7 +1858,6 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     const myMarkers = useMemo(() => markers.filter(m => m.clientId === user.clientId), [markers, user.clientId]);
     const myReports = useMemo(() => reports.filter(r => r.clientId === user.clientId), [reports, user.clientId]);
     
-    // Statistiques détaillées pour le client
     const clientStats = useMemo(() => ({
         reported: myMarkers.filter(m => m.status === "reported_by_client").length,
         active: myMarkers.filter(m => m.status.startsWith("present")).length,
@@ -1738,7 +1872,6 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     const [isUploading, setIsUploading] = useState(false);
     const [activeTab, setActiveTab] = useState('dashboard');
     
-    // NOUVEAU : États pour la barre de recherche client
     const [searchQuery, setSearchQuery] = useState("");
     const [mapCenter, setMapCenter] = useState(null);
     const [tempMarker, setTempMarker] = useState(null);
@@ -1763,7 +1896,6 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
         }
     };
 
-    // NOUVEAU : Logique de recherche pour le client
     const handleSearch = useCallback(async (e) => {
         if (e.key === "Enter" && searchQuery.trim()) {
             let lat, lng, addr;
@@ -1792,7 +1924,6 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
             case 'dashboard':
                 return (
                     <div className="space-y-8 animate-in fade-in duration-500">
-                        {/* WIDGETS PRINCIPAUX */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-slate-900">
                             <Card className="p-8 border-0 shadow-xl rounded-[32px] flex flex-col justify-center bg-white relative overflow-hidden group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setActiveTab('map')}>
                                 <div className="relative z-10">
@@ -1811,7 +1942,6 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             </Card>
                         </div>
 
-                        {/* REPARTITION DETAILLEE */}
                         <div>
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-4 pl-2">Analyse de la population</h3>
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -1838,7 +1968,6 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             </div>
                         </div>
 
-                        {/* ACTIONS RAPIDES */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
                             <Card className="p-8 border-0 shadow-2xl rounded-[32px] bg-slate-900 text-white flex flex-col justify-center items-center text-center relative overflow-hidden lg:col-span-1">
                                 <div className="relative z-10 w-full">
