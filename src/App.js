@@ -71,7 +71,7 @@ const db = getFirestore(app);
 const appId = "aerothau-goelands";
 
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
-const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; // Sète
+const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; 
 
 const TILE_URLS = {
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -100,10 +100,66 @@ const MOCK_CLIENTS = [
 ];
 
 // ============================================================================
-// 2. COMPRESSION D'IMAGES & UTILITAIRES
+// 2. COMPOSANTS UI DE BASE
 // ============================================================================
 
-// Compresse l'image pour éviter de faire saturer la base de données Firestore
+const Card = ({ children, className = "", onClick }) => (
+  <div onClick={onClick} className={`bg-white rounded-3xl shadow-sm border border-slate-100 ${className}`}>{children}</div>
+);
+
+const Button = ({ children, variant = "primary", className = "", ...props }) => {
+  const baseStyle = "px-4 py-2 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
+  const variants = {
+    primary: "bg-slate-900 text-white hover:bg-slate-800 shadow-md",
+    secondary: "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50",
+    danger: "bg-red-50 text-red-600 hover:bg-red-100",
+    success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200 shadow-md",
+    outline: "border border-slate-300 text-slate-600 hover:bg-slate-50",
+    sky: "bg-sky-600 text-white hover:bg-sky-700 shadow-lg shadow-sky-200",
+    ghost: "text-slate-500 hover:bg-slate-100",
+    purple: "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-200"
+  };
+  return <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>{children}</button>;
+};
+
+const Badge = ({ status }) => {
+  const styles = {
+    Terminé: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+    present_high: "bg-red-100 text-red-700 border border-red-200",
+    present: "bg-[#27F5D6] text-slate-900 border border-[#27F5D6]/50 shadow-sm", // COULEUR CYAN DEMANDÉE
+    present_medium: "bg-orange-100 text-orange-700 border border-orange-200",
+    present_low: "bg-yellow-100 text-yellow-700 border border-yellow-200",
+    non_priority: "bg-blue-100 text-blue-700 border border-blue-200",
+    sterilized_1: "bg-lime-100 text-lime-700 border border-lime-200",
+    sterilized_2: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+    reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
+    non_present: "bg-slate-100 text-slate-500 border border-slate-200",
+    temp: "bg-slate-800 text-white animate-pulse"
+  };
+  const labels = {
+    present: "Présent",
+    present_high: "Prio Haute",
+    non_priority: "Non Prioritaire",
+    sterilized_1: "1er Passage",
+    sterilized_2: "2ème Passage",
+    reported_by_client: "Signalement",
+    non_present: "Absent",
+    temp: "À valider"
+  };
+  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
+};
+
+const Toast = ({ message, type, onClose }) => {
+    useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
+    const bg = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
+    const icon = type === 'success' ? <CheckCircle size={18}/> : <AlertTriangle size={18}/>;
+    return <div className={`fixed bottom-4 right-4 ${bg} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-10 z-[2000]`}>{icon} <span className="font-bold">{message}</span></div>;
+};
+
+// ============================================================================
+// 3. UTILITAIRES
+// ============================================================================
+
 const compressImage = (file) => new Promise((resolve) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -112,13 +168,13 @@ const compressImage = (file) => new Promise((resolve) => {
         img.src = e.target.result;
         img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 800; // Taille max pour PDF et App
+            const MAX_WIDTH = 800;
             const scaleSize = MAX_WIDTH / img.width;
             canvas.width = MAX_WIDTH;
             canvas.height = img.height * scaleSize;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.6)); // Qualité 60%
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
         };
     };
 });
@@ -173,49 +229,41 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`Statut : ${nest.status}`, 20, y); y += 8;
             doc.text(`Contenu : ${nest.eggs} œuf(s)`, 20, y); y += 8;
             
-            if(nest.ster_1_date) { doc.text(`Date 1er passage : ${new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
-            if(nest.ster_2_date) { doc.text(`Date 2ème passage : ${new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
+            if(nest.dateInspection) { doc.text(`Inspection : ${new Date(nest.dateInspection).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
+            if(nest.ster_1_date) { doc.text(`1er passage : ${new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
+            if(nest.ster_2_date) { doc.text(`2ème passage : ${new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
             if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 8; }
-            if(nest.dateVisite) { doc.text(`Date visite : ${nest.dateVisite}`, 20, y); y += 8; }
+            if(nest.dateVisite) { doc.text(`Date visite Excel : ${nest.dateVisite}`, 20, y); y += 8; }
             if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 8; }
             if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
-            y += (notesLines.length * 8) + 5;
+            y += (notesLines.length * 8) + 10;
 
-            // Rétrocompatibilité ancienne photo + nouveau tableau photos
             const photos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
-
             if (photos.length > 0) {
                 doc.setFontSize(14);
                 doc.text("Documentation Photographique :", 20, y);
                 y += 10;
                 doc.setFontSize(10);
-
                 photos.forEach((p, idx) => {
-                    if (y > 230) { doc.addPage(); y = 20; } // Nouvelle page si on dépasse en bas
-                    
-                    const xPos = (idx % 2 === 0) ? 20 : 115; // Colonne gauche ou droite
-                    
+                    if (y > 230) { doc.addPage(); y = 20; }
+                    const xPos = (idx % 2 === 0) ? 20 : 115;
                     try { doc.addImage(p.data, 'JPEG', xPos, y, 80, 60); } catch(e) {}
-                    
                     if (p.comment) {
                         const commentLines = doc.splitTextToSize(p.comment, 80);
                         doc.text(commentLines, xPos, y + 65);
                     }
-                    
-                    // On descend l'axe Y seulement toutes les 2 photos
-                    if (idx % 2 === 1) y += 80; 
+                    if (idx % 2 === 1 || idx === photos.length - 1) y += 80;
                 });
             }
             doc.save(`Fiche_Nid_${nest.id}.pdf`);
-
         } else if (type === 'complete_report') {
             const client = extraData.client || { name: "Client Inconnu" };
             const markers = extraData.markers || [];
             const interventions = extraData.interventions || [];
-            doc.text("RAPPORT D'ACTIVITÉ", 20, 50);
+            doc.text("BILAN ACTIVITÉ", 20, 50);
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(16);
             doc.text(`Client : ${client.name}`, 20, 65);
@@ -235,17 +283,18 @@ const generatePDF = (type, data, extraData = {}) => {
                 `${m.title || "Nid"}\n${m.address}`, 
                 m.status, 
                 m.eggs,
+                m.dateInspection ? new Date(m.dateInspection).toLocaleDateString('fr-FR') : "-",
                 m.ster_1_date ? new Date(m.ster_1_date).toLocaleDateString('fr-FR') : "-",
                 m.ster_2_date ? new Date(m.ster_2_date).toLocaleDateString('fr-FR') : "-"
             ]);
 
             doc.autoTable({ 
                 startY: 110, 
-                head: [['Réf / Localisation', 'Statut', 'Oeufs', '1er Pass.', '2ème Pass.']], 
+                head: [['Réf / Localisation', 'Statut', 'Oeufs', 'Insp.', '1er Pass.', '2ème Pass.']], 
                 body: nestRows, 
                 theme: 'grid', 
                 headStyles: { fillColor: [14, 165, 233] },
-                styles: { fontSize: 9 }
+                styles: { fontSize: 8 }
             });
             
             const finalY = doc.lastAutoTable.finalY + 15;
@@ -262,70 +311,6 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.save(`${report.title}.pdf`);
         }
     }).catch(e => console.error("PDF Error", e));
-};
-
-// ============================================================================
-// 3. COMPOSANTS UI PARTAGÉS
-// ============================================================================
-
-const Button = ({ children, variant = "primary", className = "", ...props }) => {
-  const baseStyle = "px-4 py-2 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 justify-center disabled:opacity-50";
-  const variants = {
-    primary: "bg-slate-900 text-white hover:bg-slate-800 shadow-md",
-    secondary: "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100",
-    success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200 shadow-md",
-    outline: "border border-slate-300 text-slate-600 hover:bg-slate-50",
-    sky: "bg-sky-600 text-white hover:bg-sky-700 shadow-lg shadow-sky-200",
-    ghost: "text-slate-500 hover:bg-slate-100",
-    purple: "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-200"
-  };
-  return <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>{children}</button>;
-};
-
-const Card = ({ children, className = "", onClick }) => (
-  <div onClick={onClick} className={`bg-white rounded-3xl shadow-sm border border-slate-100 ${className}`}>{children}</div>
-);
-
-const Badge = ({ status }) => {
-  const styles = {
-    Terminé: "bg-emerald-100 text-emerald-700 border border-emerald-200",
-    Planifié: "bg-sky-100 text-sky-700 border border-sky-200",
-    "En attente": "bg-orange-100 text-orange-700 border border-orange-200",
-    Annulé: "bg-red-100 text-red-700 border border-red-200",
-    present: "bg-red-100 text-red-700 border border-red-200",
-    present_high: "bg-red-100 text-red-700 border border-red-200",
-    present_medium: "bg-orange-100 text-orange-700 border border-orange-200",
-    present_low: "bg-yellow-100 text-yellow-700 border border-yellow-200",
-    non_priority: "bg-cyan-100 text-cyan-700 border border-cyan-200",
-    non_present: "bg-slate-100 text-slate-500 border border-slate-200",
-    sterilized_1: "bg-lime-100 text-lime-700 border border-lime-200",
-    sterilized_2: "bg-emerald-100 text-emerald-700 border border-emerald-200",
-    reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
-    temp: "bg-slate-800 text-white animate-pulse border border-slate-900",
-  };
-  
-  const labels = {
-    present: "Présent",
-    present_high: "Prio Haute",
-    present_medium: "Prio Moyenne",
-    present_low: "Prio Faible",
-    non_priority: "Non Prioritaire",
-    non_present: "Non présent",
-    sterilized_1: "1er Passage",
-    sterilized_2: "2ème Passage",
-    reported_by_client: "Signalement",
-    temp: "À valider"
-  };
-
-  return <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${styles[status] || "bg-gray-100 text-gray-600"}`}>{labels[status] || status}</span>;
-};
-
-const Toast = ({ message, type, onClose }) => {
-    useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
-    const bg = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
-    const icon = type === 'success' ? <CheckCircle size={18}/> : <AlertTriangle size={18}/>;
-    return <div className={`fixed bottom-4 right-4 ${bg} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-10 z-[2000]`}>{icon} <span className="font-bold">{message}</span></div>;
 };
 
 // ============================================================================
@@ -367,17 +352,9 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 };
 
 const ClientReportForm = ({ nest, onSave, onCancel }) => {
-  // Adaptation vers le tableau photos (Max 4)
   const initialPhotos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
-  
   const [formData, setFormData] = useState({ 
-      title: "", 
-      comments: "", 
-      contactName: "", 
-      contactPhone: "", 
-      status: "reported_by_client", 
-      ...nest,
-      photos: initialPhotos
+      title: "", comments: "", contactName: "", contactPhone: "", status: "reported_by_client", ...nest, photos: initialPhotos
   });
 
   const handlePhotoUpload = async (e) => { 
@@ -408,13 +385,9 @@ const ClientReportForm = ({ nest, onSave, onCancel }) => {
       const finalData = {
           ...formData,
           comments: formData.comments ? `[Signalement Client] : ${formData.comments}` : "",
-          nestContacts: (formData.contactName || formData.contactPhone) 
-              ? [{ name: formData.contactName, phone: formData.contactPhone, email: "" }] 
-              : []
+          nestContacts: (formData.contactName || formData.contactPhone) ? [{ name: formData.contactName, phone: formData.contactPhone, email: "" }] : []
       };
-      delete finalData.contactName;
-      delete finalData.contactPhone;
-      delete finalData.photo; 
+      delete finalData.contactName; delete finalData.contactPhone; delete finalData.photo; 
       onSave(finalData);
   };
 
@@ -425,7 +398,6 @@ const ClientReportForm = ({ nest, onSave, onCancel }) => {
         <div><p className="font-bold">Nouveau Signalement</p><p className="text-xs opacity-80">Précisez les détails pour l'équipe technique.</p></div>
       </div>
       
-      {/* PHOTOS MULTIPLES CLIENT */}
       <div>
           <div className="flex justify-between items-center mb-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase">Photos (Optionnel - Max 4)</label>
@@ -479,7 +451,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   
   const [formData, setFormData] = useState({ 
       title: "", comments: "", eggs: 0, status: "present_high", clientId: "", 
-      lieux: "", dateVisite: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
+      lieux: "", dateVisite: "", dateInspection: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
       ster_1_date: "", ster_2_date: "",
       ...nest,
       photos: initialPhotos
@@ -526,13 +498,12 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   const handleSave = () => {
       const validContacts = nestContacts.filter(c => c.name.trim() || c.phone.trim() || c.email.trim());
       const finalData = { ...formData, nestContacts: validContacts.length > 0 ? validContacts : null };
-      delete finalData.photo; // Nettoyage de l'ancien format
+      delete finalData.photo; 
       onSave(finalData);
   };
 
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
-          {/* LECTURE : PHOTOS MULTIPLES */}
           {formData.photos && formData.photos.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   {formData.photos.map((p, idx) => (
@@ -571,25 +542,29 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
               </div>
           </div>
 
-          {/* LECTURE : HISTORIQUE DATES INTERVENTIONS */}
-          {(nest.ster_1_date || nest.ster_2_date) && (
-              <div className="grid grid-cols-2 gap-4">
+          {(nest.dateInspection || nest.ster_1_date || nest.ster_2_date) && (
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                  {nest.dateInspection && (
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-200 flex flex-col items-center justify-center text-center">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-slate-500 mb-1">Inspection</span>
+                          <span className="font-bold text-xs text-slate-800">{new Date(nest.dateInspection).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                  )}
                   {nest.ster_1_date && (
-                      <div className="bg-lime-50 p-3 rounded-xl border border-lime-100 flex flex-col items-center">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-lime-600 mb-1">1er Passage</span>
-                          <span className="font-bold text-sm text-slate-800">{new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}</span>
+                      <div className="bg-lime-50 p-2 rounded-xl border border-lime-100 flex flex-col items-center justify-center text-center">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-lime-600 mb-1">1er Passage</span>
+                          <span className="font-bold text-xs text-slate-800">{new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}</span>
                       </div>
                   )}
                   {nest.ster_2_date && (
-                      <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 flex flex-col items-center">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-1">2ème Passage</span>
-                          <span className="font-bold text-sm text-slate-800">{new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}</span>
+                      <div className="bg-emerald-50 p-2 rounded-xl border border-emerald-100 flex flex-col items-center justify-center text-center">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 mb-1">2ème Passage</span>
+                          <span className="font-bold text-xs text-slate-800">{new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}</span>
                       </div>
                   )}
               </div>
           )}
           
-          {/* LECTURE : BLOC CONTACTS SUR PLACE */}
           {nest.nestContacts && nest.nestContacts.length > 0 && (
              <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 text-sm space-y-3">
                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2 flex items-center gap-2"><User size={14}/> Contacts sur place</p>
@@ -639,7 +614,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   
   return (
     <div className="space-y-6 text-slate-800">
-        {/* ÉDITION : PHOTOS MULTIPLES */}
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
             <div className="flex justify-between items-center mb-3">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Photos du nid (Max 4)</label>
@@ -681,24 +655,28 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                     <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
                         <option value="reported_by_client">🟣 Signalement Client</option>
                         <option value="present_high">🔴 Priorité Haute (Rouge)</option>
+                        <option value="present">🔶 Présent (Classique - Cyan)</option>
                         <option value="present_medium">🟠 Priorité Moyenne (Orange)</option>
                         <option value="present_low">🟡 Priorité Faible (Jaune)</option>
                         <option value="non_priority">🔵 Non Prioritaire (Bleu)</option>
-                        <option value="present">🔴 Présent (Classique)</option>
                         <option value="sterilized_1">🟢 1er Passage (Traité)</option>
                         <option value="sterilized_2">🟢 2ème Passage (Confirmé)</option>
                         <option value="non_present">⚪ Non présent / Inactif</option>
                     </select>
                  </div>
                  
-                 <div className="grid grid-cols-2 gap-3 p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                 <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200 mt-4">
                     <div>
-                        <label className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-1 block pl-1">1er Passage</label>
-                        <input type="date" className="w-full p-2.5 bg-white border-0 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm" value={formData.ster_1_date || ""} onChange={e=>setFormData({...formData, ster_1_date: e.target.value})} />
+                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block pl-1">Inspection</label>
+                         <input type="date" className="w-full p-2 bg-white border-0 rounded-lg text-xs font-bold focus:ring-2 focus:ring-sky-500 outline-none shadow-sm" value={formData.dateInspection || ""} onChange={e=>setFormData({...formData, dateInspection: e.target.value})} />
                     </div>
                     <div>
-                        <label className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-1 block pl-1">2ème Passage</label>
-                        <input type="date" className="w-full p-2.5 bg-white border-0 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm" value={formData.ster_2_date || ""} onChange={e=>setFormData({...formData, ster_2_date: e.target.value})} />
+                         <label className="text-[9px] font-black text-lime-600 uppercase tracking-widest mb-1 block pl-1">1er Pass.</label>
+                         <input type="date" className="w-full p-2 bg-white border-0 rounded-lg text-xs font-bold focus:ring-2 focus:ring-lime-500 outline-none shadow-sm" value={formData.ster_1_date || ""} onChange={e=>setFormData({...formData, ster_1_date: e.target.value})} />
+                    </div>
+                    <div>
+                         <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1 block pl-1">2ème Pass.</label>
+                         <input type="date" className="w-full p-2 bg-white border-0 rounded-lg text-xs font-bold focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm" value={formData.ster_2_date || ""} onChange={e=>setFormData({...formData, ster_2_date: e.target.value})} />
                     </div>
                 </div>
             </div>
@@ -740,7 +718,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
             <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm h-24 focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" placeholder="Accès difficile, type de toiture, nacelle nécessaire..." value={formData.comments} onChange={(e) => setFormData({...formData, comments: e.target.value})}/>
         </div>
 
-        {/* ÉDITION : SECTION CONTACTS NID */}
         <div className="pt-4 border-t border-slate-100">
             <div className="flex justify-between items-center mb-3 pl-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><User size={14}/> Contacts sur place</label>
@@ -763,7 +740,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
             </div>
         </div>
 
-        {/* SECTION IMPORTÉE MASQUABLE */}
         {(formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info) && (
             <div className="pt-4 border-t border-slate-100">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 pl-1"><Layers size={14}/> Champs Import Excel</label>
@@ -817,13 +793,7 @@ const ClientEditForm = ({ client, onSave, onCancel }) => {
         
         <div>
             <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 mb-1">Contacts étendus (Sites, Survol...)</label>
-            <p className="text-[9px] text-slate-400 mb-1 italic">Un contact par ligne. Exemple : Mairie annexe : 04.xx.xx.xx</p>
-            <textarea 
-                className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm h-24 resize-none focus:ring-2 focus:ring-sky-500 outline-none" 
-                value={formData.extendedContactsText} 
-                onChange={(e) => setFormData({ ...formData, extendedContactsText: e.target.value })} 
-                placeholder="Ecole Pasteur : M. Dupont (06...)"
-            />
+            <textarea className="w-full p-3 bg-slate-50 border-0 rounded-xl text-sm h-24 resize-none focus:ring-2 focus:ring-sky-500 outline-none" value={formData.extendedContactsText} onChange={(e) => setFormData({ ...formData, extendedContactsText: e.target.value })} placeholder="Ecole Pasteur : M. Dupont (06...)" />
         </div>
 
         <div className="bg-slate-100 p-4 rounded-xl">
@@ -869,7 +839,6 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
         const file = e.target.files[0];
         if (file) {
             setFormData({ ...formData, title: file.name, type: "Fichier", status: "Envoyé" });
-            // Si c'est une image on la compresse avant de l'envoyer comme fichier attaché
             if(file.type.startsWith('image/')) {
                  const compressed = await compressImage(file);
                  setFormData(prev => ({...prev, attachmentData: compressed }));
@@ -1001,7 +970,8 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       
       markers.forEach(m => {
           let color = "#64748b"; // Gris par défaut (Non présent)
-          if (m.status === "present" || m.status === "present_high") color = "#ef4444"; // Rouge
+          if (m.status === "present_high") color = "#ef4444"; // Rouge
+          else if (m.status === "present") color = "#27F5D6"; // CYAN / TURQUOISE DEMANDÉ
           else if (m.status === "present_medium") color = "#f97316"; // Orange
           else if (m.status === "present_low") color = "#eab308"; // Jaune
           else if (m.status === "non_priority") color = "#0ea5e9"; // Bleu Cyan
@@ -1376,6 +1346,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       "observation": m.comments || "",
       "Latitude": m.lat,
       "Longitude": m.lng,
+      "Date d'inspection": m.dateInspection || "",
       "Date 1er Passage": m.ster_1_date || "",
       "Date 2ème Passage": m.ster_2_date || "",
       "Lieux": m.lieux || "",
@@ -1406,7 +1377,10 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         let count = 0;
         for (const row of jsonData) {
-            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) continue;
+            
+            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) {
+                continue;
+            }
             
             let lat = MAP_CENTER_DEFAULT.lat;
             let lng = MAP_CENTER_DEFAULT.lng;
@@ -1440,7 +1414,10 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                 if (rawLocation.includes("narbonne")) matchedClient = clients.find(c => c.name.toLowerCase().includes("narbonne"));
                 else if (rawLocation.includes("meze") || rawLocation.includes("mèze")) matchedClient = clients.find(c => c.name.toLowerCase().includes("meze") || c.name.toLowerCase().includes("mèze"));
                 else if (rawLocation.includes("sete") || rawLocation.includes("sète")) matchedClient = clients.find(c => c.name.toLowerCase().includes("sete") || c.name.toLowerCase().includes("sète"));
-                if(!matchedClient && rawLocation.length > 3) matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
+                
+                if(!matchedClient && rawLocation.length > 3) {
+                     matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
+                }
             }
             
             const client = matchedClient || clients[0];
@@ -1455,6 +1432,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                 lng: lng,
                 title: `N°${row["N° point"] || count} - ${row["Lieux"] || "Nid importé"}`,
                 comments: row["observation"] || "Import depuis fichier Excel.",
+                dateInspection: row["Date d'inspection"] || row["Date inspection"] || "",
                 ster_1_date: row["Date 1er Passage"] || "",
                 ster_2_date: row["Date 2ème Passage"] || "",
                 lieux: row["Lieux"] || "",
@@ -2018,18 +1996,12 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
             case 'map':
                 return (
                     <div className="h-[700px] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-500">
-                        <Card className="p-3 flex flex-col md:flex-row gap-4 items-center z-20 shadow-lg border-0 rounded-3xl bg-white">
-                            <div className="relative flex-1 w-full group">
-                                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={20}/>
-                                <input type="text" placeholder="Rechercher une adresse ou un point GPS pour signaler un nid..." className="w-full pl-14 pr-6 py-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
-                            </div>
-                            <div className="flex gap-2 shrink-0 pr-2">
-                                <Button variant={isAddingMode ? "danger" : "sky"} className={`h-14 px-6 rounded-2xl text-xs uppercase tracking-widest ${isAddingMode ? '' : 'shadow-xl shadow-sky-200'}`} onClick={() => setIsAddingMode(!isAddingMode)}>
-                                    {isAddingMode ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
-                                </Button>
-                            </div>
+                        <Card className="p-3 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-3xl bg-white">
+                            <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-800 flex items-center gap-3"><MapIcon className="text-sky-500"/> Cartographie du Site</div>
+                            <Button variant={isAddingMode ? "danger" : "sky"} className="py-4 px-8 rounded-2xl uppercase font-black tracking-widest text-xs shadow-lg" onClick={() => setIsAddingMode(!isAddingMode)}>
+                                {isAddingMode ? <><X size={18}/> Mode Navigation</> : <><Plus size={18}/> Signaler un nouveau nid</>}
+                            </Button>
                         </Card>
-                        
                         <div className={`flex-1 relative shadow-2xl rounded-[32px] overflow-hidden bg-white transition-all duration-300 ${isAddingMode ? 'border-[8px] border-sky-500' : 'border-0'}`}>
                             {isAddingMode && (
                                 <div className="absolute inset-x-0 top-6 z-[1000] flex justify-center pointer-events-none animate-in slide-in-from-top-4">
@@ -2039,9 +2011,6 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                     </div>
                                 </div>
                             )}
-                            
-                            {tempMarker && !isAddingMode && (<div className="absolute top-6 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest animate-bounce pointer-events-none shadow-2xl">📍 Cliquez sur le point gris pour valider</div>)}
-                            
                             <LeafletMap 
                                 markers={displayMarkers} 
                                 isAddingMode={isAddingMode} 
