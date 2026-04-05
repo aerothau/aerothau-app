@@ -126,7 +126,7 @@ const Badge = ({ status }) => {
   const styles = {
     Terminé: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     present_high: "bg-red-100 text-red-700 border border-red-200",
-    present: "bg-[#27F5D6] text-slate-900 border border-[#27F5D6]/50 shadow-sm", // COULEUR CYAN DEMANDÉE
+    present: "bg-[#27F5D6]/20 text-slate-900 border border-[#27F5D6] shadow-sm", // CYAN DEMANDÉ
     present_medium: "bg-orange-100 text-orange-700 border border-orange-200",
     present_low: "bg-yellow-100 text-yellow-700 border border-yellow-200",
     non_priority: "bg-blue-100 text-blue-700 border border-blue-200",
@@ -229,13 +229,9 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.text(`Statut : ${nest.status}`, 20, y); y += 8;
             doc.text(`Contenu : ${nest.eggs} œuf(s)`, 20, y); y += 8;
             
-            if(nest.dateInspection) { doc.text(`Inspection : ${new Date(nest.dateInspection).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
-            if(nest.ster_1_date) { doc.text(`1er passage : ${new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
-            if(nest.ster_2_date) { doc.text(`2ème passage : ${new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
-            if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 8; }
-            if(nest.dateVisite) { doc.text(`Date visite Excel : ${nest.dateVisite}`, 20, y); y += 8; }
-            if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 8; }
-            if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 8; }
+            if(nest.dateInspection) { doc.text(`Date d'inspection : ${new Date(nest.dateInspection).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
+            if(nest.ster_1_date) { doc.text(`Date 1er passage : ${new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
+            if(nest.ster_2_date) { doc.text(`Date 2ème passage : ${new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
@@ -243,18 +239,11 @@ const generatePDF = (type, data, extraData = {}) => {
 
             const photos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
             if (photos.length > 0) {
-                doc.setFontSize(14);
-                doc.text("Documentation Photographique :", 20, y);
-                y += 10;
-                doc.setFontSize(10);
                 photos.forEach((p, idx) => {
                     if (y > 230) { doc.addPage(); y = 20; }
                     const xPos = (idx % 2 === 0) ? 20 : 115;
                     try { doc.addImage(p.data, 'JPEG', xPos, y, 80, 60); } catch(e) {}
-                    if (p.comment) {
-                        const commentLines = doc.splitTextToSize(p.comment, 80);
-                        doc.text(commentLines, xPos, y + 65);
-                    }
+                    if (p.comment) doc.text(doc.splitTextToSize(p.comment, 80), xPos, y + 65);
                     if (idx % 2 === 1 || idx === photos.length - 1) y += 80;
                 });
             }
@@ -655,7 +644,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                     <select className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.status} onChange={e=>setFormData({...formData, status: e.target.value})}>
                         <option value="reported_by_client">🟣 Signalement Client</option>
                         <option value="present_high">🔴 Priorité Haute (Rouge)</option>
-                        <option value="present">🔶 Présent (Classique - Cyan)</option>
+                        <option value="present">💠 Présent (Classique - Cyan)</option>
                         <option value="present_medium">🟠 Priorité Moyenne (Orange)</option>
                         <option value="present_low">🟡 Priorité Faible (Jaune)</option>
                         <option value="non_priority">🔵 Non Prioritaire (Bleu)</option>
@@ -971,7 +960,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       markersLayerRef.current.clearLayers();
       
       markers.forEach(m => {
-          let color = "#64748b"; // Gris par défaut (Non présent)
+          let color = "#64748b"; // Gris par défaut
           if (m.status === "present_high") color = "#ef4444"; // Rouge
           else if (m.status === "present") color = "#27F5D6"; // CYAN / TURQUOISE DEMANDÉ
           else if (m.status === "present_medium") color = "#f97316"; // Orange
@@ -1014,7 +1003,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       if (mapInstanceRef.current && center) mapInstanceRef.current.setView([center.lat, center.lng], 18);
   }, [center]);
 
-  // Suivi de la position GPS de l'utilisateur (Pilote) en temps réel
+  // Suivi GPS
   useEffect(() => {
       if (!navigator.geolocation) return;
       const watchId = navigator.geolocation.watchPosition(
@@ -1027,7 +1016,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // Création et mise à jour du marqueur "Drone" sur la carte
+  // Marqueur Drone
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L || !userPosition) return;
       
@@ -1037,7 +1026,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       
       userLayerRef.current.clearLayers();
       
-      // Dessin du drone en SVG
       const droneSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px; transform: rotate(45deg);"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4 12H2"/><path d="M22 12h-2"/><path d="M5.4 5.4l2.8 2.8"/><path d="M15.8 15.8l2.8 2.8"/><path d="M5.4 18.6l2.8-2.8"/><path d="M15.8 8.2l2.8-2.8"/><rect x="8" y="8" width="8" height="8" rx="2" fill="white"/></svg>`;
       
       const droneIcon = window.L.divIcon({
@@ -1050,7 +1038,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       window.L.marker([userPosition.lat, userPosition.lng], { icon: droneIcon, zIndexOffset: 1000 }).addTo(userLayerRef.current);
   }, [userPosition]);
 
-  // Fonction pour recentrer la carte sur le pilote
   const centerOnUser = (e) => {
       e.stopPropagation();
       if (userPosition && mapInstanceRef.current) {
@@ -1428,6 +1415,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         let count = 0;
         for (const row of jsonData) {
             
+            // ANTI-FANTÔME
             if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) {
                 continue;
             }
