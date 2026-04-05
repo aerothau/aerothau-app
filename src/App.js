@@ -910,8 +910,10 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
   const routeLayerRef = useRef(null);
+  const userLayerRef = useRef(null);
   const tileLayerRef = useRef(null);
   const [mapType, setMapType] = useState("satellite");
+  const [userPosition, setUserPosition] = useState(null);
 
   const onMapClickRef = useRef(onMapClick);
   const onMarkerClickRef = useRef(onMarkerClick);
@@ -1012,10 +1014,58 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       if (mapInstanceRef.current && center) mapInstanceRef.current.setView([center.lat, center.lng], 18);
   }, [center]);
 
+  // Suivi de la position GPS de l'utilisateur (Pilote) en temps réel
+  useEffect(() => {
+      if (!navigator.geolocation) return;
+      const watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+              setUserPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          },
+          (err) => console.warn("Erreur GPS:", err),
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+      );
+      return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  // Création et mise à jour du marqueur "Drone" sur la carte
+  useEffect(() => {
+      if (!mapInstanceRef.current || !window.L || !userPosition) return;
+      
+      if (!userLayerRef.current) {
+          userLayerRef.current = window.L.layerGroup().addTo(mapInstanceRef.current);
+      }
+      
+      userLayerRef.current.clearLayers();
+      
+      // Dessin du drone en SVG
+      const droneSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px; transform: rotate(45deg);"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4 12H2"/><path d="M22 12h-2"/><path d="M5.4 5.4l2.8 2.8"/><path d="M15.8 15.8l2.8 2.8"/><path d="M5.4 18.6l2.8-2.8"/><path d="M15.8 8.2l2.8-2.8"/><rect x="8" y="8" width="8" height="8" rx="2" fill="white"/></svg>`;
+      
+      const droneIcon = window.L.divIcon({
+          className: "drone-marker",
+          html: `<div style="background-color: white; border-radius: 50%; padding: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; border: 2px solid #0ea5e9;">${droneSvg}</div>`,
+          iconSize: [36, 36],
+          iconAnchor: [18, 18]
+      });
+      
+      window.L.marker([userPosition.lat, userPosition.lng], { icon: droneIcon, zIndexOffset: 1000 }).addTo(userLayerRef.current);
+  }, [userPosition]);
+
+  // Fonction pour recentrer la carte sur le pilote
+  const centerOnUser = (e) => {
+      e.stopPropagation();
+      if (userPosition && mapInstanceRef.current) {
+          mapInstanceRef.current.setView([userPosition.lat, userPosition.lng], 19);
+      } else {
+          alert("Recherche de votre position GPS en cours... Assurez-vous d'avoir autorisé la géolocalisation sur votre navigateur.");
+      }
+  };
+
   return (
       <div className="relative w-full h-full">
           <div ref={mapContainerRef} className="w-full h-full bg-slate-100 z-0" style={{minHeight:'100%'}}/>
           <div className="absolute top-4 right-4 z-[400] bg-white/90 backdrop-blur-sm p-1 rounded-xl shadow-lg flex gap-1">
+              <button onClick={centerOnUser} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors text-sky-600 hover:bg-sky-50 flex items-center gap-1" title="Ma position GPS"><Locate size={14}/> Moi</button>
+              <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
               <button onClick={(e) => { e.stopPropagation(); setMapType('satellite'); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${mapType === 'satellite' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Satellite</button>
               <button onClick={(e) => { e.stopPropagation(); setMapType('plan'); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${mapType === 'plan' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Plan</button>
           </div>
