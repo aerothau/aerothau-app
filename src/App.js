@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import {
-  getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, enableIndexedDbPersistence
+  getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc
 } from "firebase/firestore";
 import {
   Users, MapPin, Calendar, FileText, CheckCircle, LogOut, Menu, X, Plus, 
@@ -10,7 +10,7 @@ import {
   Crosshair, Edit, Trash2, Key, User, Send, Info, Printer, Locate, Camera, 
   MessageSquare, AlertTriangle, Download, Upload, File, FileCheck, Activity, 
   Cloud, Wind, List as ListIcon, Layers, Bell, FileSpreadsheet, BarChart3, 
-  MessageCircle, QrCode, Filter, Flame, Navigation2, CheckSquare, Smartphone
+  MessageCircle, QrCode, Filter, Flame, Navigation2
 } from "lucide-react";
 
 // ============================================================================
@@ -30,9 +30,6 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "aerothau-goelands";
-
-// Mode hors-ligne Firebase
-try { enableIndexedDbPersistence(db).catch(() => {}); } catch (e) {}
 
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; 
@@ -948,13 +945,16 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
 // 5. CARTE LEAFLET SÉCURISÉE
 // ============================================================================
 
-const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }) => {
+const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, routePath }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
+  const routeLayerRef = useRef(null);
   const userLayerRef = useRef(null);
+  const heatLayerRef = useRef(null);
   const [mapType, setMapType] = useState("satellite");
   const [userPosition, setUserPosition] = useState(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   const onMapClickRef = useRef(onMapClick);
   const onMarkerClickRef = useRef(onMarkerClick);
@@ -964,12 +964,20 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   useEffect(() => {
     if (mapInstanceRef.current) return;
 
-    const initMap = () => {
+    const initMap = async () => {
         if (!mapContainerRef.current) return;
         try {
-            const L = window.L;
-            if (!L || typeof L.map !== 'function') return;
+            if (!window.L) {
+                await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
+                const link = document.createElement("link"); 
+                link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; 
+                document.head.appendChild(link);
+            }
+            if (!window.L.heatLayer) {
+                await loadScript("https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js");
+            }
 
+            const L = window.L;
             const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
             mapInstanceRef.current = map;
 
@@ -977,6 +985,8 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
             map.tileLayer = L.tileLayer(TILE_URLS['satellite'], { attribution: 'Esri' }).addTo(map);
             
             markersLayerRef.current = L.layerGroup().addTo(map);
+            routeLayerRef.current = L.layerGroup().addTo(map);
+            heatLayerRef.current = L.layerGroup().addTo(map);
 
             map.on('click', (e) => {
                 if(onMapClickRef.current) onMapClickRef.current(e.latlng);
@@ -985,17 +995,7 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
             setTimeout(() => map.invalidateSize(), 400); 
         } catch (e) { console.error("Erreur Map:", e); }
     };
-
-    if (!window.L) {
-        if(!document.getElementById('leaflet-script')) {
-            const link = document.createElement("link"); link.id = 'leaflet-css'; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
-            const script = document.createElement("script"); script.id = 'leaflet-script'; script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true; script.onload = initMap; document.head.appendChild(script);
-        } else {
-            const script = document.getElementById('leaflet-script');
-            script.addEventListener('load', initMap);
-            setTimeout(() => { if(window.L && !mapInstanceRef.current) initMap(); }, 500);
-        }
-    } else { initMap(); }
+    initMap();
 
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
@@ -1004,36 +1004,52 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
      if (mapInstanceRef.current) {
          setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 400);
      }
-  }, [markers, isAddingMode]);
+  }, [markers, isAddingMode, showHeatmap]);
 
   useEffect(() => {
-      if (!mapInstanceRef.current || !window.L || !markersLayerRef.current) return;
+      if (!mapInstanceRef.current || !window.L || !markersLayerRef.current || !heatLayerRef.current) return;
       const L = window.L;
       markersLayerRef.current.clearLayers();
+      heatLayerRef.current.clearLayers();
       
-      markers.forEach(m => {
-          let color = "#64748b"; 
-          if (m.status === "present_high") color = "#ef4444"; 
-          else if (m.status === "present") color = "#27F5D6"; // CYAN
-          else if (m.status === "present_medium") color = "#f97316"; 
-          else if (m.status === "present_low") color = "#eab308"; 
-          else if (m.status === "non_priority") color = "#0ea5e9"; 
-          else if (m.status === "temp") color = "#94a3b8"; 
-          else if (m.status === "sterilized_1") color = "#84cc16"; 
-          else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; 
-          else if (m.status === "reported_by_client") color = "#a855f7"; 
+      if (showHeatmap && L.heatLayer) {
+          const heatPoints = markers.map(m => [m.lat, m.lng, 1]); 
+          L.heatLayer(heatPoints, { radius: 35, blur: 25, maxZoom: 17, gradient: {0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red'} }).addTo(heatLayerRef.current);
+      } else {
+          markers.forEach(m => {
+              let color = "#64748b"; 
+              if (m.status === "present_high") color = "#ef4444"; 
+              else if (m.status === "present") color = "#27F5D6"; // CYAN
+              else if (m.status === "present_medium") color = "#f97316"; 
+              else if (m.status === "present_low") color = "#eab308"; 
+              else if (m.status === "non_priority") color = "#0ea5e9"; 
+              else if (m.status === "temp") color = "#94a3b8"; 
+              else if (m.status === "sterilized_1") color = "#84cc16"; 
+              else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; 
+              else if (m.status === "reported_by_client") color = "#a855f7"; 
 
-          const icon = L.divIcon({ 
-              className: "custom-icon", 
-              html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); ${m.status === 'temp' ? 'animation: pulse 1.5s infinite;' : ''}"></div>`,
-              iconSize: [24, 24],
-              iconAnchor: [12, 12]
+              const icon = L.divIcon({ 
+                  className: "custom-icon", 
+                  html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); ${m.status === 'temp' ? 'animation: pulse 1.5s infinite;' : ''}"></div>`,
+                  iconSize: [24, 24],
+                  iconAnchor: [12, 12]
+              });
+              const marker = L.marker([m.lat, m.lng], { icon });
+              marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClickRef.current) onMarkerClickRef.current(m); });
+              marker.addTo(markersLayerRef.current);
           });
-          const marker = L.marker([m.lat, m.lng], { icon });
-          marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClickRef.current) onMarkerClickRef.current(m); });
-          marker.addTo(markersLayerRef.current);
-      });
-  }, [markers]);
+      }
+  }, [markers, showHeatmap]);
+
+  useEffect(() => {
+      if (!mapInstanceRef.current || !window.L || !routeLayerRef.current) return;
+      routeLayerRef.current.clearLayers();
+      if (routePath && routePath.length > 1) {
+          const pointList = routePath.map(m => [m.lat, m.lng]);
+          const polyline = window.L.polyline(pointList, { color: '#0ea5e9', weight: 4, dashArray: '10, 10' }).addTo(routeLayerRef.current);
+          mapInstanceRef.current.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+      }
+  }, [routePath]);
 
   useEffect(() => {
       if (mapInstanceRef.current && mapInstanceRef.current.tileLayer && TILE_URLS[mapType]) {
@@ -1075,6 +1091,8 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
       <div className="relative w-full h-full">
           <div ref={mapContainerRef} className="w-full h-full bg-slate-100 z-0" style={{minHeight:'100%'}}/>
           <div className="absolute top-4 right-4 z-[400] bg-white/90 backdrop-blur-sm p-1 rounded-xl shadow-lg flex gap-1">
+              <button onClick={(e) => { e.stopPropagation(); setShowHeatmap(!showHeatmap); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors flex items-center gap-1 ${showHeatmap ? 'bg-rose-500 text-white' : 'text-slate-500 hover:bg-slate-100'}`} title="Carte de densité"><Flame size={14}/> Densité</button>
+              <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
               <button onClick={centerOnUser} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors text-sky-600 hover:bg-sky-50 flex items-center gap-1" title="Ma position GPS"><Locate size={14}/> Moi</button>
               <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
               <button onClick={(e) => { e.stopPropagation(); setMapType('satellite'); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${mapType === 'satellite' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Satellite</button>
@@ -1096,6 +1114,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
     const [isAdding, setIsAdding] = useState(false);
     const [mapCenter, setMapCenter] = useState(null);
     const [tempMarker, setTempMarker] = useState(null);
+    const [routePath, setRoutePath] = useState(null); 
 
     const handleSearch = useCallback(async (e) => {
         if (e.key === "Enter" && searchQuery.trim()) {
@@ -1125,6 +1144,33 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
         } else {
             setSelectedMarker(marker);
         }
+    };
+
+    const optimizeRoute = () => {
+        const filtered = filterNestsHelper(markers, nestFilterQuery, statusFilter).filter(m => campaignFilter === "Toutes" || m.campaign === campaignFilter);
+        if (filtered.length < 2) return alert("Il faut au moins 2 nids affichés pour tracer un itinéraire.");
+        let unvisited = [...filtered];
+        let current = unvisited.shift();
+        let path = [current];
+        
+        while (unvisited.length > 0) {
+            let nearest = null;
+            let minDetails = Infinity;
+            let nearestIndex = -1;
+            
+            for (let i = 0; i < unvisited.length; i++) {
+                const m = unvisited[i];
+                const dist = Math.sqrt(Math.pow(m.lat - current.lat, 2) + Math.pow(m.lng - current.lng, 2));
+                if (dist < minDetails) { minDetails = dist; nearest = m; nearestIndex = i; }
+            }
+            
+            if (nearest) { 
+                path.push(nearest); 
+                current = nearest; 
+                unvisited.splice(nearestIndex, 1); 
+            }
+        }
+        setRoutePath(path);
     };
 
     const displayMarkers = useMemo(() => {
@@ -1157,8 +1203,9 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
                 </div>
 
                 <div className="flex gap-2 shrink-0 pr-2">
-                    <Button variant={isAdding ? "danger" : "sky"} className={`py-3 px-6 rounded-2xl text-xs uppercase tracking-widest h-12 ${isAdding ? '' : 'shadow-xl shadow-sky-200'}`} onClick={() => setIsAdding(!isAdding)}>
-                        {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
+                    <Button variant="outline" className="py-3 px-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={optimizeRoute} title="Générer itinéraire optimisé"><Activity size={16}/></Button>
+                    <Button variant={isAdding ? "danger" : "sky"} className={`py-3 px-4 rounded-2xl text-xs uppercase tracking-widest ${isAdding ? '' : 'shadow-xl shadow-sky-200'}`} onClick={() => setIsAdding(!isAdding)}>
+                        {isAdding ? <X size={16}/> : <Plus size={16}/>}
                     </Button>
                 </div>
             </Card>
@@ -1174,8 +1221,9 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
                 )}
                 
                 {tempMarker && !isAdding && (<div className="absolute top-6 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest animate-bounce pointer-events-none shadow-2xl">📍 Cliquez sur le point gris pour valider</div>)}
-                
-                <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} onMapClick={async (ll) => {
+                {routePath && (<div className="absolute bottom-6 left-6 z-[500] bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-3 shadow-2xl"><Activity size={16} className="text-sky-400"/> Itinéraire actif <button onClick={() => setRoutePath(null)} className="p-1 hover:bg-white/20 rounded-full transition-colors"><X size={16}/></button></div>)}
+
+                <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} routePath={routePath} onMapClick={async (ll) => {
                     if(!isAdding) return;
                     const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present_high", eggs: 0, clientId: clients[0]?.id || "", campaign: campaignFilter === "Toutes" ? CURRENT_YEAR : campaignFilter };
                     await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
@@ -1250,7 +1298,6 @@ const AdminDashboard = ({ interventions, clients, markers, campaignFilter }) => 
         </Card>
       </div>
 
-      {/* STATISTIQUES OPTION 4 */}
       <PopulationStats markers={filteredMarkers} />
 
       {reportedNests.length > 0 && (
@@ -1376,8 +1423,6 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
   const [isExporting, setIsExporting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedNests, setSelectedNests] = useState([]);
-  const [bulkActionStatus, setBulkActionStatus] = useState("");
 
   const filteredMarkers = useMemo(() => {
       let filtered = filterNestsHelper(markers, searchQuery, statusFilter);
@@ -1386,29 +1431,6 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       }
       return filtered;
   }, [markers, searchQuery, statusFilter, campaignFilter]);
-
-  const toggleSelectAll = (e) => {
-      if (e.target.checked) setSelectedNests(filteredMarkers.map(m => m.id));
-      else setSelectedNests([]);
-  };
-
-  const toggleNestSelection = (id) => {
-      if (selectedNests.includes(id)) setSelectedNests(selectedNests.filter(nid => nid !== id));
-      else setSelectedNests([...selectedNests, id]);
-  };
-
-  const handleBulkUpdate = async () => {
-      if (!bulkActionStatus) return alert("Sélectionnez un statut à appliquer.");
-      if (selectedNests.length === 0) return alert("Aucun nid sélectionné.");
-      if (window.confirm(`Mettre à jour le statut de ${selectedNests.length} nid(s) ?`)) {
-          for (const nid of selectedNests) {
-              const nestToUpdate = markers.find(m => m.id === nid);
-              if (nestToUpdate) await onUpdateNest({ ...nestToUpdate, status: bulkActionStatus });
-          }
-          setSelectedNests([]);
-          alert("Mise à jour groupée terminée.");
-      }
-  };
 
   const cleanGhosts = async () => {
       const ghosts = markers.filter(m => m.lat === MAP_CENTER_DEFAULT.lat && m.lng === MAP_CENTER_DEFAULT.lng);
@@ -1466,7 +1488,11 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         let count = 0;
         for (const row of jsonData) {
-            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) continue;
+            
+            // ANTI-FANTÔME
+            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) {
+                continue;
+            }
             
             let lat = MAP_CENTER_DEFAULT.lat;
             let lng = MAP_CENTER_DEFAULT.lng;
@@ -1554,41 +1580,21 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         </div>
       </div>
 
-      {/* RECHERCHE ET FILTRES */}
-      <Card className="p-4 flex flex-col md:flex-row gap-4 bg-white border-0 shadow-lg rounded-3xl space-y-4">
-          <div className="flex flex-col md:flex-row gap-4 w-full">
-              <div className="relative flex-1 group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={18}/>
-                  <input type="text" placeholder="Rechercher par référence, adresse..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-              </div>
-              <div className="flex items-center gap-2">
-                  <Filter className="text-slate-400" size={18}/>
-                  <select className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                      <option value="all">Tous les statuts</option>
-                      <option value="reported">Signalements</option>
-                      <option value="active">Nids Actifs (À traiter)</option>
-                      <option value="treated">Stérilisés (Pass. 1 & 2)</option>
-                      <option value="absent">Absents</option>
-                  </select>
-              </div>
+      <Card className="p-4 flex flex-col md:flex-row gap-4 bg-white border-0 shadow-lg rounded-3xl">
+          <div className="relative flex-1 group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={18}/>
+              <input type="text" placeholder="Rechercher par référence, adresse..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
-          
-          {selectedNests.length > 0 && (
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between bg-sky-50 p-4 rounded-2xl animate-in fade-in">
-                  <span className="text-sm font-black text-sky-700 uppercase flex items-center gap-2"><CheckSquare size={18}/> {selectedNests.length} nid(s) sélectionné(s)</span>
-                  <div className="flex gap-2">
-                      <select className="p-2 border-0 bg-white rounded-xl text-sm font-bold text-slate-600 outline-none shadow-sm" value={bulkActionStatus} onChange={e => setBulkActionStatus(e.target.value)}>
-                          <option value="">-- Choisir un nouveau statut --</option>
-                          <option value="present_high">🔴 Priorité Haute</option>
-                          <option value="present">💠 Présent (Cyan)</option>
-                          <option value="sterilized_1">🟢 1er Passage</option>
-                          <option value="sterilized_2">🟢 2ème Passage</option>
-                          <option value="non_present">⚪ Absent</option>
-                      </select>
-                      <Button variant="sky" className="text-xs py-2 uppercase" onClick={handleBulkUpdate}>Appliquer</Button>
-                  </div>
-              </div>
-          )}
+          <div className="flex items-center gap-2">
+              <Filter className="text-slate-400" size={18}/>
+              <select className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                  <option value="all">Tous les statuts</option>
+                  <option value="reported">Signalements</option>
+                  <option value="active">Nids Actifs (À traiter)</option>
+                  <option value="treated">Stérilisés (Pass. 1 & 2)</option>
+                  <option value="absent">Absents</option>
+              </select>
+          </div>
       </Card>
 
       {clients.map(client => {
@@ -1608,8 +1614,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                       <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-slate-100">
                               <tr>
-                                  <th className="p-5 pl-6 w-10"><input type="checkbox" className="w-4 h-4 accent-sky-500 rounded cursor-pointer" onChange={toggleSelectAll} checked={selectedNests.length === filteredMarkers.length && filteredMarkers.length > 0} /></th>
-                                  <th className="p-5">Réf / Adresse</th>
+                                  <th className="p-5 pl-8">Réf / Adresse</th>
                                   <th className="p-5">Statut</th>
                                   <th className="p-5 text-center">Contenu</th>
                                   <th className="p-5 text-right pr-8">Actions</th>
@@ -1617,9 +1622,8 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                           </thead>
                           <tbody className="divide-y divide-slate-50">
                               {clientNests.map((m) => (
-                                  <tr key={m.id} className={`hover:bg-slate-50/80 transition-colors ${selectedNests.includes(m.id) ? 'bg-sky-50/30' : ''}`}>
-                                      <td className="p-5 pl-6"><input type="checkbox" className="w-4 h-4 accent-sky-500 rounded cursor-pointer" checked={selectedNests.includes(m.id)} onChange={() => toggleNestSelection(m.id)}/></td>
-                                      <td className="p-5">
+                                  <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
+                                      <td className="p-5 pl-8">
                                           <div className="font-black text-slate-800 text-base mb-1">{m.title || "Nid"}</div>
                                           <div className="text-xs text-slate-400 font-medium truncate max-w-[350px] flex items-center gap-1"><MapPin size={12} className="text-slate-300"/> {m.address}</div>
                                       </td>
@@ -1683,7 +1687,7 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
     
     return (
         <div className="space-y-8 text-slate-800 animate-in fade-in duration-300">
-            <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-2 h-12 text-xs uppercase tracking-widest font-black">&larr; Retour Clients</Button>
+            <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-2 h-12 text-xs uppercase tracking-widest font-black">← Retour Clients</Button>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="space-y-8">
                     <Card className="p-8 border-0 shadow-xl rounded-[32px] bg-white">
@@ -2055,6 +2059,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             </Card>
                         </div>
 
+                        {/* STATISTIQUES OPTION 4 */}
                         <PopulationStats markers={myMarkers} />
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
@@ -2363,8 +2368,26 @@ export default function AerothauApp() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [toast, setToast] = useState(null);
+  
+  const [installPrompt, setInstallPrompt] = useState(null);
 
   const showToast = useCallback((message, type = 'success') => { setToast({ message, type }); }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+        e.preventDefault();
+        setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallPwa = () => {
+    if (installPrompt) {
+        installPrompt.prompt();
+        installPrompt.userChoice.then(() => setInstallPrompt(null));
+    }
+  };
 
   useEffect(() => {
     const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) { console.error("Auth error", e); } };
@@ -2431,7 +2454,7 @@ export default function AerothauApp() {
                 <div className="flex items-center gap-4"><div className="p-2 bg-white rounded-xl shadow-lg"><img src={LOGO_URL} alt="Logo" className="h-8 w-auto" /></div><span className="text-xl font-black uppercase tracking-tighter">Aerothau</span></div>
                 <button className="lg:hidden p-2 text-slate-400 hover:text-white" onClick={() => setIsSidebarOpen(false)}><X size={20}/></button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-2">
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-4 ml-2">Menu Principal</p>
                 {[
