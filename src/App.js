@@ -15,7 +15,7 @@ import {
   Crosshair, Edit, Trash2, Key, User, Send, Info, Printer, Locate, Camera, 
   MessageSquare, AlertTriangle, Download, Upload, File, FileCheck, Activity, 
   Cloud, Wind, List as ListIcon, Layers, Bell, FileSpreadsheet, BarChart3, 
-  MessageCircle, QrCode, Filter, Flame
+  MessageCircle, QrCode, Filter, Flame, Navigation2
 } from "lucide-react";
 
 // ============================================================================
@@ -38,6 +38,7 @@ const appId = "aerothau-goelands";
 
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; 
+const CURRENT_YEAR = new Date().getFullYear().toString(); 
 
 const TILE_URLS = {
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -49,20 +50,7 @@ const INITIAL_USERS = [
 ];
 
 const MOCK_CLIENTS = [
-  { id: 1, name: "Mairie de Sète", type: "Collectivité", address: "12 Rue de l'Hôtel de Ville, 34200 Sète", contact: "Jean Dupont", phone: "04 67 00 00 00", email: "contact@sete.fr", username: "mairie", password: "123" },
-  { id: 2, name: "Mairie de Narbonne", type: "Collectivité", address: "Place de l'Hôtel de Ville, 11100 Narbonne", contact: "Contacts Multiples", phone: "Voir contacts", email: "", username: "narbonne", password: "123",
-    extendedContacts: [
-        "La maison de Charles TRENET : Mme Manuelle NOYES (06.33.82.55.74)",
-        "La Calandreta/La Jaquetona : Mme Sophie VAISSIERES (06.19.02.26.20)",
-        "Ecole Pasteur, Lamartine, Lakanal, Buisson : M. Louis AYMERIC (06.84.69.40.35)"
-    ]
-  },
-  { id: 3, name: "Domitia Habitat", type: "Syndic", address: "11100 Narbonne", contact: "Responsables Secteurs", phone: "Voir contacts", email: "", username: "domitia", password: "123",
-    extendedContacts: [
-        "Mme BAUDEMONT pour le secteur Centre-Ville : 06.07.42.28.31",
-        "Mme ABAD pour le secteur Razimbaud : 07.64.18.49.37"
-    ]
-  }
+  { id: 1, name: "Mairie de Sète", type: "Collectivité", address: "12 Rue de l'Hôtel de Ville, 34200 Sète", contact: "Jean Dupont", phone: "04 67 00 00 00", email: "contact@sete.fr", username: "mairie", password: "123" }
 ];
 
 // ============================================================================
@@ -83,7 +71,9 @@ const Button = ({ children, variant = "primary", className = "", ...props }) => 
     outline: "border border-slate-300 text-slate-600 hover:bg-slate-50",
     sky: "bg-sky-600 text-white hover:bg-sky-700 shadow-lg shadow-sky-200",
     ghost: "text-slate-500 hover:bg-slate-100",
-    purple: "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-200"
+    purple: "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-200",
+    waze: "bg-[#05c8f6] text-white hover:bg-[#049bc0] shadow-md",
+    gmaps: "bg-[#34a853] text-white hover:bg-[#20843a] shadow-md"
   };
   return <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>{children}</button>;
 };
@@ -92,7 +82,7 @@ const Badge = ({ status }) => {
   const styles = {
     Terminé: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     present_high: "bg-red-100 text-red-700 border border-red-200",
-    present: "bg-[#27F5D6]/20 text-slate-900 border border-[#27F5D6] shadow-sm", // CYAN DEMANDÉ
+    present: "bg-[#27F5D6]/20 text-slate-900 border border-[#27F5D6] shadow-sm", // CYAN
     present_medium: "bg-orange-100 text-orange-700 border border-orange-200",
     present_low: "bg-yellow-100 text-yellow-700 border border-yellow-200",
     non_priority: "bg-cyan-100 text-cyan-700 border border-cyan-200",
@@ -278,6 +268,7 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.setFontSize(12);
             let y = 65;
             doc.text(`Référence : ${nest.title || "Nid #" + nest.id}`, 20, y); y += 8;
+            doc.text(`Campagne : ${nest.campaign || CURRENT_YEAR}`, 20, y); y += 8;
             doc.text(`Client : ${clientName}`, 20, y); y += 8;
             doc.text(`Adresse : ${nest.address}`, 20, y); y += 8;
             doc.text(`GPS : ${nest.lat?.toFixed(6)}, ${nest.lng?.toFixed(6)}`, 20, y); y += 8;
@@ -287,6 +278,10 @@ const generatePDF = (type, data, extraData = {}) => {
             if(nest.dateInspection) { doc.text(`Date d'inspection : ${new Date(nest.dateInspection).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
             if(nest.ster_1_date) { doc.text(`Date 1er passage : ${new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
             if(nest.ster_2_date) { doc.text(`Date 2ème passage : ${new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
+            if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 8; }
+            if(nest.dateVisite) { doc.text(`Date visite Excel : ${nest.dateVisite}`, 20, y); y += 8; }
+            if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 8; }
+            if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
@@ -312,41 +307,49 @@ const generatePDF = (type, data, extraData = {}) => {
             const client = extraData.client || { name: "Client Inconnu" };
             const markers = extraData.markers || [];
             const interventions = extraData.interventions || [];
+            const campaign = extraData.campaign || "Toutes";
 
             doc.text("BILAN ACTIVITÉ", 20, 50);
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(16);
             doc.text(`Client : ${client.name}`, 20, 65);
             doc.setFontSize(10);
-            doc.text(client.address || "", 20, 72);
+            doc.text(`Campagne : ${campaign}`, 20, 72);
+            doc.text(client.address || "", 20, 79);
             
             const totalEggs = markers.reduce((acc, curr) => acc + (curr.eggs || 0), 0);
             const treated = markers.filter(m => m.status && m.status.includes('sterilized')).length;
             
             doc.setFillColor(240, 240, 240);
-            doc.rect(20, 80, 170, 20, 'F');
-            doc.text(`Total Nids : ${markers.length}`, 30, 92);
-            doc.text(`Traités : ${treated}`, 80, 92);
-            doc.text(`Œufs stérilisés : ${totalEggs}`, 130, 92);
+            doc.rect(20, 85, 170, 20, 'F');
+            doc.text(`Total Nids : ${markers.length}`, 30, 97);
+            doc.text(`Traités : ${treated}`, 80, 97);
+            doc.text(`Œufs stérilisés : ${totalEggs}`, 130, 97);
             
             const nestRows = markers.map(m => [
                 `${m.title || "Nid"}\n${m.address}`, 
                 m.status, 
                 m.eggs,
                 m.dateInspection ? new Date(m.dateInspection).toLocaleDateString('fr-FR') : "-",
+                m.ster_1_date ? new Date(m.ster_1_date).toLocaleDateString('fr-FR') : "-",
                 m.ster_2_date ? new Date(m.ster_2_date).toLocaleDateString('fr-FR') : "-"
             ]);
 
             doc.autoTable({ 
-                startY: 110, 
-                head: [['Réf / Localisation', 'Statut', 'Oeufs', 'Insp.', 'Stérilisé le']], 
+                startY: 115, 
+                head: [['Réf / Localisation', 'Statut', 'Oeufs', 'Insp.', '1er Pass.', '2ème Pass.']], 
                 body: nestRows, 
                 theme: 'grid', 
                 headStyles: { fillColor: [14, 165, 233] },
                 styles: { fontSize: 8 }
             });
             
-            doc.save(`Rapport_${client.name.replace(/\s+/g, '_')}.pdf`);
+            const finalY = doc.lastAutoTable.finalY + 15;
+            doc.text("Historique Interventions", 20, finalY);
+            const intRows = interventions.map(i => [i.date, i.status, i.technician || "-", i.notes || ""]);
+            doc.autoTable({ startY: finalY + 5, head: [['Date', 'Statut', 'Agent', 'Notes']], body: intRows, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, });
+            
+            doc.save(`Rapport_${client.name.replace(/\s+/g, '_')}_${campaign}.pdf`);
         } else {
             const report = data;
             doc.text("DOCUMENT", 20, 50);
@@ -398,7 +401,7 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 const ClientReportForm = ({ nest, onSave, onCancel }) => {
   const initialPhotos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
   const [formData, setFormData] = useState({ 
-      title: "", comments: "", contactName: "", contactPhone: "", status: "reported_by_client", ...nest, photos: initialPhotos
+      title: "", comments: "", contactName: "", contactPhone: "", status: "reported_by_client", campaign: CURRENT_YEAR, ...nest, photos: initialPhotos
   });
 
   const handlePhotoUpload = async (e) => { 
@@ -494,7 +497,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   const initialPhotos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
   
   const [formData, setFormData] = useState({ 
-      title: "", comments: "", eggs: 0, status: "present_high", clientId: "", 
+      title: "", comments: "", eggs: 0, status: "present_high", clientId: "", campaign: CURRENT_YEAR,
       lieux: "", dateVisite: "", dateInspection: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
       ster_1_date: "", ster_2_date: "",
       ...nest,
@@ -542,6 +545,10 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
       onSave(finalData);
   };
 
+  // LA CORRECTION EST ICI : Les deux variables manquantes sont redéclarées
+  const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
+  const hasExtraData = formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info;
+
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
           {/* LECTURE : PHOTOS MULTIPLES */}
@@ -576,10 +583,9 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contenu observé</p>
                   <p className="text-3xl font-black text-slate-800">{nest.eggs} <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">œufs</span></p>
               </div>
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center flex flex-col justify-center items-center">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><Locate size={10}/> Coordonnées GPS</p>
-                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded shadow-sm w-full">{nest.lat?.toFixed(5)}</p>
-                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded shadow-sm w-full mt-1">{nest.lng?.toFixed(5)}</p>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center justify-center gap-2">
+                  <Button variant="waze" className="w-full text-xs" onClick={() => window.open(`https://waze.com/ul?ll=${nest.lat},${nest.lng}&navigate=yes`, '_blank')}><Navigation2 size={14}/> Waze</Button>
+                  <Button variant="gmaps" className="w-full text-xs" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank')}><MapIcon size={14}/> Maps</Button>
               </div>
           </div>
 
@@ -724,9 +730,15 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
             </div>
 
             <div className="space-y-4">
-                <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Identification</label>
-                    <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Campagne</label>
+                        <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.campaign || CURRENT_YEAR} onChange={e=>setFormData({...formData, campaign: e.target.value})} placeholder="Année..."/>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Œufs</label>
+                        <input type="number" className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-xl font-black text-center text-sky-600 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
+                    </div>
                 </div>
                 <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Client Associé</label>
@@ -735,11 +747,9 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                         {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
-                 <div className="flex gap-4">
-                    <div className="flex-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Œufs</label>
-                        <input type="number" className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-xl font-black text-center text-sky-600 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
-                    </div>
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Identification</label>
+                    <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
                 </div>
             </div>
         </div>
@@ -750,6 +760,11 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                 <span className="text-[9px] font-mono font-bold text-sky-500 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">GPS: {formData.lat?.toFixed(5)}, {formData.lng?.toFixed(5)}</span>
             </div>
             <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} placeholder="Numéro, Rue, Bâtiment..."/>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+             <Button type="button" variant="waze" className="w-full text-xs" onClick={() => window.open(`https://waze.com/ul?ll=${formData.lat},${formData.lng}&navigate=yes`, '_blank')}><Navigation2 size={16}/> Lancer Waze</Button>
+             <Button type="button" variant="gmaps" className="w-full text-xs" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${formData.lat},${formData.lng}`, '_blank')}><MapIcon size={16}/> Lancer Maps</Button>
         </div>
 
         <div>
@@ -1092,10 +1107,10 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
 // 6. VUES PRINCIPALES (ADMIN)
 // ============================================================================
 
-const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
+const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFilter }) => {
     const [selectedMarker, setSelectedMarker] = useState(null);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [filterQuery, setFilterQuery] = useState("");
+    const [searchQuery, setSearchQuery] = useState(""); 
+    const [nestFilterQuery, setNestFilterQuery] = useState(""); 
     const [statusFilter, setStatusFilter] = useState("all");
     const [isAdding, setIsAdding] = useState(false);
     const [mapCenter, setMapCenter] = useState(null);
@@ -1117,14 +1132,14 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
             }
             if (lat && lng) {
                 setMapCenter({ lat, lng });
-                setTempMarker({ id: "temp", lat, lng, address: addr, status: "temp", eggs: 0 });
+                setTempMarker({ id: "temp", lat, lng, address: addr, status: "temp", eggs: 0, campaign: campaignFilter === "Toutes" ? CURRENT_YEAR : campaignFilter });
             }
         }
-    }, [searchQuery]);
+    }, [searchQuery, campaignFilter]);
 
     const handleMarkerClick = (marker) => {
         if (marker.id === "temp") {
-            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
+            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present_high", eggs: 0, clientId: clients[0]?.id || "", campaign: marker.campaign };
             onUpdateNest(newNest); setTempMarker(null); setSelectedMarker(newNest);
         } else {
             setSelectedMarker(marker);
@@ -1132,10 +1147,11 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     };
 
     const displayMarkers = useMemo(() => {
-        let filtered = filterNestsHelper(markers, filterQuery, statusFilter);
+        let filtered = filterNestsHelper(markers, nestFilterQuery, statusFilter);
+        if (campaignFilter !== "Toutes") filtered = filtered.filter(m => m.campaign === campaignFilter);
         if (tempMarker) filtered.push(tempMarker);
         return filtered;
-    }, [markers, tempMarker, filterQuery, statusFilter]);
+    }, [markers, tempMarker, nestFilterQuery, statusFilter, campaignFilter]);
 
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-300">
@@ -1148,7 +1164,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 <div className="flex-1 flex gap-2 w-full">
                     <div className="relative flex-1 group">
                         <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={16}/>
-                        <input type="text" placeholder="Filtrer la carte (Réf...)" className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={filterQuery} onChange={e => setFilterQuery(e.target.value)} />
+                        <input type="text" placeholder="Filtrer la carte (Réf...)" className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={nestFilterQuery} onChange={e => setNestFilterQuery(e.target.value)} />
                     </div>
                     <select className="flex-1 p-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                         <option value="all">Tous les statuts</option>
@@ -1177,10 +1193,10 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 )}
                 
                 {tempMarker && !isAdding && (<div className="absolute top-6 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest animate-bounce pointer-events-none shadow-2xl">📍 Cliquez sur le point gris pour valider</div>)}
-
+                
                 <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} onMapClick={async (ll) => {
                     if(!isAdding) return;
-                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
+                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present_high", eggs: 0, clientId: clients[0]?.id || "", campaign: campaignFilter === "Toutes" ? CURRENT_YEAR : campaignFilter };
                     await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
                 }}/>
                 
@@ -1202,22 +1218,20 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     );
 };
 
-const AdminDashboard = ({ interventions, clients, markers }) => {
+const AdminDashboard = ({ interventions, clients, markers, campaignFilter }) => {
+  const filteredMarkers = useMemo(() => markers.filter(m => campaignFilter === "Toutes" || m.campaign === campaignFilter), [markers, campaignFilter]);
+  
   const stats = useMemo(() => ({
-    total: markers.length,
-    reported: markers.filter(m => m.status === "reported_by_client").length,
-    nonPresent: markers.filter(m => m.status === "non_present").length,
-    sterilized: markers.filter(m => m.status === "sterilized_2" || m.status === "sterilized").length,
-  }), [markers]);
+    total: filteredMarkers.length,
+    reported: filteredMarkers.filter(m => m.status === "reported_by_client").length,
+    nonPresent: filteredMarkers.filter(m => m.status === "non_present").length,
+    sterilized: filteredMarkers.filter(m => m.status === "sterilized_2" || m.status === "sterilized").length,
+  }), [filteredMarkers]);
 
-  const reportedNests = markers.filter(m => m.status === "reported_by_client");
+  const reportedNests = filteredMarkers.filter(m => m.status === "reported_by_client");
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 text-slate-800">
-      <div className="flex justify-between items-center mb-2">
-          <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">TABLEAU DE BORD</h2>
-      </div>
-      
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4 bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg border-0 text-center relative overflow-hidden flex flex-col justify-center">
             <div className="relative z-10 flex items-center justify-center gap-3">
@@ -1255,9 +1269,6 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
         </Card>
       </div>
 
-      {/* STATISTIQUES OPTION 4 */}
-      <PopulationStats markers={markers} />
-
       {reportedNests.length > 0 && (
           <div className="bg-purple-600 rounded-[32px] p-1 shadow-xl shadow-purple-200 animate-in slide-in-from-top-4 mt-6">
               <div className="bg-white rounded-[28px] p-6">
@@ -1283,6 +1294,9 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
           </div>
       )}
 
+      {/* STATISTIQUES OPTION 4 */}
+      <PopulationStats markers={filteredMarkers} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6">
           <div className="lg:col-span-2">
               <Card className="p-0 border-0 shadow-lg rounded-3xl overflow-hidden bg-white flex flex-col h-full">
@@ -1304,7 +1318,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                               {clients.map(client => {
-                                  const cNests = markers.filter(m => m.clientId === client.id);
+                                  const cNests = filteredMarkers.filter(m => m.clientId === client.id);
                                   if (cNests.length === 0) return null;
                                   
                                   const cTotal = cNests.length;
@@ -1336,7 +1350,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
                                       </tr>
                                   );
                               })}
-                              {clients.filter(c => markers.some(m => m.clientId === c.id)).length === 0 && (
+                              {clients.filter(c => filteredMarkers.some(m => m.clientId === c.id)).length === 0 && (
                                   <tr><td colSpan="7" className="p-8 text-center text-slate-400 italic text-xs">Aucune donnée disponible.</td></tr>
                               )}
                           </tbody>
@@ -1376,13 +1390,44 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
   );
 };
 
-const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests, clients }) => {
+const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests, clients, campaignFilter }) => {
   const [selectedNest, setSelectedNest] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedNests, setSelectedNests] = useState([]);
+  const [bulkActionStatus, setBulkActionStatus] = useState("");
 
-  const filteredMarkers = useMemo(() => filterNestsHelper(markers, searchQuery, statusFilter), [markers, searchQuery, statusFilter]);
+  const filteredMarkers = useMemo(() => {
+      let filtered = filterNestsHelper(markers, searchQuery, statusFilter);
+      if (campaignFilter !== "Toutes") {
+          filtered = filtered.filter(m => m.campaign === campaignFilter);
+      }
+      return filtered;
+  }, [markers, searchQuery, statusFilter, campaignFilter]);
+
+  const toggleSelectAll = (e) => {
+      if (e.target.checked) setSelectedNests(filteredMarkers.map(m => m.id));
+      else setSelectedNests([]);
+  };
+
+  const toggleNestSelection = (id) => {
+      if (selectedNests.includes(id)) setSelectedNests(selectedNests.filter(nid => nid !== id));
+      else setSelectedNests([...selectedNests, id]);
+  };
+
+  const handleBulkUpdate = async () => {
+      if (!bulkActionStatus) return alert("Sélectionnez un statut à appliquer.");
+      if (selectedNests.length === 0) return alert("Aucun nid sélectionné.");
+      if (window.confirm(`Mettre à jour le statut de ${selectedNests.length} nid(s) ?`)) {
+          for (const nid of selectedNests) {
+              const nestToUpdate = markers.find(m => m.id === nid);
+              if (nestToUpdate) await onUpdateNest({ ...nestToUpdate, status: bulkActionStatus });
+          }
+          setSelectedNests([]);
+          alert("Mise à jour groupée terminée.");
+      }
+  };
 
   const cleanGhosts = async () => {
       const ghosts = markers.filter(m => m.lat === MAP_CENTER_DEFAULT.lat && m.lng === MAP_CENTER_DEFAULT.lng);
@@ -1390,10 +1435,8 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
           alert("Aucun nid fantôme trouvé.");
           return;
       }
-      if(window.confirm(`Voulez-vous supprimer les ${ghosts.length} nids fantômes empilés à Sète ?`)) {
-          for (const ghost of ghosts) {
-              await onDeleteNest(ghost);
-          }
+      if(window.confirm(`Voulez-vous supprimer les ${ghosts.length} nids fantômes empilés au centre par défaut ?`)) {
+          for (const ghost of ghosts) { await onDeleteNest(ghost); }
           alert("Nettoyage des fantômes terminé !");
       }
   };
@@ -1403,6 +1446,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
     const XLSX = await loadSheetJS();
     const data = filteredMarkers.map(m => ({ 
       "Noms Client": clients.find(c => c.id === m.clientId)?.name || "Non assigné",
+      "Campagne": m.campaign || CURRENT_YEAR,
       "ID": m.id,
       "Etat du nids": m.status,
       "nbr d'œuf": m.eggs,
@@ -1490,6 +1534,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
             const newNest = {
                 id: row["ID"] || (row["N° point"] ? parseInt(row["N° point"]) + Date.now() : Date.now() + count),
                 clientId: client ? client.id : "",
+                campaign: row["Campagne"] || CURRENT_YEAR,
                 status: hasGps ? (row["Etat du nids"] || "present_high") : "temp",
                 eggs: parseInt(row["nbr d'œuf"]) || 0,
                 address: row["Adresse"] || row["adresse precis"] || (hasGps ? "Adresse importée" : "⚠️ À REPLACER (Pas de GPS)"),
@@ -1528,7 +1573,9 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       <div className="flex justify-between items-center flex-wrap gap-4">
         <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
         <div className="flex gap-3 flex-wrap">
+            {/* BOUTON OPTION 7 */}
             <Button variant="primary" onClick={handleRoadmapPDF} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6 border-0 shadow-lg"><QrCode size={16}/> Feuille de Route</Button>
+            
             <Button variant="outline" className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6 border-2 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={cleanGhosts}><Trash2 size={16}/> Purger Fantômes</Button>
             <Button variant="danger" onClick={onDeleteAllNests} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6"><Trash2 size={16}/> Tout purger</Button>
             <Button variant="secondary" onClick={handleExport} disabled={isExporting} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6 border-2"><Download size={16}/> Exporter .xlsx</Button>
@@ -1541,21 +1588,41 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         </div>
       </div>
 
-      <Card className="p-4 flex flex-col md:flex-row gap-4 bg-white border-0 shadow-lg rounded-3xl">
-          <div className="relative flex-1 group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={18}/>
-              <input type="text" placeholder="Rechercher par référence, adresse..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+      {/* RECHERCHE ET FILTRES */}
+      <Card className="p-4 flex flex-col md:flex-row gap-4 bg-white border-0 shadow-lg rounded-3xl space-y-4">
+          <div className="flex flex-col md:flex-row gap-4 w-full">
+              <div className="relative flex-1 group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={18}/>
+                  <input type="text" placeholder="Rechercher par référence, adresse..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              </div>
+              <div className="flex items-center gap-2">
+                  <Filter className="text-slate-400" size={18}/>
+                  <select className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                      <option value="all">Tous les statuts</option>
+                      <option value="reported">Signalements</option>
+                      <option value="active">Nids Actifs (À traiter)</option>
+                      <option value="treated">Stérilisés (Pass. 1 & 2)</option>
+                      <option value="absent">Absents</option>
+                  </select>
+              </div>
           </div>
-          <div className="flex items-center gap-2">
-              <Filter className="text-slate-400" size={18}/>
-              <select className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                  <option value="all">Tous les statuts</option>
-                  <option value="reported">Signalements</option>
-                  <option value="active">Nids Actifs (À traiter)</option>
-                  <option value="treated">Stérilisés (Pass. 1 & 2)</option>
-                  <option value="absent">Absents</option>
-              </select>
-          </div>
+          
+          {selectedNests.length > 0 && (
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between bg-sky-50 p-4 rounded-2xl animate-in fade-in">
+                  <span className="text-sm font-black text-sky-700 uppercase flex items-center gap-2"><CheckSquare size={18}/> {selectedNests.length} nid(s) sélectionné(s)</span>
+                  <div className="flex gap-2">
+                      <select className="p-2 border-0 bg-white rounded-xl text-sm font-bold text-slate-600 outline-none shadow-sm" value={bulkActionStatus} onChange={e => setBulkActionStatus(e.target.value)}>
+                          <option value="">-- Choisir un nouveau statut --</option>
+                          <option value="present_high">🔴 Priorité Haute</option>
+                          <option value="present">💠 Présent (Cyan)</option>
+                          <option value="sterilized_1">🟢 1er Passage</option>
+                          <option value="sterilized_2">🟢 2ème Passage</option>
+                          <option value="non_present">⚪ Absent</option>
+                      </select>
+                      <Button variant="sky" className="text-xs py-2 uppercase" onClick={handleBulkUpdate}>Appliquer</Button>
+                  </div>
+              </div>
+          )}
       </Card>
 
       {clients.map(client => {
@@ -1575,7 +1642,8 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                       <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-slate-100">
                               <tr>
-                                  <th className="p-5 pl-8">Réf / Adresse</th>
+                                  <th className="p-5 pl-6 w-10"><input type="checkbox" className="w-4 h-4 accent-sky-500 rounded cursor-pointer" onChange={toggleSelectAll} checked={selectedNests.length === filteredMarkers.length && filteredMarkers.length > 0} /></th>
+                                  <th className="p-5">Réf / Adresse</th>
                                   <th className="p-5">Statut</th>
                                   <th className="p-5 text-center">Contenu</th>
                                   <th className="p-5 text-right pr-8">Actions</th>
@@ -1583,8 +1651,9 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                           </thead>
                           <tbody className="divide-y divide-slate-50">
                               {clientNests.map((m) => (
-                                  <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
-                                      <td className="p-5 pl-8">
+                                  <tr key={m.id} className={`hover:bg-slate-50/80 transition-colors ${selectedNests.includes(m.id) ? 'bg-sky-50/30' : ''}`}>
+                                      <td className="p-5 pl-6"><input type="checkbox" className="w-4 h-4 accent-sky-500 rounded cursor-pointer" checked={selectedNests.includes(m.id)} onChange={() => toggleNestSelection(m.id)}/></td>
+                                      <td className="p-5">
                                           <div className="font-black text-slate-800 text-base mb-1">{m.title || "Nid"}</div>
                                           <div className="text-xs text-slate-400 font-medium truncate max-w-[350px] flex items-center gap-1"><MapPin size={12} className="text-slate-300"/> {m.address}</div>
                                       </td>
@@ -1641,10 +1710,10 @@ const ClientManagement = ({ clients, setSelectedClient, setView, onCreateClient,
   );
 };
 
-const ClientDetail = ({ selectedClient, setView, interventions, reports, markers, onUpdateClient, onDeleteClient }) => {
+const ClientDetail = ({ selectedClient, setView, interventions, reports, markers, onUpdateClient, onDeleteClient, campaignFilter }) => {
     const [isEditing, setIsEditing] = useState(false);
     const cInt = useMemo(() => interventions.filter(i => i.clientId === selectedClient.id), [interventions, selectedClient]);
-    const cNests = useMemo(() => markers.filter(m => m.clientId === selectedClient.id), [markers, selectedClient]);
+    const cNests = useMemo(() => markers.filter(m => m.clientId === selectedClient.id && (campaignFilter === "Toutes" || m.campaign === campaignFilter)), [markers, selectedClient, campaignFilter]);
     
     return (
         <div className="space-y-8 text-slate-800 animate-in fade-in duration-300">
@@ -1691,7 +1760,7 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <Card className="p-8 shadow-xl border-0 rounded-[32px] bg-slate-900 text-white relative overflow-hidden">
                             <div className="relative z-10">
-                                <p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2">Nids recensés</p>
+                                <p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2">Nids recensés ({campaignFilter})</p>
                                 <p className="text-6xl font-black text-sky-400 tracking-tighter">{cNests.length}</p>
                             </div>
                             <Bird className="absolute -right-4 -bottom-4 w-32 h-32 text-white/5 transform -scale-x-100"/>
@@ -2020,6 +2089,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             </Card>
                         </div>
 
+                        {/* STATISTIQUES OPTION 4 */}
                         <PopulationStats markers={myMarkers} />
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
@@ -2274,7 +2344,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                         <h3 className="font-black text-2xl uppercase tracking-tighter flex items-center gap-3"><Upload size={24} className="text-sky-500"/> Transmettre</h3>
                                         <button onClick={() => setIsUploading(false)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-400"/></button>
                                     </div>
-                                    <ReportEditForm report={{id: Date.now(), clientId: user.clientId}} clients={clients} userRole="client" onSave={async (d) => { await onUpdateReport(d); setIsUploading(false); }} onCancel={() => setIsUploading(false)} />
+                                    <ReportEditForm report={{id: Date.now(), clientId: user.clientId}} clients={clients} markers={markers} interventions={interventions} onSave={async (d) => { await onUpdateReport(d); setIsUploading(false); }} onCancel={() => setIsUploading(false)} />
                                 </Card>
                             </div>
                         )}
@@ -2328,6 +2398,8 @@ export default function AerothauApp() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [toast, setToast] = useState(null);
+  
+  const [campaignFilter, setCampaignFilter] = useState("Toutes");
 
   const showToast = useCallback((message, type = 'success') => { setToast({ message, type }); }, []);
 
@@ -2363,6 +2435,12 @@ export default function AerothauApp() {
     ...clients.filter(c => c.username && c.password).map(c => ({ id: c.id, username: c.username, password: c.password, role: "client", name: c.name, clientId: c.id }))
   ], [clients]);
 
+  // Extraction dynamique des campagnes existantes pour le filtre
+  const availableCampaigns = useMemo(() => {
+      const campaigns = new Set(markers.map(m => m.campaign || CURRENT_YEAR));
+      return ["Toutes", ...Array.from(campaigns).sort().reverse()];
+  }, [markers]);
+
   const updateFirebase = async (collectionName, data) => {
       if (!isFirebaseReady) return;
       try {
@@ -2397,6 +2475,13 @@ export default function AerothauApp() {
                 <button className="lg:hidden p-2 text-slate-400 hover:text-white" onClick={() => setIsSidebarOpen(false)}><X size={20}/></button>
             </div>
             
+            <div className="px-6 mb-4">
+                <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2 block ml-2">Filtre Année / Campagne</label>
+                <select className="w-full p-3 bg-slate-800 text-white border-0 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-sky-500" value={campaignFilter} onChange={e => setCampaignFilter(e.target.value)}>
+                    {availableCampaigns.map(c => <option key={c} value={c}>{c === "Toutes" ? "Toutes les années" : `Campagne ${c}`}</option>)}
+                </select>
+            </div>
+
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-2">
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-4 ml-2">Menu Principal</p>
                 {[
@@ -2438,16 +2523,16 @@ export default function AerothauApp() {
           <div className="max-w-[1400px] mx-auto p-4 md:p-8 lg:p-10">
             {user.role === "admin" ? (
               <>
-                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} />}
-                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} />}
+                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} campaignFilter={campaignFilter} />}
+                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} campaignFilter={campaignFilter} />}
                 {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} onDeleteAllNests={async () => {
                     if (window.confirm("⚠️ ACTION IRRÉVERSIBLE : Supprimer absolument TOUS les nids de la base ?")) {
                         for (const m of markers) { await deleteFromFirebase("markers", m.id); }
                         showToast("Tous les nids ont été supprimés.", "success");
                     }
-                }} />}
+                }} campaignFilter={campaignFilter} />}
                 {view === "clients" && <ClientManagement clients={clients} setSelectedClient={setSelectedClient} setView={setView} onCreateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => deleteFromFirebase("clients", c.id)} />}
-                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} />}
+                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} campaignFilter={campaignFilter} />}
                 {view === "schedule" && <ScheduleView interventions={interventions} clients={clients} onUpdateIntervention={async (i) => updateFirebase("interventions", i)} onDeleteIntervention={async (i) => deleteFromFirebase("interventions", i.id)} />}
                 {view === "reports" && <ReportsView reports={reports} clients={clients} markers={markers} interventions={interventions} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => deleteFromFirebase("reports", r.id)} />}
               </>
