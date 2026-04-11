@@ -15,7 +15,7 @@ import {
   Crosshair, Edit, Trash2, Key, User, Send, Info, Printer, Locate, Camera, 
   MessageSquare, AlertTriangle, Download, Upload, File, FileCheck, Activity, 
   Cloud, Wind, List as ListIcon, Layers, Bell, FileSpreadsheet, BarChart3, 
-  MessageCircle, QrCode, Filter
+  MessageCircle, QrCode, Filter, Flame
 } from "lucide-react";
 
 // ============================================================================
@@ -49,7 +49,20 @@ const INITIAL_USERS = [
 ];
 
 const MOCK_CLIENTS = [
-  { id: 1, name: "Mairie de Sète", type: "Collectivité", address: "12 Rue de l'Hôtel de Ville, 34200 Sète", contact: "Jean Dupont", phone: "04 67 00 00 00", email: "contact@sete.fr", username: "mairie", password: "123" }
+  { id: 1, name: "Mairie de Sète", type: "Collectivité", address: "12 Rue de l'Hôtel de Ville, 34200 Sète", contact: "Jean Dupont", phone: "04 67 00 00 00", email: "contact@sete.fr", username: "mairie", password: "123" },
+  { id: 2, name: "Mairie de Narbonne", type: "Collectivité", address: "Place de l'Hôtel de Ville, 11100 Narbonne", contact: "Contacts Multiples", phone: "Voir contacts", email: "", username: "narbonne", password: "123",
+    extendedContacts: [
+        "La maison de Charles TRENET : Mme Manuelle NOYES (06.33.82.55.74)",
+        "La Calandreta/La Jaquetona : Mme Sophie VAISSIERES (06.19.02.26.20)",
+        "Ecole Pasteur, Lamartine, Lakanal, Buisson : M. Louis AYMERIC (06.84.69.40.35)"
+    ]
+  },
+  { id: 3, name: "Domitia Habitat", type: "Syndic", address: "11100 Narbonne", contact: "Responsables Secteurs", phone: "Voir contacts", email: "", username: "domitia", password: "123",
+    extendedContacts: [
+        "Mme BAUDEMONT pour le secteur Centre-Ville : 06.07.42.28.31",
+        "Mme ABAD pour le secteur Razimbaud : 07.64.18.49.37"
+    ]
+  }
 ];
 
 // ============================================================================
@@ -79,7 +92,7 @@ const Badge = ({ status }) => {
   const styles = {
     Terminé: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     present_high: "bg-red-100 text-red-700 border border-red-200",
-    present: "bg-[#27F5D6]/20 text-slate-900 border border-[#27F5D6] shadow-sm", // Couleur Cyan demandée
+    present: "bg-[#27F5D6]/20 text-slate-900 border border-[#27F5D6] shadow-sm", // CYAN DEMANDÉ
     present_medium: "bg-orange-100 text-orange-700 border border-orange-200",
     present_low: "bg-yellow-100 text-yellow-700 border border-yellow-200",
     non_priority: "bg-cyan-100 text-cyan-700 border border-cyan-200",
@@ -482,7 +495,8 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   
   const [formData, setFormData] = useState({ 
       title: "", comments: "", eggs: 0, status: "present_high", clientId: "", 
-      dateInspection: "", ster_1_date: "", ster_2_date: "",
+      lieux: "", dateVisite: "", dateInspection: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
+      ster_1_date: "", ster_2_date: "",
       ...nest,
       photos: initialPhotos
   });
@@ -613,6 +627,20 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                          </div>
                      </div>
                  ))}
+             </div>
+          )}
+
+          {hasExtraData && (
+             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-sm space-y-3">
+                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Layers size={14}/> Données Fichier</p>
+                 <div className="grid grid-cols-2 gap-2 text-xs">
+                     {nest.lieux && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Lieux</span><span className="font-medium text-slate-700">{nest.lieux}</span></div>}
+                     {nest.dateVisite && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Date visite</span><span className="font-medium text-slate-700">{nest.dateVisite}</span></div>}
+                     {nest.nbAdultes && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Adultes</span><span className="font-medium text-slate-700">{nest.nbAdultes}</span></div>}
+                     {nest.nbPoussins && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Poussins</span><span className="font-medium text-slate-700">{nest.nbPoussins}</span></div>}
+                 </div>
+                 {nest.comportement && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Comportement</span><span className="font-medium text-slate-700 text-xs">{nest.comportement}</span></div>}
+                 {nest.remarques && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Remarques</span><span className="font-medium text-slate-700 text-xs italic">{nest.remarques}</span></div>}
              </div>
           )}
 
@@ -749,6 +777,19 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                 ))}
             </div>
         </div>
+
+        {(formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info) && (
+            <div className="pt-4 border-t border-slate-100">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 pl-1"><Layers size={14}/> Champs Import Excel</label>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Lieux" value={formData.lieux || ""} onChange={e=>setFormData({...formData, lieux: e.target.value})} />
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Date visite" value={formData.dateVisite || ""} onChange={e=>setFormData({...formData, dateVisite: e.target.value})} />
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Adultes" value={formData.nbAdultes || ""} onChange={e=>setFormData({...formData, nbAdultes: e.target.value})} />
+                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Poussins" value={formData.nbPoussins || ""} onChange={e=>setFormData({...formData, nbPoussins: e.target.value})} />
+                </div>
+                <input className="w-full p-3 bg-slate-50 border-0 rounded-xl text-xs mb-3" placeholder="Comportement" value={formData.comportement || ""} onChange={e=>setFormData({...formData, comportement: e.target.value})} />
+            </div>
+        )}
         
         {onGeneratePDF && <Button variant="secondary" className="w-full py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={()=>onGeneratePDF(nest)}><Printer size={16}/> Générer Fiche PDF</Button>}
         
@@ -907,8 +948,10 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
   const userLayerRef = useRef(null);
+  const heatLayerRef = useRef(null);
   const [mapType, setMapType] = useState("satellite");
   const [userPosition, setUserPosition] = useState(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   const onMapClickRef = useRef(onMapClick);
   const onMarkerClickRef = useRef(onMarkerClick);
@@ -918,75 +961,81 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   useEffect(() => {
     if (mapInstanceRef.current) return;
 
-    const initMap = () => {
+    const initMap = async () => {
         if (!mapContainerRef.current) return;
         try {
-            const L = window.L;
-            if (!L || typeof L.map !== 'function') return;
+            if (!window.L) {
+                await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
+                const link = document.createElement("link"); 
+                link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; 
+                document.head.appendChild(link);
+            }
+            if (!window.L.heatLayer) {
+                await loadScript("https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js");
+            }
 
+            const L = window.L;
             const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
             mapInstanceRef.current = map;
 
             L.control.zoom({ position: 'bottomright' }).addTo(map);
-            L.tileLayer(TILE_URLS['satellite'], { attribution: 'Esri' }).addTo(map);
+            map.tileLayer = L.tileLayer(TILE_URLS['satellite'], { attribution: 'Esri' }).addTo(map);
+            
             markersLayerRef.current = L.layerGroup().addTo(map);
+            heatLayerRef.current = L.layerGroup().addTo(map);
 
             map.on('click', (e) => {
                 if(onMapClickRef.current) onMapClickRef.current(e.latlng);
             });
             
-            setTimeout(() => map.invalidateSize(), 200);
+            setTimeout(() => map.invalidateSize(), 400); 
         } catch (e) { console.error("Erreur Map:", e); }
     };
-
-    if (!window.L) {
-        if(!document.getElementById('leaflet-script')) {
-            const link = document.createElement("link"); link.id = 'leaflet-css'; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
-            const script = document.createElement("script"); script.id = 'leaflet-script'; script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true; script.onload = initMap; document.head.appendChild(script);
-        } else {
-            const script = document.getElementById('leaflet-script');
-            script.addEventListener('load', initMap);
-            setTimeout(() => { if(window.L && !mapInstanceRef.current) initMap(); }, 500);
-        }
-    } else { initMap(); }
+    initMap();
 
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
 
   useEffect(() => {
      if (mapInstanceRef.current) {
-         setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 300);
+         setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 400);
      }
-  }, [isAddingMode]);
+  }, [markers, isAddingMode, showHeatmap]);
 
   useEffect(() => {
-      if (!mapInstanceRef.current || !window.L || !markersLayerRef.current) return;
+      if (!mapInstanceRef.current || !window.L || !markersLayerRef.current || !heatLayerRef.current) return;
       const L = window.L;
       markersLayerRef.current.clearLayers();
+      heatLayerRef.current.clearLayers();
       
-      markers.forEach(m => {
-          let color = "#64748b"; 
-          if (m.status === "present_high") color = "#ef4444"; 
-          else if (m.status === "present") color = "#27F5D6"; // CYAN
-          else if (m.status === "present_medium") color = "#f97316"; 
-          else if (m.status === "present_low") color = "#eab308"; 
-          else if (m.status === "non_priority") color = "#0ea5e9"; 
-          else if (m.status === "temp") color = "#94a3b8"; 
-          else if (m.status === "sterilized_1") color = "#84cc16"; 
-          else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; 
-          else if (m.status === "reported_by_client") color = "#a855f7"; 
+      if (showHeatmap && L.heatLayer) {
+          const heatPoints = markers.map(m => [m.lat, m.lng, 1]); 
+          L.heatLayer(heatPoints, { radius: 35, blur: 25, maxZoom: 17, gradient: {0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red'} }).addTo(heatLayerRef.current);
+      } else {
+          markers.forEach(m => {
+              let color = "#64748b"; 
+              if (m.status === "present_high") color = "#ef4444"; 
+              else if (m.status === "present") color = "#27F5D6"; // CYAN
+              else if (m.status === "present_medium") color = "#f97316"; 
+              else if (m.status === "present_low") color = "#eab308"; 
+              else if (m.status === "non_priority") color = "#0ea5e9"; 
+              else if (m.status === "temp") color = "#94a3b8"; 
+              else if (m.status === "sterilized_1") color = "#84cc16"; 
+              else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; 
+              else if (m.status === "reported_by_client") color = "#a855f7"; 
 
-          const icon = L.divIcon({ 
-              className: "custom-icon", 
-              html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); ${m.status === 'temp' ? 'animation: pulse 1.5s infinite;' : ''}"></div>`,
-              iconSize: [24, 24],
-              iconAnchor: [12, 12]
+              const icon = L.divIcon({ 
+                  className: "custom-icon", 
+                  html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); ${m.status === 'temp' ? 'animation: pulse 1.5s infinite;' : ''}"></div>`,
+                  iconSize: [24, 24],
+                  iconAnchor: [12, 12]
+              });
+              const marker = L.marker([m.lat, m.lng], { icon });
+              marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClickRef.current) onMarkerClickRef.current(m); });
+              marker.addTo(markersLayerRef.current);
           });
-          const marker = L.marker([m.lat, m.lng], { icon });
-          marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClickRef.current) onMarkerClickRef.current(m); });
-          marker.addTo(markersLayerRef.current);
-      });
-  }, [markers]);
+      }
+  }, [markers, showHeatmap]);
 
   useEffect(() => {
       if (mapInstanceRef.current && mapInstanceRef.current.tileLayer && TILE_URLS[mapType]) {
@@ -1028,7 +1077,12 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
       <div className="relative w-full h-full">
           <div ref={mapContainerRef} className="w-full h-full bg-slate-100 z-0" style={{minHeight:'100%'}}/>
           <div className="absolute top-4 right-4 z-[400] bg-white/90 backdrop-blur-sm p-1 rounded-xl shadow-lg flex gap-1">
+              <button onClick={(e) => { e.stopPropagation(); setShowHeatmap(!showHeatmap); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors flex items-center gap-1 ${showHeatmap ? 'bg-rose-500 text-white' : 'text-slate-500 hover:bg-slate-100'}`} title="Carte de densité"><Flame size={14}/> Densité</button>
+              <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
               <button onClick={centerOnUser} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors text-sky-600 hover:bg-sky-50 flex items-center gap-1" title="Ma position GPS"><Locate size={14}/> Moi</button>
+              <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
+              <button onClick={(e) => { e.stopPropagation(); setMapType('satellite'); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${mapType === 'satellite' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Satellite</button>
+              <button onClick={(e) => { e.stopPropagation(); setMapType('plan'); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${mapType === 'plan' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Plan</button>
           </div>
       </div>
   );
@@ -1094,7 +1148,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
                 <div className="flex-1 flex gap-2 w-full">
                     <div className="relative flex-1 group">
                         <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={16}/>
-                        <input type="text" placeholder="Filtrer la carte par Réf/Titre..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={filterQuery} onChange={e => setFilterQuery(e.target.value)} />
+                        <input type="text" placeholder="Filtrer la carte (Réf...)" className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={filterQuery} onChange={e => setFilterQuery(e.target.value)} />
                     </div>
                     <select className="flex-1 p-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                         <option value="all">Tous les statuts</option>
@@ -1201,6 +1255,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
         </Card>
       </div>
 
+      {/* STATISTIQUES OPTION 4 */}
       <PopulationStats markers={markers} />
 
       {reportedNests.length > 0 && (
@@ -1357,13 +1412,111 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
       "Longitude": m.lng,
       "Date d'inspection": m.dateInspection || "",
       "Date 1er Passage": m.ster_1_date || "",
-      "Date 2ème Passage": m.ster_2_date || ""
+      "Date 2ème Passage": m.ster_2_date || "",
+      "Lieux": m.lieux || "",
+      "Date de la visite": m.dateVisite || "",
+      "N° point": m.numPoint || "",
+      "Gps": m.gpsOriginal || "",
+      "Nb adulte": m.nbAdultes || "",
+      "Nd de Poussins (P=Poussin + S= semaine de développement)": m.nbPoussins || "",
+      "Comportement (Guetteur, Couve, Défend, Autres)": m.comportement || "",
+      "Remarques": m.remarques || "",
+      "info": m.info || ""
     }));
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Gestion Nids");
     XLSX.writeFile(workbook, `Aerothau_Nids_${new Date().toISOString().split('T')[0]}.xlsx`);
     setIsExporting(false);
+  };
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const XLSX = await loadSheetJS();
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+        let count = 0;
+        for (const row of jsonData) {
+            
+            // ANTI-FANTÔME
+            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) {
+                continue;
+            }
+            
+            let lat = MAP_CENTER_DEFAULT.lat;
+            let lng = MAP_CENTER_DEFAULT.lng;
+            let hasGps = false;
+
+            if (row["Gps"]) {
+                const parts = row["Gps"].toString().split(",");
+                if (parts.length === 2) {
+                    const pLat = parseFloat(parts[0].trim());
+                    const pLng = parseFloat(parts[1].trim());
+                    if(!isNaN(pLat) && !isNaN(pLng)) {
+                        lat = pLat;
+                        lng = pLng;
+                        hasGps = true;
+                    }
+                }
+            } else if (row["Latitude"] && row["Longitude"]) {
+                const pLat = parseFloat(row["Latitude"]);
+                const pLng = parseFloat(row["Longitude"]);
+                if(!isNaN(pLat) && !isNaN(pLng)) {
+                    lat = pLat;
+                    lng = pLng;
+                    hasGps = true;
+                }
+            }
+
+            const rawLocation = (row["Noms Client"] || row["Lieux"] || "").toString().toLowerCase();
+            let matchedClient = clients.find(c => c.name.toLowerCase() === rawLocation);
+            
+            if (!matchedClient) {
+                if (rawLocation.includes("narbonne")) matchedClient = clients.find(c => c.name.toLowerCase().includes("narbonne"));
+                else if (rawLocation.includes("meze") || rawLocation.includes("mèze")) matchedClient = clients.find(c => c.name.toLowerCase().includes("meze") || c.name.toLowerCase().includes("mèze"));
+                else if (rawLocation.includes("sete") || rawLocation.includes("sète")) matchedClient = clients.find(c => c.name.toLowerCase().includes("sete") || c.name.toLowerCase().includes("sète"));
+                
+                if(!matchedClient && rawLocation.length > 3) {
+                     matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
+                }
+            }
+            
+            const client = matchedClient || clients[0];
+            
+            const newNest = {
+                id: row["ID"] || (row["N° point"] ? parseInt(row["N° point"]) + Date.now() : Date.now() + count),
+                clientId: client ? client.id : "",
+                status: hasGps ? (row["Etat du nids"] || "present_high") : "temp",
+                eggs: parseInt(row["nbr d'œuf"]) || 0,
+                address: row["Adresse"] || row["adresse precis"] || (hasGps ? "Adresse importée" : "⚠️ À REPLACER (Pas de GPS)"),
+                lat: lat,
+                lng: lng,
+                title: `N°${row["N° point"] || count} - ${row["Lieux"] || "Nid importé"}`,
+                comments: row["observation"] || "Import depuis fichier Excel.",
+                dateInspection: row["Date d'inspection"] || row["Date inspection"] || "",
+                ster_1_date: row["Date 1er Passage"] || "",
+                ster_2_date: row["Date 2ème Passage"] || "",
+                lieux: row["Lieux"] || "",
+                dateVisite: row["Date de la visite"] || "",
+                info: row["info"] || "",
+                numPoint: row["N° point"] || "",
+                gpsOriginal: row["Gps"] || "",
+                nbAdultes: row["Nb adulte"] || "",
+                nbPoussins: row["Nd de Poussins (P=Poussin + S= semaine de développement)"] || "",
+                comportement: row["Comportement (Guetteur, Couve, Défend, Autres)"] || "",
+                remarques: row["Remarques"] || ""
+            };
+            await onUpdateNest(newNest);
+            count++;
+        }
+        alert(`${count} nids importés ou mis à jour avec succès.`);
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
   };
 
   const handleRoadmapPDF = () => {
@@ -1376,7 +1529,15 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-800">GESTION DES NIDS</h2>
         <div className="flex gap-3 flex-wrap">
             <Button variant="primary" onClick={handleRoadmapPDF} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6 border-0 shadow-lg"><QrCode size={16}/> Feuille de Route</Button>
+            <Button variant="outline" className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6 border-2 border-orange-200 text-orange-600 hover:bg-orange-50" onClick={cleanGhosts}><Trash2 size={16}/> Purger Fantômes</Button>
+            <Button variant="danger" onClick={onDeleteAllNests} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6"><Trash2 size={16}/> Tout purger</Button>
             <Button variant="secondary" onClick={handleExport} disabled={isExporting} className="h-12 rounded-2xl text-xs uppercase tracking-widest px-6 border-2"><Download size={16}/> Exporter .xlsx</Button>
+            <div className="relative">
+                <input type="file" accept=".xlsx, .csv" onChange={handleImport} className="hidden" id="import-excel-file" />
+                <label htmlFor="import-excel-file" className="flex items-center gap-2 bg-sky-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase cursor-pointer hover:bg-sky-700 shadow-xl shadow-sky-200 h-12 transition-all">
+                    <Upload size={16}/> Importer Fichier
+                </label>
+            </div>
         </div>
       </div>
 
@@ -1859,7 +2020,6 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             </Card>
                         </div>
 
-                        {/* STATISTIQUES OPTION 4 */}
                         <PopulationStats markers={myMarkers} />
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
