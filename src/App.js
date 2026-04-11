@@ -10,46 +10,12 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import {
-  Users,
-  MapPin,
-  Calendar,
-  FileText,
-  CheckCircle,
-  LogOut,
-  Menu,
-  X,
-  Plus,
-  Search,
-  Bird,
-  Plane,
-  ChevronRight,
-  ChevronLeft,
-  Phone,
-  Home,
-  Map as MapIcon,
-  Crosshair,
-  Edit,
-  Trash2,
-  Key,
-  User,
-  Send,
-  Info,
-  Printer,
-  Locate,
-  Camera,
-  MessageSquare,
-  AlertTriangle,
-  Download,
-  Upload,
-  File,
-  FileCheck,
-  Activity,
-  Cloud,
-  Wind,
-  List as ListIcon,
-  Layers,
-  Bell,
-  FileSpreadsheet
+  Users, MapPin, Calendar, FileText, CheckCircle, LogOut, Menu, X, Plus,
+  Search, Bird, Plane, ChevronRight, ChevronLeft, Phone, Home, Map as MapIcon,
+  Crosshair, Edit, Trash2, Key, User, Send, Info, Printer, Locate, Camera,
+  MessageSquare, AlertTriangle, Download, Upload, File, FileCheck, Activity,
+  Cloud, Wind, List as ListIcon, Layers, Bell, FileSpreadsheet, Filter,
+  Navigation2, CheckSquare, Flame, Smartphone
 } from "lucide-react";
 
 // ============================================================================
@@ -72,6 +38,7 @@ const appId = "aerothau-goelands";
 
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; 
+const CURRENT_YEAR = new Date().getFullYear().toString(); // Campagne par défaut
 
 const TILE_URLS = {
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -117,7 +84,9 @@ const Button = ({ children, variant = "primary", className = "", ...props }) => 
     outline: "border border-slate-300 text-slate-600 hover:bg-slate-50",
     sky: "bg-sky-600 text-white hover:bg-sky-700 shadow-lg shadow-sky-200",
     ghost: "text-slate-500 hover:bg-slate-100",
-    purple: "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-200"
+    purple: "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-200",
+    waze: "bg-[#05c8f6] text-white hover:bg-[#049bc0] shadow-md",
+    gmaps: "bg-[#34a853] text-white hover:bg-[#20843a] shadow-md"
   };
   return <button className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>{children}</button>;
 };
@@ -126,10 +95,10 @@ const Badge = ({ status }) => {
   const styles = {
     Terminé: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     present_high: "bg-red-100 text-red-700 border border-red-200",
-    present: "bg-[#27F5D6]/20 text-slate-900 border border-[#27F5D6] shadow-sm", // CYAN DEMANDÉ
+    present: "bg-[#27F5D6]/20 text-slate-900 border border-[#27F5D6] shadow-sm", // COULEUR CYAN
     present_medium: "bg-orange-100 text-orange-700 border border-orange-200",
     present_low: "bg-yellow-100 text-yellow-700 border border-yellow-200",
-    non_priority: "bg-blue-100 text-blue-700 border border-blue-200",
+    non_priority: "bg-cyan-100 text-cyan-700 border border-cyan-200",
     sterilized_1: "bg-lime-100 text-lime-700 border border-lime-200",
     sterilized_2: "bg-emerald-100 text-emerald-700 border border-emerald-200",
     reported_by_client: "bg-purple-100 text-purple-700 border border-purple-200",
@@ -157,8 +126,24 @@ const Toast = ({ message, type, onClose }) => {
 };
 
 // ============================================================================
-// 3. UTILITAIRES
+// 3. UTILITAIRES & FONCTIONS GLOBALES
 // ============================================================================
+
+const filterNestsHelper = (nests, searchQuery, filterStatus) => {
+    return nests.filter(n => {
+        const query = searchQuery ? searchQuery.toLowerCase() : "";
+        const matchSearch = (n.title || "").toLowerCase().includes(query) || 
+                            (n.address || "").toLowerCase().includes(query) ||
+                            (n.id || "").toString().includes(query);
+        let matchStatus = true;
+        if (filterStatus === "reported") matchStatus = n.status === "reported_by_client";
+        else if (filterStatus === "active") matchStatus = n.status && n.status.startsWith("present");
+        else if (filterStatus === "treated") matchStatus = n.status && n.status.startsWith("sterilized");
+        else if (filterStatus === "absent") matchStatus = n.status === "non_present";
+
+        return matchSearch && matchStatus;
+    });
+};
 
 const compressImage = (file) => new Promise((resolve) => {
     const reader = new FileReader();
@@ -179,25 +164,18 @@ const compressImage = (file) => new Promise((resolve) => {
     };
 });
 
-const loadSheetJS = () => {
-  return new Promise((resolve) => {
-    if (window.XLSX) return resolve(window.XLSX);
-    const script = document.createElement("script");
-    script.src = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
-    script.onload = () => resolve(window.XLSX);
+const loadScript = (src) => new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = reject;
     document.body.appendChild(script);
-  });
-};
+});
+
+const loadSheetJS = () => loadScript("https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js").then(() => window.XLSX);
 
 const generatePDF = (type, data, extraData = {}) => {
-    const loadScript = (src) => new Promise((resolve) => {
-        if (document.querySelector(`script[src="${src}"]`)) return resolve();
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = resolve;
-        document.body.appendChild(script);
-    });
-
     Promise.all([
         loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"),
         loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js")
@@ -223,6 +201,7 @@ const generatePDF = (type, data, extraData = {}) => {
             doc.setFontSize(12);
             let y = 65;
             doc.text(`Référence : ${nest.title || "Nid #" + nest.id}`, 20, y); y += 8;
+            doc.text(`Campagne : ${nest.campaign || CURRENT_YEAR}`, 20, y); y += 8;
             doc.text(`Client : ${clientName}`, 20, y); y += 8;
             doc.text(`Adresse : ${nest.address}`, 20, y); y += 8;
             doc.text(`GPS : ${nest.lat?.toFixed(6)}, ${nest.lng?.toFixed(6)}`, 20, y); y += 8;
@@ -239,6 +218,11 @@ const generatePDF = (type, data, extraData = {}) => {
 
             const photos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
             if (photos.length > 0) {
+                doc.setFontSize(14);
+                doc.text("Documentation Photographique :", 20, y);
+                y += 10;
+                doc.setFontSize(10);
+                
                 photos.forEach((p, idx) => {
                     if (y > 230) { doc.addPage(); y = 20; }
                     const xPos = (idx % 2 === 0) ? 20 : 115;
@@ -252,12 +236,14 @@ const generatePDF = (type, data, extraData = {}) => {
             const client = extraData.client || { name: "Client Inconnu" };
             const markers = extraData.markers || [];
             const interventions = extraData.interventions || [];
+            const campaign = extraData.campaign || "Toutes";
+
             doc.text("BILAN ACTIVITÉ", 20, 50);
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(16);
             doc.text(`Client : ${client.name}`, 20, 65);
             doc.setFontSize(10);
-            doc.text(client.address || "", 20, 72);
+            doc.text(`Campagne : ${campaign}`, 20, 72);
             
             const totalEggs = markers.reduce((acc, curr) => acc + (curr.eggs || 0), 0);
             const treated = markers.filter(m => m.status && m.status.includes('sterilized')).length;
@@ -291,7 +277,7 @@ const generatePDF = (type, data, extraData = {}) => {
             const intRows = interventions.map(i => [i.date, i.status, i.technician || "-", i.notes || ""]);
             doc.autoTable({ startY: finalY + 5, head: [['Date', 'Statut', 'Agent', 'Notes']], body: intRows, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, });
             
-            doc.save(`Rapport_${client.name.replace(/\s+/g, '_')}.pdf`);
+            doc.save(`Rapport_${client.name.replace(/\s+/g, '_')}_${campaign}.pdf`);
         } else {
             const report = data;
             doc.text("DOCUMENT", 20, 50);
@@ -343,7 +329,7 @@ const LoginForm = ({ onLogin, users, logoUrl }) => {
 const ClientReportForm = ({ nest, onSave, onCancel }) => {
   const initialPhotos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
   const [formData, setFormData] = useState({ 
-      title: "", comments: "", contactName: "", contactPhone: "", status: "reported_by_client", ...nest, photos: initialPhotos
+      title: "", comments: "", contactName: "", contactPhone: "", status: "reported_by_client", campaign: CURRENT_YEAR, ...nest, photos: initialPhotos
   });
 
   const handlePhotoUpload = async (e) => { 
@@ -439,7 +425,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
   const initialPhotos = nest.photos ? [...nest.photos] : (nest.photo ? [{ data: nest.photo, comment: "" }] : []);
   
   const [formData, setFormData] = useState({ 
-      title: "", comments: "", eggs: 0, status: "present_high", clientId: "", 
+      title: "", comments: "", eggs: 0, status: "present_high", clientId: "", campaign: CURRENT_YEAR,
       lieux: "", dateVisite: "", dateInspection: "", nbAdultes: "", nbPoussins: "", comportement: "", remarques: "", info: "",
       ster_1_date: "", ster_2_date: "",
       ...nest,
@@ -471,10 +457,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
       setFormData({ ...formData, photos: formData.photos.filter((_, i) => i !== index) });
   };
 
-  const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
-  
-  const hasExtraData = formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info;
-
   const handleContactChange = (index, field, value) => {
       const updated = [...nestContacts];
       updated[index][field] = value;
@@ -493,6 +475,7 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
 
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
+          {/* LECTURE : PHOTOS MULTIPLES */}
           {formData.photos && formData.photos.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   {formData.photos.map((p, idx) => (
@@ -524,10 +507,9 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Contenu observé</p>
                   <p className="text-3xl font-black text-slate-800">{nest.eggs} <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">œufs</span></p>
               </div>
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-center flex flex-col justify-center items-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={openRoute} title="Ouvrir itinéraire">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><Locate size={10}/> Coordonnées GPS</p>
-                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded shadow-sm w-full">{nest.lat?.toFixed(5)}</p>
-                   <p className="text-xs font-mono text-slate-600 bg-white px-2 py-1 rounded shadow-sm w-full mt-1">{nest.lng?.toFixed(5)}</p>
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center justify-center gap-2">
+                  <Button variant="waze" className="w-full text-xs" onClick={() => window.open(`https://waze.com/ul?ll=${nest.lat},${nest.lng}&navigate=yes`, '_blank')}><Navigation2 size={14}/> Waze</Button>
+                  <Button variant="gmaps" className="w-full text-xs" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank')}><MapIcon size={14}/> Maps</Button>
               </div>
           </div>
 
@@ -574,20 +556,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                          </div>
                      </div>
                  ))}
-             </div>
-          )}
-
-          {hasExtraData && (
-             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-sm space-y-3">
-                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Layers size={14}/> Données Fichier</p>
-                 <div className="grid grid-cols-2 gap-2 text-xs">
-                     {nest.lieux && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Lieux</span><span className="font-medium text-slate-700">{nest.lieux}</span></div>}
-                     {nest.dateVisite && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Date visite</span><span className="font-medium text-slate-700">{nest.dateVisite}</span></div>}
-                     {nest.nbAdultes && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Adultes</span><span className="font-medium text-slate-700">{nest.nbAdultes}</span></div>}
-                     {nest.nbPoussins && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Poussins</span><span className="font-medium text-slate-700">{nest.nbPoussins}</span></div>}
-                 </div>
-                 {nest.comportement && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Comportement</span><span className="font-medium text-slate-700 text-xs">{nest.comportement}</span></div>}
-                 {nest.remarques && <div><span className="text-slate-400 uppercase font-bold text-[9px] block">Remarques</span><span className="font-medium text-slate-700 text-xs italic">{nest.remarques}</span></div>}
              </div>
           )}
 
@@ -671,9 +639,15 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
             </div>
 
             <div className="space-y-4">
-                <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Identification</label>
-                    <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Campagne</label>
+                        <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.campaign || CURRENT_YEAR} onChange={e=>setFormData({...formData, campaign: e.target.value})} placeholder="Année..."/>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Œufs</label>
+                        <input type="number" className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-xl font-black text-center text-sky-600 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
+                    </div>
                 </div>
                 <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Client Associé</label>
@@ -682,14 +656,9 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                         {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
-                 <div className="flex gap-4">
-                    <div className="flex-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Œufs</label>
-                        <input type="number" className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-xl font-black text-center text-sky-600 focus:ring-2 focus:ring-sky-500 outline-none" value={formData.eggs} onChange={e=>setFormData({...formData, eggs: parseInt(e.target.value)})} placeholder="0"/>
-                    </div>
-                     <div className="flex-1 flex items-end">
-                         <button type="button" onClick={openRoute} className="w-full h-[58px] bg-slate-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-md"><Locate size={16}/> Voir GPS</button>
-                     </div>
+                <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block pl-1">Identification</label>
+                    <input className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-sky-500 outline-none" value={formData.title} onChange={e=>setFormData({...formData, title: e.target.value})} placeholder="Titre / Référence"/>
                 </div>
             </div>
         </div>
@@ -700,6 +669,11 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                 <span className="text-[9px] font-mono font-bold text-sky-500 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">GPS: {formData.lat?.toFixed(5)}, {formData.lng?.toFixed(5)}</span>
             </div>
             <textarea className="w-full p-4 bg-slate-50 border-0 rounded-2xl text-sm focus:ring-2 focus:ring-sky-500 outline-none resize-none leading-relaxed" rows="2" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} placeholder="Numéro, Rue, Bâtiment..."/>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+             <Button type="button" variant="waze" className="w-full text-xs" onClick={() => window.open(`https://waze.com/ul?ll=${formData.lat},${formData.lng}&navigate=yes`, '_blank')}><Navigation2 size={16}/> Lancer Waze</Button>
+             <Button type="button" variant="gmaps" className="w-full text-xs" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${formData.lat},${formData.lng}`, '_blank')}><MapIcon size={16}/> Lancer Maps</Button>
         </div>
 
         <div>
@@ -725,22 +699,8 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
                         </div>
                     </div>
                 ))}
-                {nestContacts.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2 bg-slate-50 rounded-xl border border-dashed border-slate-200">Aucun contact enregistré pour ce nid.</p>}
             </div>
         </div>
-
-        {(formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info) && (
-            <div className="pt-4 border-t border-slate-100">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 pl-1"><Layers size={14}/> Champs Import Excel</label>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Lieux" value={formData.lieux || ""} onChange={e=>setFormData({...formData, lieux: e.target.value})} />
-                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Date visite" value={formData.dateVisite || ""} onChange={e=>setFormData({...formData, dateVisite: e.target.value})} />
-                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Adultes" value={formData.nbAdultes || ""} onChange={e=>setFormData({...formData, nbAdultes: e.target.value})} />
-                    <input className="p-3 bg-slate-50 border-0 rounded-xl text-xs" placeholder="Nb Poussins" value={formData.nbPoussins || ""} onChange={e=>setFormData({...formData, nbPoussins: e.target.value})} />
-                </div>
-                <input className="w-full p-3 bg-slate-50 border-0 rounded-xl text-xs mb-3" placeholder="Comportement" value={formData.comportement || ""} onChange={e=>setFormData({...formData, comportement: e.target.value})} />
-            </div>
-        )}
         
         {onGeneratePDF && <Button variant="secondary" className="w-full py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={()=>onGeneratePDF(nest)}><Printer size={16}/> Générer Fiche PDF</Button>}
         
@@ -891,7 +851,7 @@ const ReportEditForm = ({ report, clients, markers, interventions, onSave, onCan
 };
 
 // ============================================================================
-// 5. CARTE LEAFLET SÉCURISÉE
+// 5. CARTE LEAFLET SÉCURISÉE (Avec Heatmap et Drone GPS)
 // ============================================================================
 
 const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, routePath }) => {
@@ -900,9 +860,10 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
   const markersLayerRef = useRef(null);
   const routeLayerRef = useRef(null);
   const userLayerRef = useRef(null);
-  const tileLayerRef = useRef(null);
+  const heatLayerRef = useRef(null);
   const [mapType, setMapType] = useState("satellite");
   const [userPosition, setUserPosition] = useState(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   const onMapClickRef = useRef(onMapClick);
   const onMarkerClickRef = useRef(onMarkerClick);
@@ -912,76 +873,82 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
   useEffect(() => {
     if (mapInstanceRef.current) return;
 
-    const initMap = () => {
+    const initMap = async () => {
         if (!mapContainerRef.current) return;
         try {
-            const L = window.L;
-            if (!L || typeof L.map !== 'function') return;
+            if (!window.L) {
+                await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
+                const link = document.createElement("link"); 
+                link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; 
+                document.head.appendChild(link);
+            }
+            if (!window.L.heatLayer) {
+                await loadScript("https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js");
+            }
 
+            const L = window.L;
             const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
             mapInstanceRef.current = map;
 
             L.control.zoom({ position: 'bottomright' }).addTo(map);
-            tileLayerRef.current = L.tileLayer(TILE_URLS['satellite'], { attribution: 'Esri' }).addTo(map);
+            map.tileLayer = L.tileLayer(TILE_URLS['satellite'], { attribution: 'Esri' }).addTo(map);
+            
             markersLayerRef.current = L.layerGroup().addTo(map);
             routeLayerRef.current = L.layerGroup().addTo(map);
+            heatLayerRef.current = L.layerGroup().addTo(map);
 
             map.on('click', (e) => {
                 if(onMapClickRef.current) onMapClickRef.current(e.latlng);
             });
             
-            setTimeout(() => map.invalidateSize(), 200);
+            setTimeout(() => map.invalidateSize(), 400); 
         } catch (e) { console.error("Erreur Map:", e); }
     };
-
-    if (!window.L) {
-        if(!document.getElementById('leaflet-script')) {
-            const link = document.createElement("link"); link.id = 'leaflet-css'; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
-            const script = document.createElement("script"); script.id = 'leaflet-script'; script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true; script.onload = initMap; document.head.appendChild(script);
-        } else {
-            const script = document.getElementById('leaflet-script');
-            script.addEventListener('load', initMap);
-            setTimeout(() => { if(window.L && !mapInstanceRef.current) initMap(); }, 500);
-        }
-    } else { initMap(); }
+    initMap();
 
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
 
   useEffect(() => {
      if (mapInstanceRef.current) {
-         setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 300);
+         setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 400);
      }
-  }, [isAddingMode]);
+  }, [markers, isAddingMode, showHeatmap]);
 
   useEffect(() => {
-      if (!mapInstanceRef.current || !window.L || !markersLayerRef.current) return;
+      if (!mapInstanceRef.current || !window.L || !markersLayerRef.current || !heatLayerRef.current) return;
       const L = window.L;
       markersLayerRef.current.clearLayers();
+      heatLayerRef.current.clearLayers();
       
-      markers.forEach(m => {
-          let color = "#64748b"; // Gris par défaut
-          if (m.status === "present_high") color = "#ef4444"; // Rouge
-          else if (m.status === "present") color = "#27F5D6"; // CYAN / TURQUOISE DEMANDÉ
-          else if (m.status === "present_medium") color = "#f97316"; // Orange
-          else if (m.status === "present_low") color = "#eab308"; // Jaune
-          else if (m.status === "non_priority") color = "#0ea5e9"; // Bleu Cyan
-          else if (m.status === "temp") color = "#94a3b8"; // Gris clair
-          else if (m.status === "sterilized_1") color = "#84cc16"; // Vert clair
-          else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; // Vert foncé
-          else if (m.status === "reported_by_client") color = "#a855f7"; // Violet
-
-          const icon = L.divIcon({ 
-              className: "custom-icon", 
-              html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); ${m.status === 'temp' ? 'animation: pulse 1.5s infinite;' : ''}"></div>`,
-              iconSize: [24, 24],
-              iconAnchor: [12, 12]
+      if (showHeatmap && L.heatLayer) {
+          const heatPoints = markers.map(m => [m.lat, m.lng, 1]); 
+          L.heatLayer(heatPoints, { radius: 35, blur: 25, maxZoom: 17, gradient: {0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red'} }).addTo(heatLayerRef.current);
+      } else {
+          markers.forEach(m => {
+              let color = "#64748b"; 
+              if (m.status === "present_high") color = "#ef4444"; 
+              else if (m.status === "present") color = "#27F5D6"; // CYAN 
+              else if (m.status === "present_medium") color = "#f97316"; 
+              else if (m.status === "present_low") color = "#eab308"; 
+              else if (m.status === "non_priority") color = "#0ea5e9"; 
+              else if (m.status === "temp") color = "#94a3b8"; 
+              else if (m.status === "sterilized_1") color = "#84cc16"; 
+              else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; 
+              else if (m.status === "reported_by_client") color = "#a855f7"; 
+    
+              const icon = L.divIcon({ 
+                  className: "custom-icon", 
+                  html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); ${m.status === 'temp' ? 'animation: pulse 1.5s infinite;' : ''}"></div>`,
+                  iconSize: [24, 24],
+                  iconAnchor: [12, 12]
+              });
+              const marker = L.marker([m.lat, m.lng], { icon });
+              marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClickRef.current) onMarkerClickRef.current(m); });
+              marker.addTo(markersLayerRef.current);
           });
-          const marker = L.marker([m.lat, m.lng], { icon });
-          marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClickRef.current) onMarkerClickRef.current(m); });
-          marker.addTo(markersLayerRef.current);
-      });
-  }, [markers]);
+      }
+  }, [markers, showHeatmap]);
 
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L || !routeLayerRef.current) return;
@@ -994,8 +961,8 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
   }, [routePath]);
 
   useEffect(() => {
-      if (mapInstanceRef.current && tileLayerRef.current && TILE_URLS[mapType]) {
-          tileLayerRef.current.setUrl(TILE_URLS[mapType]);
+      if (mapInstanceRef.current && mapInstanceRef.current.tileLayer && TILE_URLS[mapType]) {
+          mapInstanceRef.current.tileLayer.setUrl(TILE_URLS[mapType]);
       }
   }, [mapType]);
 
@@ -1003,7 +970,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       if (mapInstanceRef.current && center) mapInstanceRef.current.setView([center.lat, center.lng], 18);
   }, [center]);
 
-  // Suivi GPS
   useEffect(() => {
       if (!navigator.geolocation) return;
       const watchId = navigator.geolocation.watchPosition(
@@ -1016,7 +982,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // Marqueur Drone
   useEffect(() => {
       if (!mapInstanceRef.current || !window.L || !userPosition) return;
       
@@ -1051,6 +1016,8 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
       <div className="relative w-full h-full">
           <div ref={mapContainerRef} className="w-full h-full bg-slate-100 z-0" style={{minHeight:'100%'}}/>
           <div className="absolute top-4 right-4 z-[400] bg-white/90 backdrop-blur-sm p-1 rounded-xl shadow-lg flex gap-1">
+              <button onClick={(e) => { e.stopPropagation(); setShowHeatmap(!showHeatmap); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors flex items-center gap-1 ${showHeatmap ? 'bg-rose-500 text-white' : 'text-slate-500 hover:bg-slate-100'}`} title="Carte de densité"><Flame size={14}/> Densité</button>
+              <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
               <button onClick={centerOnUser} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors text-sky-600 hover:bg-sky-50 flex items-center gap-1" title="Ma position GPS"><Locate size={14}/> Moi</button>
               <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
               <button onClick={(e) => { e.stopPropagation(); setMapType('satellite'); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${mapType === 'satellite' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Satellite</button>
@@ -1064,9 +1031,11 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
 // 6. VUES PRINCIPALES (ADMIN)
 // ============================================================================
 
-const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
+const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFilter }) => {
     const [selectedMarker, setSelectedMarker] = useState(null);
-    const [searchQuery, setSearchQuery] = useState("");
+    const [searchQuery, setSearchQuery] = useState(""); 
+    const [nestFilterQuery, setNestFilterQuery] = useState(""); 
+    const [statusFilter, setStatusFilter] = useState("all");
     const [isAdding, setIsAdding] = useState(false);
     const [mapCenter, setMapCenter] = useState(null);
     const [tempMarker, setTempMarker] = useState(null);
@@ -1088,14 +1057,14 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
             }
             if (lat && lng) {
                 setMapCenter({ lat, lng });
-                setTempMarker({ id: "temp", lat, lng, address: addr, status: "temp", eggs: 0 });
+                setTempMarker({ id: "temp", lat, lng, address: addr, status: "temp", eggs: 0, campaign: campaignFilter === "Toutes" ? CURRENT_YEAR : campaignFilter });
             }
         }
-    }, [searchQuery]);
+    }, [searchQuery, campaignFilter]);
 
     const handleMarkerClick = (marker) => {
         if (marker.id === "temp") {
-            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
+            const newNest = { id: Date.now(), lat: marker.lat, lng: marker.lng, address: marker.address, status: "present_high", eggs: 0, clientId: clients[0]?.id || "", campaign: marker.campaign };
             onUpdateNest(newNest); setTempMarker(null); setSelectedMarker(newNest);
         } else {
             setSelectedMarker(marker);
@@ -1103,8 +1072,9 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     };
 
     const optimizeRoute = () => {
-        if (markers.length < 2) return alert("Il faut au moins 2 nids pour tracer un itinéraire.");
-        let unvisited = [...markers];
+        const filtered = filterNestsHelper(markers, nestFilterQuery, statusFilter).filter(m => campaignFilter === "Toutes" || m.campaign === campaignFilter);
+        if (filtered.length < 2) return alert("Il faut au moins 2 nids affichés pour tracer un itinéraire.");
+        let unvisited = [...filtered];
         let current = unvisited.shift();
         let path = [current];
         
@@ -1128,19 +1098,39 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
         setRoutePath(path);
     };
 
-    const displayMarkers = useMemo(() => tempMarker ? [...markers, tempMarker] : markers, [markers, tempMarker]);
+    const displayMarkers = useMemo(() => {
+        let filtered = filterNestsHelper(markers, nestFilterQuery, statusFilter);
+        if (campaignFilter !== "Toutes") filtered = filtered.filter(m => m.campaign === campaignFilter);
+        if (tempMarker) filtered.push(tempMarker);
+        return filtered;
+    }, [markers, tempMarker, nestFilterQuery, statusFilter, campaignFilter]);
 
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-300">
             <Card className="p-3 flex flex-col md:flex-row gap-4 items-center z-20 shadow-lg border-0 rounded-3xl bg-white">
                 <div className="relative flex-1 w-full group">
                     <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={20}/>
-                    <input type="text" placeholder="Rechercher une adresse ou des coordonnées (Lat, Lng)..." className="w-full pl-14 pr-6 py-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
+                    <input type="text" placeholder="Aller à une adresse (Taper Entrée)..." className="w-full pl-14 pr-6 py-3 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
                 </div>
+                
+                <div className="flex-1 flex gap-2 w-full">
+                    <div className="relative flex-1 group">
+                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={16}/>
+                        <input type="text" placeholder="Filtrer la carte (Réf...)" className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={nestFilterQuery} onChange={e => setNestFilterQuery(e.target.value)} />
+                    </div>
+                    <select className="flex-1 p-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                        <option value="all">Tous les statuts</option>
+                        <option value="reported">Signalements</option>
+                        <option value="active">Nids Actifs (À traiter)</option>
+                        <option value="treated">Stérilisés (Pass. 1 & 2)</option>
+                        <option value="absent">Absents</option>
+                    </select>
+                </div>
+
                 <div className="flex gap-2 shrink-0 pr-2">
-                    <Button variant="outline" className="h-14 px-6 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={optimizeRoute}><Activity size={16}/> Itinéraire</Button>
-                    <Button variant={isAdding ? "danger" : "sky"} className={`h-14 px-6 rounded-2xl text-xs uppercase tracking-widest ${isAdding ? '' : 'shadow-xl shadow-sky-200'}`} onClick={() => setIsAdding(!isAdding)}>
-                        {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
+                    <Button variant="outline" className="py-3 px-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={optimizeRoute} title="Générer itinéraire optimisé"><Activity size={16}/></Button>
+                    <Button variant={isAdding ? "danger" : "sky"} className={`py-3 px-4 rounded-2xl text-xs uppercase tracking-widest ${isAdding ? '' : 'shadow-xl shadow-sky-200'}`} onClick={() => setIsAdding(!isAdding)}>
+                        {isAdding ? <X size={16}/> : <Plus size={16}/>}
                     </Button>
                 </div>
             </Card>
@@ -1160,7 +1150,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
 
                 <LeafletMap markers={displayMarkers} isAddingMode={isAdding} center={mapCenter} onMarkerClick={handleMarkerClick} routePath={routePath} onMapClick={async (ll) => {
                     if(!isAdding) return;
-                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present_high", eggs: 0, clientId: clients[0]?.id || "" };
+                    const newM = { id: Date.now(), lat: ll.lat, lng: ll.lng, address: "Localisation enregistrée", status: "present_high", eggs: 0, clientId: clients[0]?.id || "", campaign: campaignFilter === "Toutes" ? CURRENT_YEAR : campaignFilter };
                     await onUpdateNest(newM); setSelectedMarker(newM); setIsAdding(false);
                 }}/>
                 
@@ -1182,22 +1172,20 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest }) => {
     );
 };
 
-const AdminDashboard = ({ interventions, clients, markers }) => {
+const AdminDashboard = ({ interventions, clients, markers, campaignFilter }) => {
+  const filteredMarkers = useMemo(() => markers.filter(m => campaignFilter === "Toutes" || m.campaign === campaignFilter), [markers, campaignFilter]);
+  
   const stats = useMemo(() => ({
-    total: markers.length,
-    reported: markers.filter(m => m.status === "reported_by_client").length,
-    nonPresent: markers.filter(m => m.status === "non_present").length,
-    sterilized: markers.filter(m => m.status === "sterilized_2" || m.status === "sterilized").length,
-  }), [markers]);
+    total: filteredMarkers.length,
+    reported: filteredMarkers.filter(m => m.status === "reported_by_client").length,
+    nonPresent: filteredMarkers.filter(m => m.status === "non_present").length,
+    sterilized: filteredMarkers.filter(m => m.status === "sterilized_2" || m.status === "sterilized").length,
+  }), [filteredMarkers]);
 
-  const reportedNests = markers.filter(m => m.status === "reported_by_client");
+  const reportedNests = filteredMarkers.filter(m => m.status === "reported_by_client");
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 text-slate-800">
-      <div className="flex justify-between items-center mb-2">
-          <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">TABLEAU DE BORD</h2>
-      </div>
-      
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4 bg-gradient-to-br from-sky-400 to-blue-600 text-white shadow-lg border-0 text-center relative overflow-hidden flex flex-col justify-center">
             <div className="relative z-10 flex items-center justify-center gap-3">
@@ -1281,7 +1269,7 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                               {clients.map(client => {
-                                  const cNests = markers.filter(m => m.clientId === client.id);
+                                  const cNests = filteredMarkers.filter(m => m.clientId === client.id);
                                   if (cNests.length === 0) return null;
                                   
                                   const cTotal = cNests.length;
@@ -1313,8 +1301,8 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
                                       </tr>
                                   );
                               })}
-                              {clients.filter(c => markers.some(m => m.clientId === c.id)).length === 0 && (
-                                  <tr><td colSpan="7" className="p-8 text-center text-slate-400 italic text-xs">Aucune donnée client disponible.</td></tr>
+                              {clients.filter(c => filteredMarkers.some(m => m.clientId === c.id)).length === 0 && (
+                                  <tr><td colSpan="7" className="p-8 text-center text-slate-400 italic text-xs">Aucune donnée sur cette campagne.</td></tr>
                               )}
                           </tbody>
                       </table>
@@ -1353,9 +1341,44 @@ const AdminDashboard = ({ interventions, clients, markers }) => {
   );
 };
 
-const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests, clients }) => {
+const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests, clients, campaignFilter }) => {
   const [selectedNest, setSelectedNest] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedNests, setSelectedNests] = useState([]);
+  const [bulkActionStatus, setBulkActionStatus] = useState("");
+
+  const filteredMarkers = useMemo(() => {
+      let filtered = filterNestsHelper(markers, searchQuery, statusFilter);
+      if (campaignFilter !== "Toutes") {
+          filtered = filtered.filter(m => m.campaign === campaignFilter);
+      }
+      return filtered;
+  }, [markers, searchQuery, statusFilter, campaignFilter]);
+
+  const toggleSelectAll = (e) => {
+      if (e.target.checked) setSelectedNests(filteredMarkers.map(m => m.id));
+      else setSelectedNests([]);
+  };
+
+  const toggleNestSelection = (id) => {
+      if (selectedNests.includes(id)) setSelectedNests(selectedNests.filter(nid => nid !== id));
+      else setSelectedNests([...selectedNests, id]);
+  };
+
+  const handleBulkUpdate = async () => {
+      if (!bulkActionStatus) return alert("Sélectionnez un statut à appliquer.");
+      if (selectedNests.length === 0) return alert("Aucun nid sélectionné.");
+      if (window.confirm(`Mettre à jour le statut de ${selectedNests.length} nid(s) ?`)) {
+          for (const nid of selectedNests) {
+              const nestToUpdate = markers.find(m => m.id === nid);
+              if (nestToUpdate) await onUpdateNest({ ...nestToUpdate, status: bulkActionStatus });
+          }
+          setSelectedNests([]);
+          alert("Mise à jour groupée terminée.");
+      }
+  };
 
   const cleanGhosts = async () => {
       const ghosts = markers.filter(m => m.lat === MAP_CENTER_DEFAULT.lat && m.lng === MAP_CENTER_DEFAULT.lng);
@@ -1363,10 +1386,8 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
           alert("Aucun nid fantôme trouvé.");
           return;
       }
-      if(window.confirm(`Voulez-vous supprimer les ${ghosts.length} nids fantômes empilés à Sète ?`)) {
-          for (const ghost of ghosts) {
-              await onDeleteNest(ghost);
-          }
+      if(window.confirm(`Voulez-vous supprimer les ${ghosts.length} nids fantômes empilés au centre par défaut ?`)) {
+          for (const ghost of ghosts) { await onDeleteNest(ghost); }
           alert("Nettoyage des fantômes terminé !");
       }
   };
@@ -1374,8 +1395,9 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
   const handleExport = async () => {
     setIsExporting(true);
     const XLSX = await loadSheetJS();
-    const data = markers.map(m => ({
+    const data = filteredMarkers.map(m => ({ // Export uniquement les nids filtrés
       "Noms Client": clients.find(c => c.id === m.clientId)?.name || "Non assigné",
+      "Campagne": m.campaign || CURRENT_YEAR,
       "ID": m.id,
       "Etat du nids": m.status,
       "nbr d'œuf": m.eggs,
@@ -1463,6 +1485,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
             const newNest = {
                 id: row["ID"] || (row["N° point"] ? parseInt(row["N° point"]) + Date.now() : Date.now() + count),
                 clientId: client ? client.id : "",
+                campaign: row["Campagne"] || CURRENT_YEAR,
                 status: hasGps ? (row["Etat du nids"] || "present_high") : "temp",
                 eggs: parseInt(row["nbr d'œuf"]) || 0,
                 address: row["Adresse"] || row["adresse precis"] || (hasGps ? "Adresse importée" : "⚠️ À REPLACER (Pas de GPS)"),
@@ -1509,9 +1532,47 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         </div>
       </div>
 
+      {/* RECHERCHE, FILTRES ET ACTIONS GROUPÉES */}
+      <Card className="p-4 bg-white border-0 shadow-lg rounded-3xl space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1 group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={18}/>
+                  <input type="text" placeholder="Rechercher par référence, adresse..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              </div>
+              <div className="flex items-center gap-2">
+                  <Filter className="text-slate-400" size={18}/>
+                  <select className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                      <option value="all">Tous les statuts</option>
+                      <option value="reported">Signalements</option>
+                      <option value="active">Nids Actifs (À traiter)</option>
+                      <option value="treated">Stérilisés (Pass. 1 & 2)</option>
+                      <option value="absent">Absents</option>
+                  </select>
+              </div>
+          </div>
+          
+          {selectedNests.length > 0 && (
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between bg-sky-50 p-4 rounded-2xl animate-in fade-in">
+                  <span className="text-sm font-black text-sky-700 uppercase flex items-center gap-2"><CheckSquare size={18}/> {selectedNests.length} nid(s) sélectionné(s)</span>
+                  <div className="flex gap-2">
+                      <select className="p-2 border-0 bg-white rounded-xl text-sm font-bold text-slate-600 outline-none shadow-sm" value={bulkActionStatus} onChange={e => setBulkActionStatus(e.target.value)}>
+                          <option value="">-- Choisir un nouveau statut --</option>
+                          <option value="present_high">🔴 Priorité Haute</option>
+                          <option value="present">💠 Présent (Cyan)</option>
+                          <option value="sterilized_1">🟢 1er Passage</option>
+                          <option value="sterilized_2">🟢 2ème Passage</option>
+                          <option value="non_present">⚪ Absent</option>
+                      </select>
+                      <Button variant="sky" className="text-xs py-2 uppercase" onClick={handleBulkUpdate}>Appliquer</Button>
+                  </div>
+              </div>
+          )}
+      </Card>
+
       {clients.map(client => {
-          const clientNests = markers.filter(m => m.clientId === client.id);
-          if (clientNests.length === 0) return null;
+          const clientNests = filteredMarkers.filter(m => m.clientId === client.id);
+          if (clientNests.length === 0) return null; 
+          
           return (
               <Card key={client.id} className="overflow-hidden border-0 shadow-xl rounded-[32px] mb-8">
                   <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
@@ -1519,17 +1580,24 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                           <div className="p-3 bg-white/10 rounded-2xl"><Users size={20} className="text-sky-400"/></div>
                           <h3 className="font-black uppercase tracking-wide text-lg">{client.name}</h3>
                       </div>
-                      <span className="bg-white/20 px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-inner">{clientNests.length} Nids</span>
+                      <span className="bg-white/20 px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-inner">{clientNests.length} Nids affichés</span>
                   </div>
                   <div className="overflow-x-auto custom-scrollbar">
                       <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-slate-100">
-                              <tr><th className="p-5 pl-8">Réf / Adresse</th><th className="p-5">Statut</th><th className="p-5 text-center">Contenu</th><th className="p-5 text-right pr-8">Actions</th></tr>
+                              <tr>
+                                  <th className="p-5 pl-6 w-10"><input type="checkbox" className="w-4 h-4 accent-sky-500 rounded cursor-pointer" onChange={toggleSelectAll} checked={selectedNests.length === filteredMarkers.length && filteredMarkers.length > 0} /></th>
+                                  <th className="p-5">Réf / Adresse</th>
+                                  <th className="p-5">Statut</th>
+                                  <th className="p-5 text-center">Contenu</th>
+                                  <th className="p-5 text-right pr-8">Actions</th>
+                              </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-50">
                               {clientNests.map((m) => (
-                                  <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
-                                      <td className="p-5 pl-8">
+                                  <tr key={m.id} className={`hover:bg-slate-50/80 transition-colors ${selectedNests.includes(m.id) ? 'bg-sky-50/30' : ''}`}>
+                                      <td className="p-5 pl-6"><input type="checkbox" className="w-4 h-4 accent-sky-500 rounded cursor-pointer" checked={selectedNests.includes(m.id)} onChange={() => toggleNestSelection(m.id)}/></td>
+                                      <td className="p-5">
                                           <div className="font-black text-slate-800 text-base mb-1">{m.title || "Nid"}</div>
                                           <div className="text-xs text-slate-400 font-medium truncate max-w-[350px] flex items-center gap-1"><MapPin size={12} className="text-slate-300"/> {m.address}</div>
                                       </td>
@@ -1586,10 +1654,10 @@ const ClientManagement = ({ clients, setSelectedClient, setView, onCreateClient,
   );
 };
 
-const ClientDetail = ({ selectedClient, setView, interventions, reports, markers, onUpdateClient, onDeleteClient }) => {
+const ClientDetail = ({ selectedClient, setView, interventions, reports, markers, onUpdateClient, onDeleteClient, campaignFilter }) => {
     const [isEditing, setIsEditing] = useState(false);
     const cInt = useMemo(() => interventions.filter(i => i.clientId === selectedClient.id), [interventions, selectedClient]);
-    const cNests = useMemo(() => markers.filter(m => m.clientId === selectedClient.id), [markers, selectedClient]);
+    const cNests = useMemo(() => markers.filter(m => m.clientId === selectedClient.id && (campaignFilter === "Toutes" || m.campaign === campaignFilter)), [markers, selectedClient, campaignFilter]);
     
     return (
         <div className="space-y-8 text-slate-800 animate-in fade-in duration-300">
@@ -1636,7 +1704,7 @@ const ClientDetail = ({ selectedClient, setView, interventions, reports, markers
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <Card className="p-8 shadow-xl border-0 rounded-[32px] bg-slate-900 text-white relative overflow-hidden">
                             <div className="relative z-10">
-                                <p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2">Nids recensés</p>
+                                <p className="text-[10px] font-black opacity-50 uppercase tracking-widest mb-2">Nids recensés ({campaignFilter})</p>
                                 <p className="text-6xl font-black text-sky-400 tracking-tighter">{cNests.length}</p>
                             </div>
                             <Bird className="absolute -right-4 -bottom-4 w-32 h-32 text-white/5 transform -scale-x-100"/>
@@ -1876,9 +1944,9 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     
     const clientStats = useMemo(() => ({
         reported: myMarkers.filter(m => m.status === "reported_by_client").length,
-        active: myMarkers.filter(m => m.status.startsWith("present")).length,
+        active: myMarkers.filter(m => m.status && m.status.startsWith("present")).length,
         passage1: myMarkers.filter(m => m.status === "sterilized_1").length,
-        passage2: myMarkers.filter(m => m.status === "sterilized_2").length,
+        passage2: myMarkers.filter(m => m.status === "sterilized_2" || m.status === "sterilized").length,
         nonPresent: myMarkers.filter(m => m.status === "non_present").length,
     }), [myMarkers]);
 
@@ -1888,7 +1956,10 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
     const [isUploading, setIsUploading] = useState(false);
     const [activeTab, setActiveTab] = useState('dashboard');
     
-    const [searchQuery, setSearchQuery] = useState("");
+    const [searchQuery, setSearchQuery] = useState(""); 
+    const [nestFilterQuery, setNestFilterQuery] = useState(""); 
+    const [statusFilter, setStatusFilter] = useState("all");
+    
     const [mapCenter, setMapCenter] = useState(null);
     const [tempMarker, setTempMarker] = useState(null);
 
@@ -1933,7 +2004,11 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
         }
     }, [searchQuery]);
 
-    const displayMarkers = useMemo(() => tempMarker ? [...myMarkers, tempMarker] : myMarkers, [myMarkers, tempMarker]);
+    const displayMarkers = useMemo(() => {
+        let filtered = filterNestsHelper(myMarkers, nestFilterQuery, statusFilter);
+        if (tempMarker) filtered.push(tempMarker);
+        return filtered;
+    }, [myMarkers, tempMarker, nestFilterQuery, statusFilter]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -1961,11 +2036,11 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                         <div>
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 mb-4 pl-2">Analyse de la population</h3>
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
+                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => {setStatusFilter('reported'); setActiveTab('list');}}>
                                     <span className="text-[10px] font-black uppercase text-purple-500 tracking-widest mb-2">Signalements</span>
                                     <span className="text-3xl font-black text-slate-800">{clientStats.reported}</span>
                                 </Card>
-                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
+                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => {setStatusFilter('active'); setActiveTab('list');}}>
                                     <span className="text-[10px] font-black uppercase text-red-500 tracking-widest mb-2">Actifs & Sensibles</span>
                                     <span className="text-3xl font-black text-slate-800">{clientStats.active}</span>
                                 </Card>
@@ -1973,11 +2048,11 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                     <span className="text-[10px] font-black uppercase text-lime-600 tracking-widest mb-2">1er Passage</span>
                                     <span className="text-3xl font-black text-slate-800">{clientStats.passage1}</span>
                                 </Card>
-                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
+                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => {setStatusFilter('treated'); setActiveTab('list');}}>
                                     <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-2">2ème Passage</span>
                                     <span className="text-3xl font-black text-slate-800">{clientStats.passage2}</span>
                                 </Card>
-                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => setActiveTab('list')}>
+                                <Card className="p-5 bg-white border-0 shadow-md text-center flex flex-col justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1" onClick={() => {setStatusFilter('absent'); setActiveTab('list');}}>
                                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Inactifs</span>
                                     <span className="text-3xl font-black text-slate-800">{clientStats.nonPresent}</span>
                                 </Card>
@@ -2035,8 +2110,26 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                 return (
                     <div className="h-[700px] flex flex-col gap-6 text-slate-800 animate-in fade-in duration-500">
                         <Card className="p-3 flex flex-col md:flex-row gap-4 items-center z-20 shadow-xl border-0 rounded-3xl bg-white">
-                            <div className="flex-1 font-black uppercase tracking-widest text-sm text-slate-800 flex items-center gap-3"><MapIcon className="text-sky-500"/> Cartographie du Site</div>
-                            <Button variant={isAddingMode ? "danger" : "sky"} className="py-4 px-8 rounded-2xl uppercase font-black tracking-widest text-xs shadow-lg" onClick={() => setIsAddingMode(!isAddingMode)}>
+                            <div className="relative flex-1 w-full group">
+                                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={20}/>
+                                <input type="text" placeholder="Aller à une adresse (Taper Entrée)..." className="w-full pl-14 pr-6 py-4 bg-slate-50 border-0 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={handleSearch} />
+                            </div>
+                            
+                            <div className="flex-1 flex gap-2 w-full">
+                                <div className="relative flex-1 group">
+                                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={16}/>
+                                    <input type="text" placeholder="Filtrer la carte par Réf/Titre..." className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={nestFilterQuery} onChange={e => setNestFilterQuery(e.target.value)} />
+                                </div>
+                                <select className="flex-1 p-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                                    <option value="all">Tous les nids</option>
+                                    <option value="reported">Signalements</option>
+                                    <option value="active">Actifs (À traiter)</option>
+                                    <option value="treated">Stérilisés</option>
+                                    <option value="absent">Absents</option>
+                                </select>
+                            </div>
+
+                            <Button variant={isAddingMode ? "danger" : "sky"} className="py-4 px-8 rounded-2xl uppercase font-black tracking-widest text-xs shadow-lg h-12" onClick={() => setIsAddingMode(!isAddingMode)}>
                                 {isAddingMode ? <><X size={18}/> Mode Navigation</> : <><Plus size={18}/> Signaler un nouveau nid</>}
                             </Button>
                         </Card>
@@ -2049,6 +2142,9 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                     </div>
                                 </div>
                             )}
+                            
+                            {tempMarker && !isAddingMode && (<div className="absolute top-6 left-1/2 -translate-x-1/2 z-[500] bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest animate-bounce pointer-events-none shadow-2xl">📍 Cliquez sur le point gris pour valider</div>)}
+                            
                             <LeafletMap 
                                 markers={displayMarkers} 
                                 isAddingMode={isAddingMode} 
@@ -2111,16 +2207,29 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                 <h3 className="font-black text-2xl text-slate-900 uppercase tracking-tighter mb-1">Inventaire du site</h3>
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Liste détaillée de tous les nids</p>
                             </div>
+                            <div className="flex items-center gap-3 flex-1 max-w-xl mx-8">
+                                <div className="relative flex-1 group">
+                                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={16}/>
+                                    <input type="text" placeholder="Filtrer par Réf/Adresse..." className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={nestFilterQuery} onChange={e => setNestFilterQuery(e.target.value)} />
+                                </div>
+                                <select className="p-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                                    <option value="all">Tous les statuts</option>
+                                    <option value="reported">Signalements</option>
+                                    <option value="active">Actifs (À traiter)</option>
+                                    <option value="treated">Stérilisés</option>
+                                    <option value="absent">Absents</option>
+                                </select>
+                            </div>
                             <div className="p-4 bg-white rounded-2xl shadow-sm"><Bird size={24} className="text-sky-500"/></div>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
-                             {myMarkers.length > 0 ? (
+                             {displayMarkers.length > 0 ? (
                                  <table className="w-full text-left text-sm">
                                      <thead className="bg-white text-slate-400 font-bold uppercase text-[10px] tracking-widest sticky top-0 z-10 shadow-sm">
                                          <tr><th className="p-5 pl-8">Référence / Localisation</th><th className="p-5">État d'avancement</th><th className="p-5 text-center">Contenu</th><th className="p-5 pr-8">Notes équipe</th></tr>
                                      </thead>
                                      <tbody className="divide-y divide-slate-50">
-                                         {myMarkers.map(m => (
+                                         {displayMarkers.map(m => (
                                              <tr key={m.id} className="hover:bg-slate-50/80 transition-colors cursor-pointer group" onClick={() => { setSelectedNestDetail(m); setActiveTab('map'); }}>
                                                  <td className="p-5 pl-8">
                                                      <div className="font-black text-slate-800 text-base mb-1 group-hover:text-sky-600 transition-colors">{m.title || "Nid #" + m.id.toString().slice(-4)}</div>
@@ -2136,7 +2245,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                              ) : (
                                  <div className="h-full flex flex-col items-center justify-center text-slate-400 p-12 text-center">
                                      <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6"><Bird size={48} className="opacity-20"/></div>
-                                     <p className="text-sm font-bold uppercase tracking-widest">Aucun nid recensé sur votre site pour le moment.</p>
+                                     <p className="text-sm font-bold uppercase tracking-widest">Aucun nid ne correspond aux filtres.</p>
                                  </div>
                              )}
                         </div>
@@ -2242,7 +2351,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
 };
 
 // ============================================================================
-// 8. APP PRINCIPALE & ROUTING
+// 8. APP PRINCIPALE & ROUTING (ET PWA)
 // ============================================================================
 
 export default function AerothauApp() {
@@ -2256,8 +2365,28 @@ export default function AerothauApp() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [toast, setToast] = useState(null);
+  
+  const [campaignFilter, setCampaignFilter] = useState("Toutes");
+  const [installPrompt, setInstallPrompt] = useState(null);
 
   const showToast = useCallback((message, type = 'success') => { setToast({ message, type }); }, []);
+
+  // Gestion PWA (Bouton d'installation mobile)
+  useEffect(() => {
+    const handler = (e) => {
+        e.preventDefault();
+        setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallPwa = () => {
+    if (installPrompt) {
+        installPrompt.prompt();
+        installPrompt.userChoice.then(() => setInstallPrompt(null));
+    }
+  };
 
   useEffect(() => {
     const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) { console.error("Auth error", e); } };
@@ -2290,6 +2419,12 @@ export default function AerothauApp() {
     ...INITIAL_USERS,
     ...clients.filter(c => c.username && c.password).map(c => ({ id: c.id, username: c.username, password: c.password, role: "client", name: c.name, clientId: c.id }))
   ], [clients]);
+
+  // Extraction dynamique des campagnes existantes pour le filtre
+  const availableCampaigns = useMemo(() => {
+      const campaigns = new Set(markers.map(m => m.campaign || CURRENT_YEAR));
+      return ["Toutes", ...Array.from(campaigns).sort().reverse()];
+  }, [markers]);
 
   const updateFirebase = async (collectionName, data) => {
       if (!isFirebaseReady) return;
@@ -2325,6 +2460,13 @@ export default function AerothauApp() {
                 <button className="lg:hidden p-2 text-slate-400 hover:text-white" onClick={() => setIsSidebarOpen(false)}><X size={20}/></button>
             </div>
             
+            <div className="px-6 mb-4">
+                <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2 block ml-2">Filtre Année / Campagne</label>
+                <select className="w-full p-3 bg-slate-800 text-white border-0 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-sky-500" value={campaignFilter} onChange={e => setCampaignFilter(e.target.value)}>
+                    {availableCampaigns.map(c => <option key={c} value={c}>{c === "Toutes" ? "Toutes les années" : `Campagne ${c}`}</option>)}
+                </select>
+            </div>
+
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-2">
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-4 ml-2">Menu Principal</p>
                 {[
@@ -2342,6 +2484,11 @@ export default function AerothauApp() {
             </div>
             
             <div className="p-6 mt-auto bg-slate-950/50 shrink-0">
+                  {installPrompt && (
+                      <button onClick={handleInstallPwa} className="w-full flex items-center justify-center gap-3 text-sky-400 hover:bg-sky-500 hover:text-white py-4 rounded-2xl transition-all font-black uppercase text-xs tracking-widest bg-sky-500/10 border border-sky-500/20 mb-4">
+                          <Smartphone size={16} /> Installer l'App
+                      </button>
+                  )}
                   <div className="flex items-center gap-4 mb-6">
                       <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center font-black text-sky-400 border-2 border-slate-700 shadow-inner uppercase text-xl">{user.name.charAt(0)}</div>
                       <div className="overflow-hidden flex-1"><p className="text-sm font-black uppercase tracking-tighter truncate text-white">{user.name}</p><p className="text-[10px] font-bold uppercase text-sky-500 tracking-widest">Administrateur</p></div>
@@ -2366,16 +2513,16 @@ export default function AerothauApp() {
           <div className="max-w-[1400px] mx-auto p-4 md:p-8 lg:p-10">
             {user.role === "admin" ? (
               <>
-                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} />}
-                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} />}
+                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} campaignFilter={campaignFilter} />}
+                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} campaignFilter={campaignFilter} />}
                 {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} onDeleteAllNests={async () => {
                     if (window.confirm("⚠️ ACTION IRRÉVERSIBLE : Supprimer absolument TOUS les nids de la base ?")) {
                         for (const m of markers) { await deleteFromFirebase("markers", m.id); }
                         showToast("Tous les nids ont été supprimés.", "success");
                     }
-                }} />}
+                }} campaignFilter={campaignFilter} />}
                 {view === "clients" && <ClientManagement clients={clients} setSelectedClient={setSelectedClient} setView={setView} onCreateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => deleteFromFirebase("clients", c.id)} />}
-                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} />}
+                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} campaignFilter={campaignFilter} />}
                 {view === "schedule" && <ScheduleView interventions={interventions} clients={clients} onUpdateIntervention={async (i) => updateFirebase("interventions", i)} onDeleteIntervention={async (i) => deleteFromFirebase("interventions", i.id)} />}
                 {view === "reports" && <ReportsView reports={reports} clients={clients} markers={markers} interventions={interventions} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => deleteFromFirebase("reports", r.id)} />}
               </>
