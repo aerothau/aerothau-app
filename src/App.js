@@ -2,12 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import {
-  getFirestore,
-  collection,
-  doc,
-  setDoc,
-  onSnapshot,
-  deleteDoc,
+  getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, enableIndexedDbPersistence
 } from "firebase/firestore";
 import {
   Users, MapPin, Calendar, FileText, CheckCircle, LogOut, Menu, X, Plus, 
@@ -15,7 +10,7 @@ import {
   Crosshair, Edit, Trash2, Key, User, Send, Info, Printer, Locate, Camera, 
   MessageSquare, AlertTriangle, Download, Upload, File, FileCheck, Activity, 
   Cloud, Wind, List as ListIcon, Layers, Bell, FileSpreadsheet, BarChart3, 
-  MessageCircle, QrCode, Filter, Flame, Navigation2
+  MessageCircle, QrCode, Filter, Flame, Navigation2, CheckSquare, Smartphone
 } from "lucide-react";
 
 // ============================================================================
@@ -35,6 +30,9 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "aerothau-goelands";
+
+// Mode hors-ligne Firebase
+try { enableIndexedDbPersistence(db).catch(() => {}); } catch (e) {}
 
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; 
@@ -70,8 +68,6 @@ const Button = ({ children, variant = "primary", className = "", ...props }) => 
     success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200 shadow-md",
     outline: "border border-slate-300 text-slate-600 hover:bg-slate-50",
     sky: "bg-sky-600 text-white hover:bg-sky-700 shadow-lg shadow-sky-200",
-    ghost: "text-slate-500 hover:bg-slate-100",
-    purple: "bg-purple-600 text-white hover:bg-purple-700 shadow-lg shadow-purple-200",
     waze: "bg-[#05c8f6] text-white hover:bg-[#049bc0] shadow-md",
     gmaps: "bg-[#34a853] text-white hover:bg-[#20843a] shadow-md"
   };
@@ -278,10 +274,6 @@ const generatePDF = (type, data, extraData = {}) => {
             if(nest.dateInspection) { doc.text(`Date d'inspection : ${new Date(nest.dateInspection).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
             if(nest.ster_1_date) { doc.text(`Date 1er passage : ${new Date(nest.ster_1_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
             if(nest.ster_2_date) { doc.text(`Date 2ème passage : ${new Date(nest.ster_2_date).toLocaleDateString('fr-FR')}`, 20, y); y += 8; }
-            if(nest.lieux) { doc.text(`Lieux : ${nest.lieux}`, 20, y); y += 8; }
-            if(nest.dateVisite) { doc.text(`Date visite Excel : ${nest.dateVisite}`, 20, y); y += 8; }
-            if(nest.nbAdultes) { doc.text(`Nb Adultes : ${nest.nbAdultes}`, 20, y); y += 8; }
-            if(nest.nbPoussins) { doc.text(`Nb Poussins : ${nest.nbPoussins}`, 20, y); y += 8; }
             
             const notesLines = doc.splitTextToSize(`Notes : ${nest.comments || "Aucune observation."}`, 170);
             doc.text(notesLines, 20, y);
@@ -331,13 +323,12 @@ const generatePDF = (type, data, extraData = {}) => {
                 m.status, 
                 m.eggs,
                 m.dateInspection ? new Date(m.dateInspection).toLocaleDateString('fr-FR') : "-",
-                m.ster_1_date ? new Date(m.ster_1_date).toLocaleDateString('fr-FR') : "-",
                 m.ster_2_date ? new Date(m.ster_2_date).toLocaleDateString('fr-FR') : "-"
             ]);
 
             doc.autoTable({ 
                 startY: 115, 
-                head: [['Réf / Localisation', 'Statut', 'Oeufs', 'Insp.', '1er Pass.', '2ème Pass.']], 
+                head: [['Réf / Localisation', 'Statut', 'Oeufs', 'Insp.', 'Dernier Pass.']], 
                 body: nestRows, 
                 theme: 'grid', 
                 headStyles: { fillColor: [14, 165, 233] },
@@ -545,7 +536,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
       onSave(finalData);
   };
 
-  // LA CORRECTION EST ICI : Les deux variables manquantes sont redéclarées
   const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
   const hasExtraData = formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info;
 
@@ -963,10 +953,8 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
   const userLayerRef = useRef(null);
-  const heatLayerRef = useRef(null);
   const [mapType, setMapType] = useState("satellite");
   const [userPosition, setUserPosition] = useState(null);
-  const [showHeatmap, setShowHeatmap] = useState(false);
 
   const onMapClickRef = useRef(onMapClick);
   const onMarkerClickRef = useRef(onMarkerClick);
@@ -976,20 +964,12 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
   useEffect(() => {
     if (mapInstanceRef.current) return;
 
-    const initMap = async () => {
+    const initMap = () => {
         if (!mapContainerRef.current) return;
         try {
-            if (!window.L) {
-                await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
-                const link = document.createElement("link"); 
-                link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; 
-                document.head.appendChild(link);
-            }
-            if (!window.L.heatLayer) {
-                await loadScript("https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js");
-            }
-
             const L = window.L;
+            if (!L || typeof L.map !== 'function') return;
+
             const map = L.map(mapContainerRef.current, { zoomControl: false }).setView([43.4028, 3.696], 15);
             mapInstanceRef.current = map;
 
@@ -997,7 +977,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
             map.tileLayer = L.tileLayer(TILE_URLS['satellite'], { attribution: 'Esri' }).addTo(map);
             
             markersLayerRef.current = L.layerGroup().addTo(map);
-            heatLayerRef.current = L.layerGroup().addTo(map);
 
             map.on('click', (e) => {
                 if(onMapClickRef.current) onMapClickRef.current(e.latlng);
@@ -1006,7 +985,17 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
             setTimeout(() => map.invalidateSize(), 400); 
         } catch (e) { console.error("Erreur Map:", e); }
     };
-    initMap();
+
+    if (!window.L) {
+        if(!document.getElementById('leaflet-script')) {
+            const link = document.createElement("link"); link.id = 'leaflet-css'; link.rel = "stylesheet"; link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
+            const script = document.createElement("script"); script.id = 'leaflet-script'; script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.async = true; script.onload = initMap; document.head.appendChild(script);
+        } else {
+            const script = document.getElementById('leaflet-script');
+            script.addEventListener('load', initMap);
+            setTimeout(() => { if(window.L && !mapInstanceRef.current) initMap(); }, 500);
+        }
+    } else { initMap(); }
 
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, []);
@@ -1015,42 +1004,36 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
      if (mapInstanceRef.current) {
          setTimeout(() => { mapInstanceRef.current.invalidateSize(); }, 400);
      }
-  }, [markers, isAddingMode, showHeatmap]);
+  }, [markers, isAddingMode]);
 
   useEffect(() => {
-      if (!mapInstanceRef.current || !window.L || !markersLayerRef.current || !heatLayerRef.current) return;
+      if (!mapInstanceRef.current || !window.L || !markersLayerRef.current) return;
       const L = window.L;
       markersLayerRef.current.clearLayers();
-      heatLayerRef.current.clearLayers();
       
-      if (showHeatmap && L.heatLayer) {
-          const heatPoints = markers.map(m => [m.lat, m.lng, 1]); 
-          L.heatLayer(heatPoints, { radius: 35, blur: 25, maxZoom: 17, gradient: {0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red'} }).addTo(heatLayerRef.current);
-      } else {
-          markers.forEach(m => {
-              let color = "#64748b"; 
-              if (m.status === "present_high") color = "#ef4444"; 
-              else if (m.status === "present") color = "#27F5D6"; // CYAN
-              else if (m.status === "present_medium") color = "#f97316"; 
-              else if (m.status === "present_low") color = "#eab308"; 
-              else if (m.status === "non_priority") color = "#0ea5e9"; 
-              else if (m.status === "temp") color = "#94a3b8"; 
-              else if (m.status === "sterilized_1") color = "#84cc16"; 
-              else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; 
-              else if (m.status === "reported_by_client") color = "#a855f7"; 
+      markers.forEach(m => {
+          let color = "#64748b"; 
+          if (m.status === "present_high") color = "#ef4444"; 
+          else if (m.status === "present") color = "#27F5D6"; // CYAN
+          else if (m.status === "present_medium") color = "#f97316"; 
+          else if (m.status === "present_low") color = "#eab308"; 
+          else if (m.status === "non_priority") color = "#0ea5e9"; 
+          else if (m.status === "temp") color = "#94a3b8"; 
+          else if (m.status === "sterilized_1") color = "#84cc16"; 
+          else if (m.status === "sterilized_2" || m.status === "sterilized") color = "#22c55e"; 
+          else if (m.status === "reported_by_client") color = "#a855f7"; 
 
-              const icon = L.divIcon({ 
-                  className: "custom-icon", 
-                  html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); ${m.status === 'temp' ? 'animation: pulse 1.5s infinite;' : ''}"></div>`,
-                  iconSize: [24, 24],
-                  iconAnchor: [12, 12]
-              });
-              const marker = L.marker([m.lat, m.lng], { icon });
-              marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClickRef.current) onMarkerClickRef.current(m); });
-              marker.addTo(markersLayerRef.current);
+          const icon = L.divIcon({ 
+              className: "custom-icon", 
+              html: `<div style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); ${m.status === 'temp' ? 'animation: pulse 1.5s infinite;' : ''}"></div>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12]
           });
-      }
-  }, [markers, showHeatmap]);
+          const marker = L.marker([m.lat, m.lng], { icon });
+          marker.on('click', (e) => { L.DomEvent.stopPropagation(e); if(onMarkerClickRef.current) onMarkerClickRef.current(m); });
+          marker.addTo(markersLayerRef.current);
+      });
+  }, [markers]);
 
   useEffect(() => {
       if (mapInstanceRef.current && mapInstanceRef.current.tileLayer && TILE_URLS[mapType]) {
@@ -1092,8 +1075,6 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center }
       <div className="relative w-full h-full">
           <div ref={mapContainerRef} className="w-full h-full bg-slate-100 z-0" style={{minHeight:'100%'}}/>
           <div className="absolute top-4 right-4 z-[400] bg-white/90 backdrop-blur-sm p-1 rounded-xl shadow-lg flex gap-1">
-              <button onClick={(e) => { e.stopPropagation(); setShowHeatmap(!showHeatmap); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors flex items-center gap-1 ${showHeatmap ? 'bg-rose-500 text-white' : 'text-slate-500 hover:bg-slate-100'}`} title="Carte de densité"><Flame size={14}/> Densité</button>
-              <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
               <button onClick={centerOnUser} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors text-sky-600 hover:bg-sky-50 flex items-center gap-1" title="Ma position GPS"><Locate size={14}/> Moi</button>
               <div className="w-px h-6 bg-slate-200 my-auto mx-1"></div>
               <button onClick={(e) => { e.stopPropagation(); setMapType('satellite'); }} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors ${mapType === 'satellite' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>Satellite</button>
@@ -1269,6 +1250,9 @@ const AdminDashboard = ({ interventions, clients, markers, campaignFilter }) => 
         </Card>
       </div>
 
+      {/* STATISTIQUES OPTION 4 */}
+      <PopulationStats markers={filteredMarkers} />
+
       {reportedNests.length > 0 && (
           <div className="bg-purple-600 rounded-[32px] p-1 shadow-xl shadow-purple-200 animate-in slide-in-from-top-4 mt-6">
               <div className="bg-white rounded-[28px] p-6">
@@ -1293,9 +1277,6 @@ const AdminDashboard = ({ interventions, clients, markers, campaignFilter }) => 
               </div>
           </div>
       )}
-
-      {/* STATISTIQUES OPTION 4 */}
-      <PopulationStats markers={filteredMarkers} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6">
           <div className="lg:col-span-2">
@@ -1485,11 +1466,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         let count = 0;
         for (const row of jsonData) {
-            
-            // ANTI-FANTÔME
-            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) {
-                continue;
-            }
+            if (!row["ID"] && !row["N° point"] && !row["Noms Client"] && !row["Lieux"] && !row["Latitude"] && !row["Gps"]) continue;
             
             let lat = MAP_CENTER_DEFAULT.lat;
             let lng = MAP_CENTER_DEFAULT.lng;
@@ -1500,20 +1477,12 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                 if (parts.length === 2) {
                     const pLat = parseFloat(parts[0].trim());
                     const pLng = parseFloat(parts[1].trim());
-                    if(!isNaN(pLat) && !isNaN(pLng)) {
-                        lat = pLat;
-                        lng = pLng;
-                        hasGps = true;
-                    }
+                    if(!isNaN(pLat) && !isNaN(pLng)) { lat = pLat; lng = pLng; hasGps = true; }
                 }
             } else if (row["Latitude"] && row["Longitude"]) {
                 const pLat = parseFloat(row["Latitude"]);
                 const pLng = parseFloat(row["Longitude"]);
-                if(!isNaN(pLat) && !isNaN(pLng)) {
-                    lat = pLat;
-                    lng = pLng;
-                    hasGps = true;
-                }
+                if(!isNaN(pLat) && !isNaN(pLng)) { lat = pLat; lng = pLng; hasGps = true; }
             }
 
             const rawLocation = (row["Noms Client"] || row["Lieux"] || "").toString().toLowerCase();
@@ -1523,10 +1492,7 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                 if (rawLocation.includes("narbonne")) matchedClient = clients.find(c => c.name.toLowerCase().includes("narbonne"));
                 else if (rawLocation.includes("meze") || rawLocation.includes("mèze")) matchedClient = clients.find(c => c.name.toLowerCase().includes("meze") || c.name.toLowerCase().includes("mèze"));
                 else if (rawLocation.includes("sete") || rawLocation.includes("sète")) matchedClient = clients.find(c => c.name.toLowerCase().includes("sete") || c.name.toLowerCase().includes("sète"));
-                
-                if(!matchedClient && rawLocation.length > 3) {
-                     matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
-                }
+                if(!matchedClient && rawLocation.length > 3) matchedClient = clients.find(c => rawLocation.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(rawLocation));
             }
             
             const client = matchedClient || clients[0];
@@ -2089,7 +2055,6 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                             </Card>
                         </div>
 
-                        {/* STATISTIQUES OPTION 4 */}
                         <PopulationStats markers={myMarkers} />
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
@@ -2344,7 +2309,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                                         <h3 className="font-black text-2xl uppercase tracking-tighter flex items-center gap-3"><Upload size={24} className="text-sky-500"/> Transmettre</h3>
                                         <button onClick={() => setIsUploading(false)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-400"/></button>
                                     </div>
-                                    <ReportEditForm report={{id: Date.now(), clientId: user.clientId}} clients={clients} markers={markers} interventions={interventions} onSave={async (d) => { await onUpdateReport(d); setIsUploading(false); }} onCancel={() => setIsUploading(false)} />
+                                    <ReportEditForm report={{id: Date.now(), clientId: user.clientId}} clients={clients} userRole="client" onSave={async (d) => { await onUpdateReport(d); setIsUploading(false); }} onCancel={() => setIsUploading(false)} />
                                 </Card>
                             </div>
                         )}
@@ -2398,8 +2363,6 @@ export default function AerothauApp() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [toast, setToast] = useState(null);
-  
-  const [campaignFilter, setCampaignFilter] = useState("Toutes");
 
   const showToast = useCallback((message, type = 'success') => { setToast({ message, type }); }, []);
 
@@ -2435,12 +2398,6 @@ export default function AerothauApp() {
     ...clients.filter(c => c.username && c.password).map(c => ({ id: c.id, username: c.username, password: c.password, role: "client", name: c.name, clientId: c.id }))
   ], [clients]);
 
-  // Extraction dynamique des campagnes existantes pour le filtre
-  const availableCampaigns = useMemo(() => {
-      const campaigns = new Set(markers.map(m => m.campaign || CURRENT_YEAR));
-      return ["Toutes", ...Array.from(campaigns).sort().reverse()];
-  }, [markers]);
-
   const updateFirebase = async (collectionName, data) => {
       if (!isFirebaseReady) return;
       try {
@@ -2475,13 +2432,6 @@ export default function AerothauApp() {
                 <button className="lg:hidden p-2 text-slate-400 hover:text-white" onClick={() => setIsSidebarOpen(false)}><X size={20}/></button>
             </div>
             
-            <div className="px-6 mb-4">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2 block ml-2">Filtre Année / Campagne</label>
-                <select className="w-full p-3 bg-slate-800 text-white border-0 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-sky-500" value={campaignFilter} onChange={e => setCampaignFilter(e.target.value)}>
-                    {availableCampaigns.map(c => <option key={c} value={c}>{c === "Toutes" ? "Toutes les années" : `Campagne ${c}`}</option>)}
-                </select>
-            </div>
-
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-2">
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-4 ml-2">Menu Principal</p>
                 {[
@@ -2523,16 +2473,16 @@ export default function AerothauApp() {
           <div className="max-w-[1400px] mx-auto p-4 md:p-8 lg:p-10">
             {user.role === "admin" ? (
               <>
-                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} campaignFilter={campaignFilter} />}
-                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} campaignFilter={campaignFilter} />}
+                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} />}
+                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} />}
                 {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} onDeleteAllNests={async () => {
                     if (window.confirm("⚠️ ACTION IRRÉVERSIBLE : Supprimer absolument TOUS les nids de la base ?")) {
                         for (const m of markers) { await deleteFromFirebase("markers", m.id); }
                         showToast("Tous les nids ont été supprimés.", "success");
                     }
-                }} campaignFilter={campaignFilter} />}
+                }} />}
                 {view === "clients" && <ClientManagement clients={clients} setSelectedClient={setSelectedClient} setView={setView} onCreateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => deleteFromFirebase("clients", c.id)} />}
-                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} campaignFilter={campaignFilter} />}
+                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} />}
                 {view === "schedule" && <ScheduleView interventions={interventions} clients={clients} onUpdateIntervention={async (i) => updateFirebase("interventions", i)} onDeleteIntervention={async (i) => deleteFromFirebase("interventions", i.id)} />}
                 {view === "reports" && <ReportsView reports={reports} clients={clients} markers={markers} interventions={interventions} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => deleteFromFirebase("reports", r.id)} />}
               </>
