@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import {
-  getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc
+  getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc, enableIndexedDbPersistence
 } from "firebase/firestore";
 import {
   Users, MapPin, Calendar, FileText, CheckCircle, LogOut, Menu, X, Plus, 
@@ -10,7 +10,7 @@ import {
   Crosshair, Edit, Trash2, Key, User, Send, Info, Printer, Locate, Camera, 
   MessageSquare, AlertTriangle, Download, Upload, File, FileCheck, Activity, 
   Cloud, Wind, List as ListIcon, Layers, Bell, FileSpreadsheet, BarChart3, 
-  MessageCircle, QrCode, Filter, Flame, Navigation2
+  MessageCircle, QrCode, Filter, Flame, Navigation2, CheckSquare, Smartphone
 } from "lucide-react";
 
 // ============================================================================
@@ -30,6 +30,9 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = "aerothau-goelands";
+
+// Mode hors-ligne Firebase
+try { enableIndexedDbPersistence(db).catch(() => {}); } catch (e) {}
 
 const LOGO_URL = "https://aerothau.fr/wp-content/uploads/2025/10/New-Logo-Aerothau.png";
 const MAP_CENTER_DEFAULT = { lat: 43.4028, lng: 3.696 }; 
@@ -533,9 +536,6 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
       onSave(finalData);
   };
 
-  const openRoute = () => { if (nest.lat && nest.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${nest.lat},${nest.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); };
-  const hasExtraData = formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info;
-
   if (readOnly) return (
       <div className="space-y-6 text-slate-800">
           {/* LECTURE : PHOTOS MULTIPLES */}
@@ -796,9 +796,9 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
         {onGeneratePDF && <Button variant="secondary" className="w-full py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={()=>onGeneratePDF(nest)}><Printer size={16}/> Générer Fiche PDF</Button>}
         
         <div className="flex gap-3 pt-4 border-t border-slate-100">
-             {onDelete && <button onClick={() => onDelete(formData)} className="p-4 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-2xl transition-colors"><Trash2 size={20}/></button>}
-             <Button variant="outline" className="flex-1 py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={onCancel}>Annuler</Button>
-             <Button variant="success" className="flex-1 py-4 rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-emerald-200" onClick={handleSave}>Enregistrer</Button>
+             {onDelete && <button type="button" onClick={() => onDelete(formData)} className="p-4 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-2xl transition-colors"><Trash2 size={20}/></button>}
+             <Button type="button" variant="outline" className="flex-1 py-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={onCancel}>Annuler</Button>
+             <Button type="button" variant="success" className="flex-1 py-4 rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-emerald-200" onClick={handleSave}>Enregistrer</Button>
         </div>
     </div>
   );
@@ -1017,6 +1017,9 @@ const LeafletMap = ({ markers, isAddingMode, onMapClick, onMarkerClick, center, 
           L.heatLayer(heatPoints, { radius: 35, blur: 25, maxZoom: 17, gradient: {0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1: 'red'} }).addTo(heatLayerRef.current);
       } else {
           markers.forEach(m => {
+              // Sécurité anti-crash
+              if (!m || typeof m.lat !== 'number' || typeof m.lng !== 'number' || isNaN(m.lat) || isNaN(m.lng)) return;
+
               let color = "#64748b"; 
               if (m.status === "present_high") color = "#ef4444"; 
               else if (m.status === "present") color = "#27F5D6"; // CYAN
@@ -1147,7 +1150,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
     };
 
     const optimizeRoute = () => {
-        const filtered = filterNestsHelper(markers, nestFilterQuery, statusFilter).filter(m => campaignFilter === "Toutes" || m.campaign === campaignFilter);
+        const filtered = filterNestsHelper(markers, nestFilterQuery, statusFilter).filter(m => campaignFilter === "Toutes" || (m.campaign || CURRENT_YEAR) === campaignFilter);
         if (filtered.length < 2) return alert("Il faut au moins 2 nids affichés pour tracer un itinéraire.");
         let unvisited = [...filtered];
         let current = unvisited.shift();
@@ -1160,6 +1163,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
             
             for (let i = 0; i < unvisited.length; i++) {
                 const m = unvisited[i];
+                if (typeof m.lat !== 'number' || typeof m.lng !== 'number') continue;
                 const dist = Math.sqrt(Math.pow(m.lat - current.lat, 2) + Math.pow(m.lng - current.lng, 2));
                 if (dist < minDetails) { minDetails = dist; nearest = m; nearestIndex = i; }
             }
@@ -1168,6 +1172,8 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
                 path.push(nearest); 
                 current = nearest; 
                 unvisited.splice(nearestIndex, 1); 
+            } else {
+                break;
             }
         }
         setRoutePath(path);
@@ -1175,7 +1181,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
 
     const displayMarkers = useMemo(() => {
         let filtered = filterNestsHelper(markers, nestFilterQuery, statusFilter);
-        if (campaignFilter !== "Toutes") filtered = filtered.filter(m => m.campaign === campaignFilter);
+        if (campaignFilter !== "Toutes") filtered = filtered.filter(m => (m.campaign || CURRENT_YEAR) === campaignFilter);
         if (tempMarker) filtered.push(tempMarker);
         return filtered;
     }, [markers, tempMarker, nestFilterQuery, statusFilter, campaignFilter]);
@@ -1204,8 +1210,8 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
 
                 <div className="flex gap-2 shrink-0 pr-2">
                     <Button variant="outline" className="py-3 px-4 rounded-2xl text-xs uppercase tracking-widest border-2" onClick={optimizeRoute} title="Générer itinéraire optimisé"><Activity size={16}/></Button>
-                    <Button variant={isAdding ? "danger" : "sky"} className={`py-3 px-4 rounded-2xl text-xs uppercase tracking-widest ${isAdding ? '' : 'shadow-xl shadow-sky-200'}`} onClick={() => setIsAdding(!isAdding)}>
-                        {isAdding ? <X size={16}/> : <Plus size={16}/>}
+                    <Button variant={isAdding ? "danger" : "sky"} className={`py-3 px-6 rounded-2xl text-xs uppercase tracking-widest h-12 ${isAdding ? '' : 'shadow-xl shadow-sky-200'}`} onClick={() => setIsAdding(!isAdding)}>
+                        {isAdding ? <><X size={16}/> Annuler</> : <><Plus size={16}/> Pointer un nid</>}
                     </Button>
                 </div>
             </Card>
@@ -1248,7 +1254,7 @@ const MapInterface = ({ markers, clients, onUpdateNest, onDeleteNest, campaignFi
 };
 
 const AdminDashboard = ({ interventions, clients, markers, campaignFilter }) => {
-  const filteredMarkers = useMemo(() => markers.filter(m => campaignFilter === "Toutes" || m.campaign === campaignFilter), [markers, campaignFilter]);
+  const filteredMarkers = useMemo(() => markers.filter(m => campaignFilter === "Toutes" || (m.campaign || CURRENT_YEAR) === campaignFilter), [markers, campaignFilter]);
   
   const stats = useMemo(() => ({
     total: filteredMarkers.length,
@@ -1298,6 +1304,7 @@ const AdminDashboard = ({ interventions, clients, markers, campaignFilter }) => 
         </Card>
       </div>
 
+      {/* STATISTIQUES OPTION 4 */}
       <PopulationStats markers={filteredMarkers} />
 
       {reportedNests.length > 0 && (
@@ -1423,14 +1430,39 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
   const [isExporting, setIsExporting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedNests, setSelectedNests] = useState([]);
+  const [bulkActionStatus, setBulkActionStatus] = useState("");
 
   const filteredMarkers = useMemo(() => {
       let filtered = filterNestsHelper(markers, searchQuery, statusFilter);
       if (campaignFilter !== "Toutes") {
-          filtered = filtered.filter(m => m.campaign === campaignFilter);
+          filtered = filtered.filter(m => (m.campaign || CURRENT_YEAR) === campaignFilter);
       }
       return filtered;
   }, [markers, searchQuery, statusFilter, campaignFilter]);
+
+  const toggleSelectAll = (e) => {
+      if (e.target.checked) setSelectedNests(filteredMarkers.map(m => m.id));
+      else setSelectedNests([]);
+  };
+
+  const toggleNestSelection = (id) => {
+      if (selectedNests.includes(id)) setSelectedNests(selectedNests.filter(nid => nid !== id));
+      else setSelectedNests([...selectedNests, id]);
+  };
+
+  const handleBulkUpdate = async () => {
+      if (!bulkActionStatus) return alert("Sélectionnez un statut à appliquer.");
+      if (selectedNests.length === 0) return alert("Aucun nid sélectionné.");
+      if (window.confirm(`Mettre à jour le statut de ${selectedNests.length} nid(s) ?`)) {
+          for (const nid of selectedNests) {
+              const nestToUpdate = markers.find(m => m.id === nid);
+              if (nestToUpdate) await onUpdateNest({ ...nestToUpdate, status: bulkActionStatus });
+          }
+          setSelectedNests([]);
+          alert("Mise à jour groupée terminée.");
+      }
+  };
 
   const cleanGhosts = async () => {
       const ghosts = markers.filter(m => m.lat === MAP_CENTER_DEFAULT.lat && m.lng === MAP_CENTER_DEFAULT.lng);
@@ -1580,21 +1612,40 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
         </div>
       </div>
 
-      <Card className="p-4 flex flex-col md:flex-row gap-4 bg-white border-0 shadow-lg rounded-3xl">
-          <div className="relative flex-1 group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={18}/>
-              <input type="text" placeholder="Rechercher par référence, adresse..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+      <Card className="p-4 flex flex-col md:flex-row gap-4 bg-white border-0 shadow-lg rounded-3xl space-y-4">
+          <div className="flex flex-col md:flex-row gap-4 w-full">
+              <div className="relative flex-1 group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={18}/>
+                  <input type="text" placeholder="Rechercher par référence, adresse..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              </div>
+              <div className="flex items-center gap-2">
+                  <Filter className="text-slate-400" size={18}/>
+                  <select className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                      <option value="all">Tous les statuts</option>
+                      <option value="reported">Signalements</option>
+                      <option value="active">Nids Actifs (À traiter)</option>
+                      <option value="treated">Stérilisés (Pass. 1 & 2)</option>
+                      <option value="absent">Absents</option>
+                  </select>
+              </div>
           </div>
-          <div className="flex items-center gap-2">
-              <Filter className="text-slate-400" size={18}/>
-              <select className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-sky-500" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                  <option value="all">Tous les statuts</option>
-                  <option value="reported">Signalements</option>
-                  <option value="active">Nids Actifs (À traiter)</option>
-                  <option value="treated">Stérilisés (Pass. 1 & 2)</option>
-                  <option value="absent">Absents</option>
-              </select>
-          </div>
+          
+          {selectedNests.length > 0 && (
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between bg-sky-50 p-4 rounded-2xl animate-in fade-in">
+                  <span className="text-sm font-black text-sky-700 uppercase flex items-center gap-2"><CheckSquare size={18}/> {selectedNests.length} nid(s) sélectionné(s)</span>
+                  <div className="flex gap-2">
+                      <select className="p-2 border-0 bg-white rounded-xl text-sm font-bold text-slate-600 outline-none shadow-sm" value={bulkActionStatus} onChange={e => setBulkActionStatus(e.target.value)}>
+                          <option value="">-- Choisir un nouveau statut --</option>
+                          <option value="present_high">🔴 Priorité Haute</option>
+                          <option value="present">💠 Présent (Cyan)</option>
+                          <option value="sterilized_1">🟢 1er Passage</option>
+                          <option value="sterilized_2">🟢 2ème Passage</option>
+                          <option value="non_present">⚪ Absent</option>
+                      </select>
+                      <Button variant="sky" className="text-xs py-2 uppercase" onClick={handleBulkUpdate}>Appliquer</Button>
+                  </div>
+              </div>
+          )}
       </Card>
 
       {clients.map(client => {
@@ -1614,7 +1665,8 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                       <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-slate-100">
                               <tr>
-                                  <th className="p-5 pl-8">Réf / Adresse</th>
+                                  <th className="p-5 pl-6 w-10"><input type="checkbox" className="w-4 h-4 accent-sky-500 rounded cursor-pointer" onChange={toggleSelectAll} checked={selectedNests.length === filteredMarkers.length && filteredMarkers.length > 0} /></th>
+                                  <th className="p-5">Réf / Adresse</th>
                                   <th className="p-5">Statut</th>
                                   <th className="p-5 text-center">Contenu</th>
                                   <th className="p-5 text-right pr-8">Actions</th>
@@ -1622,8 +1674,9 @@ const NestManagement = ({ markers, onUpdateNest, onDeleteNest, onDeleteAllNests,
                           </thead>
                           <tbody className="divide-y divide-slate-50">
                               {clientNests.map((m) => (
-                                  <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
-                                      <td className="p-5 pl-8">
+                                  <tr key={m.id} className={`hover:bg-slate-50/80 transition-colors ${selectedNests.includes(m.id) ? 'bg-sky-50/30' : ''}`}>
+                                      <td className="p-5 pl-6"><input type="checkbox" className="w-4 h-4 accent-sky-500 rounded cursor-pointer" checked={selectedNests.includes(m.id)} onChange={() => toggleNestSelection(m.id)}/></td>
+                                      <td className="p-5">
                                           <div className="font-black text-slate-800 text-base mb-1">{m.title || "Nid"}</div>
                                           <div className="text-xs text-slate-400 font-medium truncate max-w-[350px] flex items-center gap-1"><MapPin size={12} className="text-slate-300"/> {m.address}</div>
                                       </td>
@@ -1683,11 +1736,11 @@ const ClientManagement = ({ clients, setSelectedClient, setView, onCreateClient,
 const ClientDetail = ({ selectedClient, setView, interventions, reports, markers, onUpdateClient, onDeleteClient, campaignFilter }) => {
     const [isEditing, setIsEditing] = useState(false);
     const cInt = useMemo(() => interventions.filter(i => i.clientId === selectedClient.id), [interventions, selectedClient]);
-    const cNests = useMemo(() => markers.filter(m => m.clientId === selectedClient.id && (campaignFilter === "Toutes" || m.campaign === campaignFilter)), [markers, selectedClient, campaignFilter]);
+    const cNests = useMemo(() => markers.filter(m => m.clientId === selectedClient.id && (campaignFilter === "Toutes" || (m.campaign || CURRENT_YEAR) === campaignFilter)), [markers, selectedClient, campaignFilter]);
     
     return (
         <div className="space-y-8 text-slate-800 animate-in fade-in duration-300">
-            <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-2 h-12 text-xs uppercase tracking-widest font-black">← Retour Clients</Button>
+            <Button variant="secondary" onClick={() => setView("clients")} className="rounded-2xl px-6 border-2 h-12 text-xs uppercase tracking-widest font-black">&larr; Retour Clients</Button>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="space-y-8">
                     <Card className="p-8 border-0 shadow-xl rounded-[32px] bg-white">
@@ -2310,7 +2363,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
                         {isUploading && (
                              <div className="fixed inset-0 z-[1000] bg-slate-900/90 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
                                 <Card className="p-10 w-full max-w-md shadow-2xl border-0 rounded-[32px] bg-white text-slate-800">
-                                    <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-4">
+                                    <div className="flex justify-between items-center mb-8 border-b pb-4">
                                         <h3 className="font-black text-2xl uppercase tracking-tighter flex items-center gap-3"><Upload size={24} className="text-sky-500"/> Transmettre</h3>
                                         <button onClick={() => setIsUploading(false)} className="p-2 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-400"/></button>
                                     </div>
@@ -2354,7 +2407,7 @@ const ClientSpace = ({ user, markers, interventions, clients, reports, onUpdateN
 };
 
 // ============================================================================
-// 8. APP PRINCIPALE & ROUTING
+// 8. APP PRINCIPALE & ROUTING (ET PWA)
 // ============================================================================
 
 export default function AerothauApp() {
@@ -2369,10 +2422,12 @@ export default function AerothauApp() {
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [toast, setToast] = useState(null);
   
+  const [campaignFilter, setCampaignFilter] = useState("Toutes");
   const [installPrompt, setInstallPrompt] = useState(null);
 
   const showToast = useCallback((message, type = 'success') => { setToast({ message, type }); }, []);
 
+  // Gestion PWA (Bouton d'installation mobile)
   useEffect(() => {
     const handler = (e) => {
         e.preventDefault();
@@ -2421,12 +2476,23 @@ export default function AerothauApp() {
     ...clients.filter(c => c.username && c.password).map(c => ({ id: c.id, username: c.username, password: c.password, role: "client", name: c.name, clientId: c.id }))
   ], [clients]);
 
+  // Extraction dynamique des campagnes existantes pour le filtre
+  const availableCampaigns = useMemo(() => {
+      const campaigns = new Set(markers.map(m => m.campaign || CURRENT_YEAR));
+      return ["Toutes", ...Array.from(campaigns).sort().reverse()];
+  }, [markers]);
+
   const updateFirebase = async (collectionName, data) => {
       if (!isFirebaseReady) return;
       try {
-          await setDoc(doc(db, "artifacts", appId, "public", "data", collectionName, data.id.toString()), data);
+          // Nettoyage absolu des données pour Firebase (supprime les valeurs "undefined")
+          const cleanData = JSON.parse(JSON.stringify(data));
+          await setDoc(doc(db, "artifacts", appId, "public", "data", collectionName, data.id.toString()), cleanData);
           showToast("Données sauvegardées", "success");
-      } catch (error) { showToast("Erreur d'enregistrement", "error"); }
+      } catch (error) { 
+          console.error("Erreur Firebase:", error);
+          showToast("Erreur d'enregistrement", "error"); 
+      }
   };
   
   const deleteFromFirebase = async (collectionName, id) => {
@@ -2454,6 +2520,13 @@ export default function AerothauApp() {
                 <div className="flex items-center gap-4"><div className="p-2 bg-white rounded-xl shadow-lg"><img src={LOGO_URL} alt="Logo" className="h-8 w-auto" /></div><span className="text-xl font-black uppercase tracking-tighter">Aerothau</span></div>
                 <button className="lg:hidden p-2 text-slate-400 hover:text-white" onClick={() => setIsSidebarOpen(false)}><X size={20}/></button>
             </div>
+            
+            <div className="px-6 mb-4">
+                <label className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2 block ml-2">Filtre Année / Campagne</label>
+                <select className="w-full p-3 bg-slate-800 text-white border-0 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-sky-500" value={campaignFilter} onChange={e => setCampaignFilter(e.target.value)}>
+                    {availableCampaigns.map(c => <option key={c} value={c}>{c === "Toutes" ? "Toutes les années" : `Campagne ${c}`}</option>)}
+                </select>
+            </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-2">
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-4 ml-2">Menu Principal</p>
@@ -2472,6 +2545,11 @@ export default function AerothauApp() {
             </div>
             
             <div className="p-6 mt-auto bg-slate-950/50 shrink-0">
+                  {installPrompt && (
+                      <button onClick={handleInstallPwa} className="w-full flex items-center justify-center gap-3 text-sky-400 hover:bg-sky-500 hover:text-white py-4 rounded-2xl transition-all font-black uppercase text-xs tracking-widest bg-sky-500/10 border border-sky-500/20 mb-4">
+                          <Smartphone size={16} /> Installer l'App
+                      </button>
+                  )}
                   <div className="flex items-center gap-4 mb-6">
                       <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center font-black text-sky-400 border-2 border-slate-700 shadow-inner uppercase text-xl">{user.name.charAt(0)}</div>
                       <div className="overflow-hidden flex-1"><p className="text-sm font-black uppercase tracking-tighter truncate text-white">{user.name}</p><p className="text-[10px] font-bold uppercase text-sky-500 tracking-widest">Administrateur</p></div>
@@ -2496,16 +2574,16 @@ export default function AerothauApp() {
           <div className="max-w-[1400px] mx-auto p-4 md:p-8 lg:p-10">
             {user.role === "admin" ? (
               <>
-                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} />}
-                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} />}
+                {view === "dashboard" && <AdminDashboard interventions={interventions} clients={clients} markers={markers} campaignFilter={campaignFilter} />}
+                {view === "map" && <MapInterface markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} campaignFilter={campaignFilter} />}
                 {view === "nests" && <NestManagement markers={markers} clients={clients} onUpdateNest={async (n) => updateFirebase("markers", n)} onDeleteNest={async (n) => deleteFromFirebase("markers", n.id)} onDeleteAllNests={async () => {
                     if (window.confirm("⚠️ ACTION IRRÉVERSIBLE : Supprimer absolument TOUS les nids de la base ?")) {
                         for (const m of markers) { await deleteFromFirebase("markers", m.id); }
                         showToast("Tous les nids ont été supprimés.", "success");
                     }
-                }} />}
+                }} campaignFilter={campaignFilter} />}
                 {view === "clients" && <ClientManagement clients={clients} setSelectedClient={setSelectedClient} setView={setView} onCreateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => deleteFromFirebase("clients", c.id)} />}
-                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} />}
+                {view === "client-detail" && <ClientDetail selectedClient={selectedClient} setView={setView} interventions={interventions} reports={reports} markers={markers} onUpdateClient={async (c) => updateFirebase("clients", c)} onDeleteClient={async (c) => { await deleteFromFirebase("clients", c.id); setView("clients"); }} campaignFilter={campaignFilter} />}
                 {view === "schedule" && <ScheduleView interventions={interventions} clients={clients} onUpdateIntervention={async (i) => updateFirebase("interventions", i)} onDeleteIntervention={async (i) => deleteFromFirebase("interventions", i.id)} />}
                 {view === "reports" && <ReportsView reports={reports} clients={clients} markers={markers} interventions={interventions} onUpdateReport={async (r) => updateFirebase("reports", r)} onDeleteReport={async (r) => deleteFromFirebase("reports", r.id)} />}
               </>
