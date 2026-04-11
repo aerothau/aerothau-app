@@ -623,7 +623,8 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
              </div>
           )}
 
-          {hasExtraData && (
+          {/* Variables remplacées par les conditions complètes inline */}
+          {(formData.lieux || formData.dateVisite || formData.nbAdultes || formData.nbPoussins || formData.comportement || formData.remarques || formData.info) && (
              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 text-sm space-y-3">
                  <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-2 flex items-center gap-2"><Layers size={14}/> Données Fichier</p>
                  <div className="grid grid-cols-2 gap-2 text-xs">
@@ -750,8 +751,8 @@ const NestEditForm = ({ nest, clients = [], onSave, onCancel, onDelete, readOnly
         </div>
         
         <div className="grid grid-cols-2 gap-4">
-             <Button type="button" variant="waze" className="w-full text-xs" onClick={() => window.open(`https://waze.com/ul?ll=${formData.lat},${formData.lng}&navigate=yes`, '_blank')}><Navigation2 size={16}/> Lancer Waze</Button>
-             <Button type="button" variant="gmaps" className="w-full text-xs" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${formData.lat},${formData.lng}`, '_blank')}><MapIcon size={16}/> Lancer Maps</Button>
+             <Button type="button" variant="waze" className="w-full text-xs" onClick={() => { if (formData.lat && formData.lng) window.open(`https://waze.com/ul?ll=${formData.lat},${formData.lng}&navigate=yes`, '_blank'); else alert("Coordonnées GPS manquantes."); }}><Navigation2 size={16}/> Lancer Waze</Button>
+             <Button type="button" variant="gmaps" className="w-full text-xs" onClick={() => { if (formData.lat && formData.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${formData.lat},${formData.lng}`, '_blank'); else alert("Coordonnées GPS manquantes."); }}><MapIcon size={16}/> Lancer Maps</Button>
         </div>
 
         <div>
@@ -1304,7 +1305,6 @@ const AdminDashboard = ({ interventions, clients, markers, campaignFilter }) => 
         </Card>
       </div>
 
-      {/* STATISTIQUES OPTION 4 */}
       <PopulationStats markers={filteredMarkers} />
 
       {reportedNests.length > 0 && (
